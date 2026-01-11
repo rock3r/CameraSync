@@ -10,7 +10,6 @@ import dev.sebastiano.camerasync.data.repository.pairedDevicesDataStoreV2
 import dev.sebastiano.camerasync.devicesync.AndroidIntentFactory
 import dev.sebastiano.camerasync.devicesync.AndroidNotificationBuilder
 import dev.sebastiano.camerasync.devicesync.AndroidPendingIntentFactory
-import dev.sebastiano.camerasync.devicesync.DefaultLocationCollector
 import dev.sebastiano.camerasync.devicesync.IntentFactory
 import dev.sebastiano.camerasync.devicesync.MultiDeviceSyncService
 import dev.sebastiano.camerasync.devicesync.NotificationBuilder
@@ -27,7 +26,6 @@ import dev.sebastiano.camerasync.vendors.ricoh.RicohCameraVendor
 import dev.sebastiano.camerasync.vendors.sony.SonyCameraVendor
 import dev.zacsweers.metro.DependencyGraph
 import dev.zacsweers.metro.Provides
-import kotlinx.coroutines.CoroutineScope
 
 /**
  * Metro dependency graph for production dependencies.
@@ -79,16 +77,6 @@ interface AppGraph {
     @Provides
     fun provideCameraRepository(vendorRegistry: CameraVendorRegistry): CameraRepository =
         KableCameraRepository(vendorRegistry = vendorRegistry)
-
-    @Provides
-    fun provideLocationCollector(
-        locationRepository: LocationRepository,
-        coroutineScope: CoroutineScope,
-    ): dev.sebastiano.camerasync.devicesync.LocationCollector =
-        DefaultLocationCollector(
-            locationRepository = locationRepository,
-            coroutineScope = coroutineScope,
-        )
 
     @Provides
     fun provideNotificationBuilder(context: Context): NotificationBuilder =

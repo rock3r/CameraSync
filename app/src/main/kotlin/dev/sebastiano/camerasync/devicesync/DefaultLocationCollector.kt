@@ -3,6 +3,9 @@ package dev.sebastiano.camerasync.devicesync
 import com.juul.khronicle.Log
 import dev.sebastiano.camerasync.domain.model.GpsLocation
 import dev.sebastiano.camerasync.domain.repository.LocationRepository
+import dev.zacsweers.metro.Assisted
+import dev.zacsweers.metro.AssistedFactory
+import dev.zacsweers.metro.AssistedInject
 import java.util.concurrent.ConcurrentHashMap
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -22,10 +25,15 @@ private const val TAG = "LocationCollector"
  * @param locationRepository The repository providing location updates.
  * @param coroutineScope Scope for launching collection coroutines.
  */
-class DefaultLocationCollector(
+class DefaultLocationCollector @AssistedInject constructor(
     private val locationRepository: LocationRepository,
-    private val coroutineScope: CoroutineScope,
+    @Assisted private val coroutineScope: CoroutineScope,
 ) : LocationCollectionCoordinator {
+
+    @AssistedFactory
+    interface Factory {
+        fun create(coroutineScope: CoroutineScope): DefaultLocationCollector
+    }
 
     private val _locationUpdates = MutableStateFlow<GpsLocation?>(null)
     override val locationUpdates: StateFlow<GpsLocation?> = _locationUpdates.asStateFlow()

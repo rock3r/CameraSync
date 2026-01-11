@@ -69,9 +69,10 @@ class MultiDeviceSyncService : Service(), CoroutineScope {
     @Inject lateinit var intentFactory: IntentFactory
     @Inject lateinit var pendingIntentFactory: PendingIntentFactory
     @Inject lateinit var companionDeviceManagerHelper: CompanionDeviceManagerHelper
+    @Inject lateinit var locationCollectorFactory: DefaultLocationCollector.Factory
 
     private val locationCollector by lazy {
-        DefaultLocationCollector(locationRepository = locationRepository, coroutineScope = this)
+        locationCollectorFactory.create(this)
     }
 
     private val syncCoordinator by lazy {
