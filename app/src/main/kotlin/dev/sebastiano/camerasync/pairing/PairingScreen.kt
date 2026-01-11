@@ -62,6 +62,10 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import android.app.Activity
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.IntentSenderRequest
+import androidx.activity.result.contract.ActivityResultContracts
 import dev.sebastiano.camerasync.R
 import dev.sebastiano.camerasync.domain.model.Camera
 import dev.sebastiano.camerasync.ui.theme.CameraSyncTheme
@@ -86,6 +90,21 @@ fun PairingScreen(
             when (event) {
                 is PairingNavigationEvent.DevicePaired -> onDevicePaired()
             }
+        }
+    }
+
+    val intentSenderLauncher =
+        rememberLauncherForActivityResult(
+            contract = ActivityResultContracts.StartIntentSenderForResult()
+        ) { result ->
+            if (result.resultCode == Activity.RESULT_OK) {
+                viewModel.onCompanionAssociationResult(result.data)
+            }
+        }
+
+    LaunchedEffect(Unit) {
+        viewModel.associationRequest.collect { intentSender ->
+            intentSenderLauncher.launch(IntentSenderRequest.Builder(intentSender).build())
         }
     }
 
@@ -135,6 +154,7 @@ fun PairingScreen(
                         discoveredDevices = currentState.discoveredDevices,
                         isScanning = currentState.isScanning,
                         onDeviceClick = { camera -> viewModel.pairDevice(camera) },
+                        onSystemPairingClick = { viewModel.requestCompanionPairing() },
                     )
                 }
 
@@ -212,15 +232,30 @@ private fun ScanningContent(
     discoveredDevices: List<Camera>,
     isScanning: Boolean,
     onDeviceClick: (Camera) -> Unit,
+    onSystemPairingClick: () -> Unit,
 ) {
-    if (discoveredDevices.isEmpty()) {
-        ScanningEmptyState(modifier = modifier, isScanning = isScanning)
-    } else {
-        DiscoveredDevicesList(
-            modifier = modifier,
-            devices = discoveredDevices,
-            onDeviceClick = onDeviceClick,
-        )
+    Column(modifier = modifier.fillMaxSize()) {
+        Box(modifier = Modifier.fillMaxWidth().padding(16.dp), contentAlignment = Alignment.Center) {
+            Button(onClick = onSystemPairingClick, modifier = Modifier.fillMaxWidth()) {
+                Icon(
+                    painterResource(R.drawable.ic_bluetooth_searching_24dp),
+                    contentDescription = null,
+                    modifier = Modifier.size(18.dp)
+                )
+                Spacer(Modifier.width(8.dp))
+                Text("Pair using Android System")
+            }
+        }
+
+        if (discoveredDevices.isEmpty()) {
+            ScanningEmptyState(modifier = Modifier.weight(1f), isScanning = isScanning)
+        } else {
+            DiscoveredDevicesList(
+                modifier = Modifier.weight(1f),
+                devices = discoveredDevices,
+                onDeviceClick = onDeviceClick,
+            )
+        }
     }
 }
 

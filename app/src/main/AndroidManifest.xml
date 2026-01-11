@@ -91,11 +91,6 @@
         tools:targetApi="34">
 
         <service
-            android:name=".devicesync.DeviceSyncService"
-            android:exported="false"
-            android:foregroundServiceType="connectedDevice|location" />
-
-        <service
             android:name=".devicesync.MultiDeviceSyncService"
             android:exported="false"
             android:foregroundServiceType="connectedDevice|location" />

@@ -2,6 +2,7 @@ package dev.sebastiano.camerasync.di
 
 import android.app.Application
 import android.content.Context
+import dev.sebastiano.camerasync.MainActivity
 import dev.sebastiano.camerasync.data.repository.DataStorePairedDevicesRepository
 import dev.sebastiano.camerasync.data.repository.FusedLocationRepository
 import dev.sebastiano.camerasync.data.repository.KableCameraRepository
@@ -21,6 +22,7 @@ import dev.sebastiano.camerasync.domain.vendor.CameraVendorRegistry
 import dev.sebastiano.camerasync.domain.vendor.DefaultCameraVendorRegistry
 import dev.sebastiano.camerasync.pairing.AndroidBluetoothBondingChecker
 import dev.sebastiano.camerasync.pairing.BluetoothBondingChecker
+import dev.sebastiano.camerasync.pairing.CompanionDeviceManagerHelper
 import dev.sebastiano.camerasync.vendors.ricoh.RicohCameraVendor
 import dev.sebastiano.camerasync.vendors.sony.SonyCameraVendor
 import dev.zacsweers.metro.DependencyGraph
@@ -36,14 +38,8 @@ import kotlinx.coroutines.CoroutineScope
  */
 @DependencyGraph
 interface AppGraph {
-    val vendorRegistry: CameraVendorRegistry
-    val notificationBuilder: NotificationBuilder
-    val intentFactory: IntentFactory
-    val pendingIntentFactory: PendingIntentFactory
-    val pairedDevicesRepository: PairedDevicesRepository
-    val locationRepository: LocationRepository
-    val cameraRepository: CameraRepository
-    val bluetoothBondingChecker: BluetoothBondingChecker
+    fun inject(service: MultiDeviceSyncService)
+    fun inject(activity: MainActivity)
 
     @Provides fun provideApplicationContext(application: Application): Context = application
 
@@ -108,6 +104,13 @@ interface AppGraph {
     @Provides
     fun provideBluetoothBondingChecker(context: Context): BluetoothBondingChecker =
         AndroidBluetoothBondingChecker(context)
+
+    @Provides
+    fun provideCompanionDeviceManagerHelper(
+        context: Context,
+        vendorRegistry: CameraVendorRegistry,
+    ): CompanionDeviceManagerHelper =
+        CompanionDeviceManagerHelper(context, vendorRegistry)
 
     @DependencyGraph.Factory
     interface Factory {

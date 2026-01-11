@@ -11,6 +11,11 @@ import dev.sebastiano.camerasync.fakes.FakeKhronicleLogger
 import dev.sebastiano.camerasync.fakes.FakeLocationCollector
 import dev.sebastiano.camerasync.fakes.FakePairedDevicesRepository
 import dev.sebastiano.camerasync.fakes.FakeVendorRegistry
+import dev.sebastiano.camerasync.pairing.CompanionDeviceManagerHelper
+import io.mockk.every
+import io.mockk.mockk
+import io.mockk.just
+import io.mockk.Runs
 import java.time.ZoneId
 import java.time.ZonedDateTime
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -36,6 +41,7 @@ class MultiDeviceSyncCoordinatorTest {
     private lateinit var locationCollector: FakeLocationCollector
     private lateinit var vendorRegistry: FakeVendorRegistry
     private lateinit var pairedDevicesRepository: FakePairedDevicesRepository
+    private lateinit var companionDeviceManagerHelper: CompanionDeviceManagerHelper
     private lateinit var testScope: TestScope
     private lateinit var coordinator: MultiDeviceSyncCoordinator
 
@@ -72,6 +78,7 @@ class MultiDeviceSyncCoordinatorTest {
         locationCollector = FakeLocationCollector()
         vendorRegistry = FakeVendorRegistry()
         pairedDevicesRepository = FakePairedDevicesRepository()
+        companionDeviceManagerHelper = mockk(relaxed = true)
 
         testScope = TestScope(UnconfinedTestDispatcher())
 
@@ -81,6 +88,7 @@ class MultiDeviceSyncCoordinatorTest {
                 locationCollector = locationCollector,
                 vendorRegistry = vendorRegistry,
                 pairedDevicesRepository = pairedDevicesRepository,
+                companionDeviceManagerHelper = companionDeviceManagerHelper,
                 coroutineScope = testScope.backgroundScope,
                 deviceNameProvider = { "Test Device CameraSync" },
             )
@@ -253,6 +261,7 @@ class MultiDeviceSyncCoordinatorTest {
                 locationCollector = locationCollector,
                 vendorRegistry = vendorRegistry,
                 pairedDevicesRepository = pairedDevicesRepository,
+                companionDeviceManagerHelper = companionDeviceManagerHelper,
                 coroutineScope = timeoutTestScope,
             )
 

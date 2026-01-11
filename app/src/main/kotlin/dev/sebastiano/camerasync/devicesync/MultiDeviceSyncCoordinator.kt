@@ -58,6 +58,7 @@ class MultiDeviceSyncCoordinator(
     private val locationCollector: LocationCollectionCoordinator,
     private val vendorRegistry: CameraVendorRegistry,
     private val pairedDevicesRepository: PairedDevicesRepository,
+    private val companionDeviceManagerHelper: dev.sebastiano.camerasync.pairing.CompanionDeviceManagerHelper,
     private val coroutineScope: CoroutineScope,
     private val deviceNameProvider: () -> String = { "${Build.MODEL} CameraSync" },
 ) {
@@ -219,6 +220,9 @@ class MultiDeviceSyncCoordinator(
 
             // Set state to searching immediately before launching the job
             updateDeviceState(macAddress, DeviceConnectionState.Searching)
+
+            // Ensure we are observing device presence for better background performance
+            companionDeviceManagerHelper.startObservingDevicePresence(macAddress)
 
             val job =
                 coroutineScope.launch {

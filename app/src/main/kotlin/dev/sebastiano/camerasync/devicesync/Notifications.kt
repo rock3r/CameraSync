@@ -9,8 +9,6 @@ import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationCompat.PRIORITY_HIGH
 import androidx.core.app.NotificationCompat.PRIORITY_LOW
 import dev.sebastiano.camerasync.R
-import dev.sebastiano.camerasync.domain.model.Camera
-import dev.sebastiano.camerasync.domain.model.SyncState
 import java.time.Instant
 import java.time.LocalDateTime
 import java.time.ZoneId
@@ -19,78 +17,6 @@ import java.time.format.DateTimeFormatter
 import java.time.temporal.ChronoUnit
 
 internal const val NOTIFICATION_CHANNEL = "SYNC_SERVICE_NOTIFICATION_CHANNEL"
-
-/** Creates a notification for the foreground service based on the current sync state. */
-internal fun createForegroundServiceNotification(context: Context, state: SyncState): Notification =
-    when (state) {
-        SyncState.Idle -> createIdleNotification(context)
-        is SyncState.Connecting -> createConnectingNotification(context, state.camera)
-        is SyncState.Syncing ->
-            createSyncingNotification(context, state.camera, state.lastSyncInfo?.syncTime)
-        is SyncState.Disconnected -> createReconnectingNotification(context, state.camera)
-        SyncState.Stopped -> error("No notification needed when stopped")
-    }
-
-private fun createIdleNotification(context: Context): Notification =
-    NotificationCompat.Builder(context, NOTIFICATION_CHANNEL)
-        .setOngoing(true)
-        .setPriority(PRIORITY_LOW)
-        .setCategory(Notification.CATEGORY_SERVICE)
-        .setSilent(true)
-        .setContentTitle("Waiting for camera...")
-        .setContentText("Will start syncing when camera is in range")
-        .setSmallIcon(R.drawable.ic_sync_disabled)
-        .build()
-
-private fun createConnectingNotification(context: Context, camera: Camera): Notification =
-    NotificationCompat.Builder(context, NOTIFICATION_CHANNEL)
-        .setOngoing(true)
-        .setPriority(PRIORITY_LOW)
-        .setCategory(Notification.CATEGORY_SERVICE)
-        .setSilent(true)
-        .setContentTitle("Connecting to ${camera.name ?: "camera"}...")
-        .setContentText("Syncing will begin shortly")
-        .setSmallIcon(R.drawable.ic_sync_disabled)
-        .build()
-
-private fun createReconnectingNotification(context: Context, camera: Camera): Notification =
-    NotificationCompat.Builder(context, NOTIFICATION_CHANNEL)
-        .setOngoing(true)
-        .setPriority(PRIORITY_LOW)
-        .setCategory(Notification.CATEGORY_SERVICE)
-        .setSilent(true)
-        .setContentTitle("Reconnecting to ${camera.name ?: "camera"}...")
-        .setContentText("Connection to the device lost")
-        .setSmallIcon(R.drawable.ic_sync_error)
-        .build()
-
-private fun createSyncingNotification(
-    context: Context,
-    camera: Camera,
-    lastSyncTime: ZonedDateTime?,
-): Notification =
-    NotificationCompat.Builder(context, NOTIFICATION_CHANNEL)
-        .setOngoing(true)
-        .setPriority(PRIORITY_LOW)
-        .setCategory(Notification.CATEGORY_LOCATION_SHARING)
-        .setSilent(true)
-        .setContentTitle("Syncing with ${camera.name ?: "camera"}")
-        .setContentText("Last update: ${formatElapsedTimeSince(lastSyncTime)}")
-        .setSmallIcon(R.drawable.ic_sync)
-        .addAction(
-            NotificationCompat.Action.Builder(
-                    /* icon = */ 0,
-                    /* title = */ "Disconnect",
-                    /* intent = */ PendingIntent.getService(
-                        context,
-                        DeviceSyncService.STOP_REQUEST_CODE,
-                        DeviceSyncService.createDisconnectIntent(context),
-                        PendingIntent.FLAG_IMMUTABLE,
-                    ),
-                )
-                .build()
-        )
-        .build()
 
 /**
  * Formats the elapsed time since the last sync in a human-readable format.

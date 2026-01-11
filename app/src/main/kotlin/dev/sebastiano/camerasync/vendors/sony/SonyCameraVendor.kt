@@ -1,11 +1,17 @@
 package dev.sebastiano.camerasync.vendors.sony
 
+import android.bluetooth.le.ScanFilter
+import android.companion.BluetoothLeDeviceFilter
+import android.companion.DeviceFilter
+import android.os.ParcelUuid
 import dev.sebastiano.camerasync.domain.vendor.CameraCapabilities
 import dev.sebastiano.camerasync.domain.vendor.CameraGattSpec
 import dev.sebastiano.camerasync.domain.vendor.CameraProtocol
 import dev.sebastiano.camerasync.domain.vendor.CameraVendor
+import java.util.regex.Pattern
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
+import kotlin.uuid.toJavaUuid
 
 /**
  * Sony camera vendor implementation.
@@ -111,5 +117,21 @@ object SonyCameraVendor : CameraVendor {
 
         // Fallback: return the pairing name as-is
         return name
+    }
+
+    override fun getCompanionDeviceFilters(): List<DeviceFilter<*>> {
+        val serviceFilter = BluetoothLeDeviceFilter.Builder()
+            .setScanFilter(
+                ScanFilter.Builder()
+                    .setServiceUuid(ParcelUuid(SonyGattSpec.REMOTE_CONTROL_SERVICE_UUID.toJavaUuid()))
+                    .build()
+            )
+            .build()
+
+        val nameFilter = BluetoothLeDeviceFilter.Builder()
+             .setNamePattern(Pattern.compile("ILCE-.*"))
+             .build()
+
+        return listOf(serviceFilter, nameFilter)
     }
 }

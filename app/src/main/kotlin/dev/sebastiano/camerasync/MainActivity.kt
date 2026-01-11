@@ -26,31 +26,61 @@ import dev.sebastiano.camerasync.devices.DevicesListScreen
 import dev.sebastiano.camerasync.devices.DevicesListViewModel
 import dev.sebastiano.camerasync.devicesync.registerNotificationChannel
 import dev.sebastiano.camerasync.di.AppGraph
+import dev.sebastiano.camerasync.domain.repository.CameraRepository
+import dev.sebastiano.camerasync.domain.repository.LocationRepository
+import dev.sebastiano.camerasync.domain.repository.PairedDevicesRepository
+import dev.sebastiano.camerasync.domain.vendor.CameraVendorRegistry
+import dev.sebastiano.camerasync.pairing.BluetoothBondingChecker
+import dev.sebastiano.camerasync.pairing.CompanionDeviceManagerHelper
 import dev.sebastiano.camerasync.pairing.PairingScreen
 import dev.sebastiano.camerasync.pairing.PairingViewModel
 import dev.sebastiano.camerasync.permissions.PermissionsScreen
 import dev.sebastiano.camerasync.ui.theme.CameraSyncTheme
+import javax.inject.Inject
 
 class MainActivity : ComponentActivity() {
+
+    @Inject lateinit var pairedDevicesRepository: PairedDevicesRepository
+    @Inject lateinit var locationRepository: LocationRepository
+    @Inject lateinit var vendorRegistry: CameraVendorRegistry
+    @Inject lateinit var bluetoothBondingChecker: BluetoothBondingChecker
+    @Inject lateinit var cameraRepository: CameraRepository
+    @Inject lateinit var companionDeviceManagerHelper: CompanionDeviceManagerHelper
 
     private val appGraph: AppGraph by lazy { (application as CameraSyncApp).appGraph }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        appGraph.inject(this)
 
         enableEdgeToEdge()
         registerNotificationChannel(this)
 
-        setContent { RootComposable(appGraph = appGraph, context = this) }
+        setContent {
+            RootComposable(
+                pairedDevicesRepository = pairedDevicesRepository,
+                locationRepository = locationRepository,
+                vendorRegistry = vendorRegistry,
+                bluetoothBondingChecker = bluetoothBondingChecker,
+                cameraRepository = cameraRepository,
+                companionDeviceManagerHelper = companionDeviceManagerHelper,
+                context = this
+            )
+        }
     }
 }
 
 @OptIn(ExperimentalPermissionsApi::class)
 @Composable
-private fun RootComposable(appGraph: AppGraph, context: Context) {
-    val pairedDevicesRepository = appGraph.pairedDevicesRepository
-    val locationRepository = appGraph.locationRepository
-    val vendorRegistry = appGraph.vendorRegistry
+private fun RootComposable(
+    pairedDevicesRepository: PairedDevicesRepository,
+    locationRepository: LocationRepository,
+    vendorRegistry: CameraVendorRegistry,
+    bluetoothBondingChecker: BluetoothBondingChecker,
+    cameraRepository: CameraRepository,
+    companionDeviceManagerHelper: CompanionDeviceManagerHelper,
+    context: Context,
+) {
     CameraSyncTheme {
         val allPermissions =
             listOf(ACCESS_FINE_LOCATION, BLUETOOTH_SCAN, BLUETOOTH_CONNECT, POST_NOTIFICATIONS)
@@ -108,7 +138,7 @@ private fun RootComposable(appGraph: AppGraph, context: Context) {
                                 locationRepository = locationRepository,
                                 bindingContextProvider = { context.applicationContext },
                                 vendorRegistry = vendorRegistry,
-                                bluetoothBondingChecker = appGraph.bluetoothBondingChecker,
+                                bluetoothBondingChecker = bluetoothBondingChecker,
                             )
                         }
 
@@ -122,9 +152,10 @@ private fun RootComposable(appGraph: AppGraph, context: Context) {
                         val pairingViewModel = remember {
                             PairingViewModel(
                                 pairedDevicesRepository = pairedDevicesRepository,
-                                cameraRepository = appGraph.cameraRepository,
+                                cameraRepository = cameraRepository,
                                 vendorRegistry = vendorRegistry,
-                                bluetoothBondingChecker = appGraph.bluetoothBondingChecker,
+                                bluetoothBondingChecker = bluetoothBondingChecker,
+                                companionDeviceManagerHelper = companionDeviceManagerHelper,
                             )
                         }
 

@@ -1,7 +1,6 @@
 package dev.sebastiano.camerasync.devicesync
 
 import android.content.Context
-import android.os.Build
 import android.os.VibrationEffect
 import android.os.Vibrator
 import android.os.VibratorManager
@@ -20,14 +19,9 @@ private const val TAG = "SyncErrorVibrator"
 class SyncErrorVibrator(private val context: Context) {
 
     private val vibrator: Vibrator by lazy {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            val vibratorManager =
-                context.getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as VibratorManager
-            vibratorManager.defaultVibrator
-        } else {
-            @Suppress("DEPRECATION")
-            context.getSystemService(Context.VIBRATOR_SERVICE) as Vibrator
-        }
+        val vibratorManager =
+            context.getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as VibratorManager
+        vibratorManager.defaultVibrator
     }
 
     /**
@@ -55,13 +49,9 @@ class SyncErrorVibrator(private val context: Context) {
         Log.info(tag = TAG) { "Starting aggressive vibration for sync error" }
         lastVibrationTime = now
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            vibrator.vibrate(
-                VibrationEffect.createWaveform(aggressivePattern, aggressiveAmplitudes, -1)
-            )
-        } else {
-            @Suppress("DEPRECATION") vibrator.vibrate(aggressivePattern, -1)
-        }
+        vibrator.vibrate(
+            VibrationEffect.createWaveform(aggressivePattern, aggressiveAmplitudes, -1)
+        )
     }
 
     /** Stops any ongoing vibration. */

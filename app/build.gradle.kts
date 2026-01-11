@@ -105,6 +105,7 @@ dependencies {
     implementation(libs.maplibre.material3)
     implementation(libs.maplibre.spatialk)
     implementation(libs.protobuf.kotlin.lite)
+    implementation(libs.javax.inject)
 
     debugImplementation(libs.androidx.ui.test.manifest)
     debugImplementation(libs.androidx.ui.tooling)

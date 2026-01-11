@@ -1,6 +1,12 @@
 package dev.sebastiano.camerasync.pairing
 
-import android.bluetooth.le.ScanSettings
+import android.bluetooth.BluetoothDevice
+import android.companion.CompanionDeviceManager
+import android.content.Intent
+import android.content.IntentSender
+import android.os.Parcelable
+import dev.sebastiano.camerasync.pairing.CompanionDeviceManagerHelper
+import android.bluetooth.le.ScanResult
 import androidx.compose.runtime.State
 import androidx.compose.runtime.mutableStateOf
 import androidx.lifecycle.ViewModel
@@ -52,6 +58,7 @@ class PairingViewModel(
     private val cameraRepository: CameraRepository,
     private val vendorRegistry: CameraVendorRegistry,
     private val bluetoothBondingChecker: BluetoothBondingChecker,
+    private val companionDeviceManagerHelper: CompanionDeviceManagerHelper,
     private val loggingEngine: LogEngine = KhronicleLogEngine,
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) : ViewModel() {
@@ -61,6 +68,9 @@ class PairingViewModel(
 
     private val _navigationEvents = Channel<PairingNavigationEvent>(Channel.BUFFERED)
     val navigationEvents: Flow<PairingNavigationEvent> = _navigationEvents.receiveAsFlow()
+
+    private val _associationRequest = Channel<IntentSender>(Channel.BUFFERED)
+    val associationRequest: Flow<IntentSender> = _associationRequest.receiveAsFlow()
 
     private var scanJob: Job? = null
     private var pairingJob: Job? = null
@@ -94,6 +104,92 @@ class PairingViewModel(
     init {
         // Automatically start scanning when the ViewModel is created
         startScanning()
+    }
+
+    fun requestCompanionPairing() {
+        companionDeviceManagerHelper.requestAssociation(
+            object : CompanionDeviceManager.Callback() {
+                override fun onDeviceFound(chooserLauncher: IntentSender) {
+                    viewModelScope.launch {
+                        _associationRequest.send(chooserLauncher)
+                    }
+                }
+
+                override fun onFailure(error: CharSequence?) {
+                    Log.error(tag = TAG) { "Companion Device Association failed: $error" }
+                    _state.value = PairingScreenState.Idle // Reset state?
+                }
+            }
+        )
+    }
+
+    fun onCompanionAssociationResult(data: Intent?) {
+        if (data == null) return
+
+        val scanResult =
+            data.getParcelableExtra(CompanionDeviceManager.EXTRA_DEVICE, ScanResult::class.java)
+
+        val device =
+            data.getParcelableExtra(CompanionDeviceManager.EXTRA_DEVICE, BluetoothDevice::class.java)
+
+        val camera = scanResult?.toCamera() ?: device?.toCamera()
+
+        if (camera != null) {
+            Log.info(tag = TAG) { "Companion device selected: ${camera.name} (${camera.macAddress})" }
+            pairDevice(camera)
+        } else {
+            Log.warn(tag = TAG) { "Could not convert companion device result to Camera" }
+        }
+    }
+
+    private fun ScanResult.toCamera(): Camera? {
+        val record = scanRecord ?: return null
+        val mfrData = record.manufacturerSpecificData
+
+        val mfrMap = mutableMapOf<Int, ByteArray>()
+        for (i in 0 until mfrData.size()) {
+            mfrMap[mfrData.keyAt(i)] = mfrData.valueAt(i)
+        }
+
+        val serviceUuids = record.serviceUuids?.map {
+            Uuid.parse(it.uuid.toString())
+        } ?: emptyList()
+
+        val name = device.name ?: record.deviceName
+
+        val vendor = vendorRegistry.identifyVendor(
+            deviceName = name,
+            serviceUuids = serviceUuids,
+            manufacturerData = mfrMap
+        )
+
+        if (vendor == null) return null
+
+        return Camera(
+            identifier = device.address,
+            name = name,
+            macAddress = device.address,
+            vendor = vendor
+        )
+    }
+
+    private fun BluetoothDevice.toCamera(): Camera? {
+        val name = name
+        // Try to identify based on name only (vendor registry supports it fallback)
+        val vendor = vendorRegistry.identifyVendor(
+            deviceName = name,
+            serviceUuids = emptyList(),
+            manufacturerData = emptyMap()
+        )
+
+        if (vendor == null) return null
+
+        return Camera(
+            identifier = address,
+            name = name,
+            macAddress = address,
+            vendor = vendor
+        )
     }
 
     /** Starts scanning for cameras. */
