@@ -7,7 +7,6 @@ on:
 
 permissions:
   contents: write
-  discussions: write
 
 jobs:
   release-build:
