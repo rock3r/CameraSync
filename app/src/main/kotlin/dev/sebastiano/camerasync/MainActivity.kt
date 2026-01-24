@@ -40,9 +40,8 @@ import dev.sebastiano.camerasync.permissions.PermissionsScreen
 import dev.sebastiano.camerasync.ui.theme.CameraSyncTheme
 import dev.zacsweers.metro.Inject
 
-class MainActivity
 @Inject
-constructor(
+class MainActivity(
     private val pairedDevicesRepository: PairedDevicesRepository,
     private val locationRepository: LocationRepository,
     private val vendorRegistry: CameraVendorRegistry,

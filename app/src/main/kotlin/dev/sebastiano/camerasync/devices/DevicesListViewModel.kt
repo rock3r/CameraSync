@@ -41,9 +41,8 @@ private const val TAG = "DevicesListViewModel"
  * @param ioDispatcher The dispatcher to use for IO operations. Can be overridden in tests to use a
  *   test dispatcher.
  */
-class DevicesListViewModel
 @Inject
-constructor(
+class DevicesListViewModel(
     private val pairedDevicesRepository: PairedDevicesRepository,
     private val locationRepository: LocationRepository,
     private val context: Context,

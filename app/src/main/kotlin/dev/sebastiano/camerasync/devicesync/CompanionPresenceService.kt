@@ -12,16 +12,17 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
-class CompanionPresenceService
 @Inject
-constructor(private val pairedDevicesRepository: PairedDevicesRepository) :
+class CompanionPresenceService(private val pairedDevicesRepository: PairedDevicesRepository) :
     CompanionDeviceService() {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
+    @Deprecated("Deprecated in platform API", level = DeprecationLevel.WARNING)
     override fun onDeviceAppeared(associationInfo: AssociationInfo) {
         handlePresenceChange(associationInfo, isPresent = true)
     }
 
+    @Deprecated("Deprecated in platform API", level = DeprecationLevel.WARNING)
     override fun onDeviceDisappeared(associationInfo: AssociationInfo) {
         handlePresenceChange(associationInfo, isPresent = false)
     }

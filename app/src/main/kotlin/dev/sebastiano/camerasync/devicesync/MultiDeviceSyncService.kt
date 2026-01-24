@@ -52,9 +52,8 @@ private const val TAG = "MultiDeviceSyncService"
  * The service starts automatically when there are enabled paired devices and stops when all devices
  * are disabled or disconnected.
  */
-class MultiDeviceSyncService
 @Inject
-constructor(
+class MultiDeviceSyncService(
     private val vendorRegistry: CameraVendorRegistry,
     private val locationRepository: LocationRepository,
     private val cameraRepository: CameraRepository,

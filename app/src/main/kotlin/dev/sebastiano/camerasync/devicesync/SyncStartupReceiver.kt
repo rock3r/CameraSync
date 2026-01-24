@@ -31,6 +31,7 @@ class SyncStartupReceiver : BroadcastReceiver() {
                             val deviceManager =
                                 appContext.getSystemService(Context.COMPANION_DEVICE_SERVICE)
                                     as android.companion.CompanionDeviceManager
+                            @Suppress("DEPRECATION")
                             deviceManager.startObservingDevicePresence(macAddress)
                         },
                     )

@@ -1,17 +1,5 @@
 ---
 description: 
-globs: **/NONE-disabled.kt
-alwaysApply: false
----
-
----
-description: 
-globs: none.disabled
-alwaysApply: false
----
-
----
-description: 
 globs: NONE.jola
 alwaysApply: false
 ---
@@ -150,7 +138,7 @@ By injecting the dispatcher, tests can pass `UnconfinedTestDispatcher()` or `Sta
 
 ### Testing Notes
 - Primary test configuration: Pixel 9 + Android 15 + Ricoh GR IIIx
-- Run tests: `./gradlew test`
+- ALWAYS run tests: `./gradlew test`
 - Run specific test class: `./gradlew test --tests "fully.qualified.TestClassName"`
 
 ## Common Tasks

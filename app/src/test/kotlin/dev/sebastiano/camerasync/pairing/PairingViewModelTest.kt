@@ -205,6 +205,22 @@ class PairingViewModelTest {
     }
 
     @Test
+    fun `pairDevice sets TIMEOUT error when BLE connection exceeds timeout`() = runTest {
+        cameraRepository.connectDelay = PAIRING_CONNECTION_TIMEOUT_MS + 1
+
+        viewModel.pairDevice(testCamera)
+        advanceUntilIdle()
+
+        val state = viewModel.state.value
+        assertTrue(state is PairingScreenState.Pairing)
+        val pairingState = state as PairingScreenState.Pairing
+        assertEquals(PairingError.TIMEOUT, pairingState.error)
+
+        // Device should NOT be added to repository when pairing fails
+        assertFalse(pairedDevicesRepository.isDevicePaired(testCamera.macAddress))
+    }
+
+    @Test
     fun `pairDevice sets UNKNOWN error when BLE connection throws other exception`() = runTest {
         // Make connect throw an exception without "reject" or "timeout"
         val exception = Exception("Unexpected error occurred")

@@ -33,6 +33,7 @@ class CompanionDeviceManagerHelper(
     }
 
     /** Starts observing device presence to keep the app active when the device is in range. */
+    @Suppress("DEPRECATION")
     fun startObservingDevicePresence(deviceAddress: String) {
         try {
             Log.info(tag = TAG) { "Starting presence observation for $deviceAddress" }
@@ -43,6 +44,7 @@ class CompanionDeviceManagerHelper(
     }
 
     /** Stops observing device presence. */
+    @Suppress("DEPRECATION")
     fun stopObservingDevicePresence(deviceAddress: String) {
         try {
             Log.info(tag = TAG) { "Stopping presence observation for $deviceAddress" }

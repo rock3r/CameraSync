@@ -29,6 +29,7 @@ import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
@@ -40,8 +41,10 @@ import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeout
 
 private const val TAG = "PairingViewModel"
+internal const val PAIRING_CONNECTION_TIMEOUT_MS = 30_000L
 
 /**
  * ViewModel for the pairing screen.
@@ -54,9 +57,8 @@ private const val TAG = "PairingViewModel"
  *   test dispatcher.
  */
 @OptIn(ExperimentalUuidApi::class)
-class PairingViewModel
 @Inject
-constructor(
+class PairingViewModel(
     private val pairedDevicesRepository: PairedDevicesRepository,
     private val cameraRepository: CameraRepository,
     private val vendorRegistry: CameraVendorRegistry,
@@ -125,6 +127,7 @@ constructor(
         )
     }
 
+    @Suppress("DEPRECATION")
     fun onCompanionAssociationResult(data: Intent?) {
         if (data == null) return
 
@@ -307,7 +310,10 @@ constructor(
 
                     // Now establish a BLE connection to verify everything works
                     Log.info(tag = TAG) { "Connecting to ${camera.name ?: camera.macAddress}..." }
-                    connection = cameraRepository.connect(camera)
+                    connection =
+                        withTimeout(PAIRING_CONNECTION_TIMEOUT_MS) {
+                            cameraRepository.connect(camera)
+                        }
 
                     // Perform vendor-specific pairing initialization if required
                     // (e.g., Sony cameras need a specific command written to EE01)
@@ -330,6 +336,11 @@ constructor(
                     }
                     // Emit navigation event instead of setting success flag in state
                     _navigationEvents.send(PairingNavigationEvent.DevicePaired)
+                } catch (e: TimeoutCancellationException) {
+                    Log.error(tag = TAG, throwable = e) {
+                        "Pairing timed out while connecting to ${camera.macAddress}"
+                    }
+                    _state.value = PairingScreenState.Pairing(camera, error = PairingError.TIMEOUT)
                 } catch (e: Exception) {
                     Log.error(tag = TAG, throwable = e) { "Pairing failed" }
                     val error =
