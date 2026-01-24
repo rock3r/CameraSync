@@ -48,6 +48,7 @@ class MultiDeviceSyncCoordinatorTest {
             name = "Test Camera 1",
             vendorId = "fake",
             isEnabled = true,
+            lastSyncedAt = 1L,
         )
 
     private val testDevice2 =
@@ -56,6 +57,7 @@ class MultiDeviceSyncCoordinatorTest {
             name = "Test Camera 2",
             vendorId = "fake",
             isEnabled = true,
+            lastSyncedAt = 1L,
         )
 
     private val testLocation =
@@ -173,6 +175,19 @@ class MultiDeviceSyncCoordinatorTest {
             advanceUntilIdle()
 
             coordinator.refreshConnections()
+            advanceUntilIdle()
+
+            assertEquals(1, cameraRepository.connectCallCount)
+        }
+
+    @Test
+    fun `background monitoring connects never synced device when presence is empty`() =
+        testScope.runTest {
+            val neverSyncedDevice = testDevice1.copy(lastSyncedAt = null)
+            pairedDevicesRepository.setTestDevices(listOf(neverSyncedDevice))
+            cameraRepository.connectionToReturn = FakeCameraConnection(neverSyncedDevice.toTestCamera())
+
+            coordinator.startBackgroundMonitoring(pairedDevicesRepository.enabledDevices)
             advanceUntilIdle()
 
             assertEquals(1, cameraRepository.connectCallCount)

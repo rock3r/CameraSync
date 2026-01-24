@@ -118,6 +118,9 @@ class MultiDeviceSyncCoordinator(
     }
 
     private suspend fun checkAndConnectEnabledDevices(ignorePresence: Boolean = false) {
+        Log.debug(tag = TAG) {
+            "Checking enabled devices (ignorePresence=$ignorePresence)"
+        }
         _isScanning.value = true
         try {
             scanMutex.withLock {
@@ -125,6 +128,15 @@ class MultiDeviceSyncCoordinator(
                 val enabledMacAddresses = enabledDevices.map { it.macAddress }.toSet()
                 val presentMacAddresses =
                     if (ignorePresence) enabledMacAddresses else _presentDevices.value
+                val allowUnknownPresence = !ignorePresence && presentMacAddresses.isEmpty()
+                if (allowUnknownPresence) {
+                    Log.debug(tag = TAG) {
+                        "Presence list empty; allowing initial connect for never-synced devices"
+                    }
+                }
+                Log.debug(tag = TAG) {
+                    "Enabled devices: ${enabledMacAddresses.size}, present devices: ${presentMacAddresses.size}"
+                }
 
                 // First, collect devices to disconnect while holding the mutex
                 // We must NOT call stopDeviceSync while holding jobsMutex to avoid deadlock
@@ -163,18 +175,28 @@ class MultiDeviceSyncCoordinator(
                 enabledDevices.forEach { device ->
                     val macAddress = device.macAddress
                     val state = getDeviceState(macAddress)
-                    val isPresent = presentMacAddresses.contains(macAddress)
+                    val isPresent =
+                        presentMacAddresses.contains(macAddress) ||
+                            (allowUnknownPresence && device.lastSyncedAt == null)
 
-                    if (
-                        isPresent &&
-                            (state is DeviceConnectionState.Disconnected ||
-                                state is DeviceConnectionState.Unreachable ||
-                                (state is DeviceConnectionState.Error && state.isRecoverable))
-                    ) {
+                    val eligibleState =
+                        state is DeviceConnectionState.Disconnected ||
+                            state is DeviceConnectionState.Unreachable ||
+                            (state is DeviceConnectionState.Error && state.isRecoverable)
+
+                    if (isPresent && eligibleState) {
                         Log.debug(tag = TAG) {
                             "Device $macAddress is enabled but not connected (state: $state), attempting sync..."
                         }
                         startDeviceSync(device)
+                    } else if (!isPresent && !ignorePresence) {
+                        Log.debug(tag = TAG) {
+                            "Device $macAddress is enabled but not present, skipping connect"
+                        }
+                    } else if (!eligibleState) {
+                        Log.debug(tag = TAG) {
+                            "Device $macAddress not eligible for sync (state: $state)"
+                        }
                     }
                 }
             }
@@ -185,8 +207,10 @@ class MultiDeviceSyncCoordinator(
 
     /** Updates whether a device is currently present (in range). */
     fun setDevicePresence(macAddress: String, isPresent: Boolean) {
+        val normalizedMac = macAddress.uppercase()
+        Log.info(tag = TAG) { "Presence update for $normalizedMac: isPresent=$isPresent" }
         _presentDevices.update { current ->
-            if (isPresent) current + macAddress else current - macAddress
+            if (isPresent) current + normalizedMac else current - normalizedMac
         }
         coroutineScope.launch { checkAndConnectEnabledDevices() }
     }
@@ -205,6 +229,9 @@ class MultiDeviceSyncCoordinator(
     fun startDeviceSync(device: PairedDevice) {
         val macAddress = device.macAddress
 
+        Log.info(tag = TAG) {
+            "Starting sync for $macAddress (enabled=${device.isEnabled}, vendorId=${device.vendorId})"
+        }
         val vendor = vendorRegistry.getVendorById(device.vendorId)
         if (vendor == null) {
             Log.error(tag = TAG) { "Unknown vendor ${device.vendorId} for device $macAddress" }
@@ -262,6 +289,9 @@ class MultiDeviceSyncCoordinator(
                         }
 
                         val firmwareVersion = performInitialSetup(connection)
+                        Log.info(tag = TAG) {
+                            "Initial setup complete for $macAddress (firmware=$firmwareVersion)"
+                        }
 
                         updateDeviceState(
                             macAddress,
@@ -315,6 +345,9 @@ class MultiDeviceSyncCoordinator(
 
     private suspend fun performInitialSetup(connection: CameraConnection): String {
         val capabilities = connection.camera.vendor.getCapabilities()
+        Log.debug(tag = TAG) {
+            "Initial setup capabilities for ${connection.camera.macAddress}: $capabilities"
+        }
 
         // Verify connection is still active before proceeding
         if (!connection.isConnected.first()) {
@@ -327,6 +360,9 @@ class MultiDeviceSyncCoordinator(
                 try {
                     if (!connection.isConnected.first()) {
                         throw IllegalStateException("Connection lost during firmware read")
+                    }
+                    Log.debug(tag = TAG) {
+                        "Reading firmware version for ${connection.camera.macAddress}"
                     }
                     connection.readFirmwareVersion()
                 } catch (e: Exception) {
@@ -341,6 +377,9 @@ class MultiDeviceSyncCoordinator(
                 if (!connection.isConnected.first()) {
                     throw IllegalStateException("Connection lost before setting device name")
                 }
+                Log.debug(tag = TAG) {
+                    "Setting paired device name for ${connection.camera.macAddress}"
+                }
                 connection.setPairedDeviceName(deviceNameProvider())
             } catch (e: Exception) {
                 Log.warn(tag = TAG, throwable = e) { "Failed to set paired device name" }
@@ -353,6 +392,9 @@ class MultiDeviceSyncCoordinator(
                 if (!connection.isConnected.first()) {
                     throw IllegalStateException("Connection lost before date/time sync")
                 }
+                Log.debug(tag = TAG) {
+                    "Syncing date/time for ${connection.camera.macAddress}"
+                }
                 connection.syncDateTime(ZonedDateTime.now())
             } catch (e: Exception) {
                 Log.warn(tag = TAG, throwable = e) { "Failed to sync date/time" }
@@ -364,6 +406,9 @@ class MultiDeviceSyncCoordinator(
             try {
                 if (!connection.isConnected.first()) {
                     throw IllegalStateException("Connection lost before enabling geo-tagging")
+                }
+                Log.debug(tag = TAG) {
+                    "Enabling geo-tagging for ${connection.camera.macAddress}"
                 }
                 connection.setGeoTaggingEnabled(true)
             } catch (e: Exception) {

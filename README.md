@@ -4,7 +4,7 @@ A simple Android application that synchronizes GPS data and date/time from your 
 
 The app supports a multi-vendor architecture, allowing it to work with cameras from various manufacturers (Ricoh, Sony, etc.).
 
-The app allows you to select your camera from nearby BLE devices on the first start. Once paired, it automatically reconnects and maintains synchronization in the background whenever the camera's Bluetooth is active.
+The app uses Android's system pairing flow to select your camera on first start. Once paired, it automatically reconnects and maintains synchronization in the background whenever the camera's Bluetooth is active.
 
 ## Features
 
@@ -88,7 +88,7 @@ No specific environment variables are required for a standard build. Ensure `JAV
     - `.../data`: Repositories and data sources (Location, Camera, Protobuf).
     - `.../devicesync`: Foreground service and synchronization logic.
     - `.../domain`: Business logic, models, and repository interfaces.
-    - `.../scanning`: Camera discovery and pairing UI.
+    - `.../pairing`: Camera pairing UI (Companion Device Manager flow).
     - `.../ui`: Theme and shared UI components.
 - `app/src/main/proto`: Protocol Buffer definitions for data storage.
 - `app/src/test`: Unit tests.

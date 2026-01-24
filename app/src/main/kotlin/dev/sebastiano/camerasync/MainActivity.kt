@@ -17,6 +17,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.remember
+import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation3.runtime.NavEntry
@@ -25,6 +26,7 @@ import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.rememberMultiplePermissionsState
 import dev.sebastiano.camerasync.devices.DevicesListScreen
 import dev.sebastiano.camerasync.devices.DevicesListViewModel
+import dev.sebastiano.camerasync.devicesync.MultiDeviceSyncService
 import dev.sebastiano.camerasync.devicesync.registerNotificationChannel
 import dev.sebastiano.camerasync.di.AppGraph
 import dev.sebastiano.camerasync.domain.repository.CameraRepository
@@ -129,6 +131,7 @@ private fun RootComposable(viewModelFactory: ViewModelProvider.Factory) {
                     NavRoute.Pairing -> {
                         val pairingViewModel: PairingViewModel =
                             viewModel(factory = viewModelFactory)
+                        val context = LocalContext.current
 
                         PairingScreen(
                             viewModel = pairingViewModel,
@@ -143,6 +146,10 @@ private fun RootComposable(viewModelFactory: ViewModelProvider.Factory) {
                                 // Ensure we don't remove the last item (must keep at least one
                                 // route)
                                 if (backStack.size > 1) backStack.removeAt(backStack.lastIndex)
+                                // Trigger a refresh so the newly paired device connects immediately.
+                                context.startService(
+                                    MultiDeviceSyncService.createRefreshIntent(context)
+                                )
                             },
                         )
                     }

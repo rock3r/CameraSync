@@ -8,12 +8,13 @@ import dev.sebastiano.camerasync.fakes.FakeCameraRepository
 import dev.sebastiano.camerasync.fakes.FakeCameraVendor
 import dev.sebastiano.camerasync.fakes.FakeIssueReporter
 import dev.sebastiano.camerasync.fakes.FakeKhronicleLogger
-import dev.sebastiano.camerasync.fakes.FakeLoggingEngine
 import dev.sebastiano.camerasync.fakes.FakePairedDevicesRepository
 import dev.sebastiano.camerasync.fakes.FakeVendorRegistry
 import io.mockk.mockk
+import io.mockk.verify
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.take
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
@@ -35,6 +36,7 @@ class PairingViewModelTest {
     private lateinit var cameraRepository: FakeCameraRepository
     private lateinit var bluetoothBondingChecker: FakeBluetoothBondingChecker
     private lateinit var issueReporter: FakeIssueReporter
+    private lateinit var companionDeviceManagerHelper: CompanionDeviceManagerHelper
     private lateinit var viewModel: PairingViewModel
     private val testDispatcher = UnconfinedTestDispatcher()
 
@@ -59,17 +61,16 @@ class PairingViewModelTest {
         bluetoothBondingChecker = FakeBluetoothBondingChecker()
         issueReporter = FakeIssueReporter()
         val vendorRegistry = FakeVendorRegistry()
-        // Inject FakeLoggingEngine instead of using KhronicleLogEngine
+        companionDeviceManagerHelper = mockk(relaxed = true)
         viewModel =
             PairingViewModel(
                 pairedDevicesRepository = pairedDevicesRepository,
                 cameraRepository = cameraRepository,
                 vendorRegistry = vendorRegistry,
                 bluetoothBondingChecker = bluetoothBondingChecker,
-                companionDeviceManagerHelper = mockk(),
+                companionDeviceManagerHelper = companionDeviceManagerHelper,
                 issueReporter = issueReporter,
                 ioDispatcher = testDispatcher, // Inject test dispatcher
-                loggingEngine = FakeLoggingEngine,
             )
     }
 
@@ -84,29 +85,26 @@ class PairingViewModelTest {
     }
 
     @Test
-    fun `pairDevice transitions to Pairing state`() = runTest {
-        // Simulate OS bonding the device after BLE connection succeeds
-        cameraRepository.onConnectSuccess = { camera ->
-            bluetoothBondingChecker.setBonded(camera.macAddress, bonded = true)
-        }
-
+    fun `pairDevice adds device to repository`() = runTest {
         viewModel.pairDevice(testCamera)
-        // Note: With UnconfinedTestDispatcher, the coroutine runs immediately,
-        // so by the time pairDevice returns, the full pairing flow has completed.
-        // We can't easily test the intermediate Pairing state without more complex setup.
-        // This test now verifies the device was successfully paired.
         advanceUntilIdle()
 
         assertTrue(pairedDevicesRepository.isDevicePaired(testCamera.macAddress))
     }
 
     @Test
-    fun `pairDevice emits DevicePaired navigation event on success`() = runTest {
-        // Simulate OS bonding the device after BLE connection succeeds
-        cameraRepository.onConnectSuccess = { camera ->
-            bluetoothBondingChecker.setBonded(camera.macAddress, bonded = true)
-        }
+    fun `pairDevice enables sync and observes presence`() = runTest {
+        pairedDevicesRepository.setSyncEnabled(false)
 
+        viewModel.pairDevice(testCamera)
+        advanceUntilIdle()
+
+        assertTrue(pairedDevicesRepository.isSyncEnabled.first())
+        verify { companionDeviceManagerHelper.startObservingDevicePresence(testCamera.macAddress) }
+    }
+
+    @Test
+    fun `pairDevice emits DevicePaired navigation event on success`() = runTest {
         val events = mutableListOf<PairingNavigationEvent>()
 
         // Collect events in background
@@ -125,10 +123,6 @@ class PairingViewModelTest {
     fun `pairDevice establishes BLE connection before adding device to repository`() = runTest {
         val fakeConnection = FakeCameraConnection(testCamera)
         cameraRepository.connectionToReturn = fakeConnection
-        // Simulate OS bonding the device after BLE connection succeeds
-        cameraRepository.onConnectSuccess = { camera ->
-            bluetoothBondingChecker.setBonded(camera.macAddress, bonded = true)
-        }
 
         assertFalse(pairedDevicesRepository.addDeviceCalled)
         assertEquals(0, cameraRepository.connectCallCount)
@@ -146,25 +140,6 @@ class PairingViewModelTest {
 
         // Verify connection was disconnected after pairing
         assertTrue(fakeConnection.disconnectCalled)
-    }
-
-    @Test
-    fun `pairDevice sets REJECTED error when bonding times out or is rejected`() = runTest {
-        // createBond succeeds (returns true) but bonding never completes
-        // This simulates user dismissing or rejecting the pairing dialog
-        cameraRepository.connectionToReturn = FakeCameraConnection(testCamera)
-        bluetoothBondingChecker.createBondAutoBonds = false // Don't auto-bond
-
-        viewModel.pairDevice(testCamera)
-        advanceUntilIdle()
-
-        val state = viewModel.state.value
-        assertTrue(state is PairingScreenState.Pairing)
-        val pairingState = state as PairingScreenState.Pairing
-        assertEquals(PairingError.REJECTED, pairingState.error)
-
-        // Device should NOT be added to repository
-        assertFalse(pairedDevicesRepository.isDevicePaired(testCamera.macAddress))
     }
 
     @Test
@@ -298,19 +273,6 @@ class PairingViewModelTest {
     }
 
     @Test
-    fun `pairDevice stops scanning before pairing`() = runTest {
-        // Start scanning (this happens automatically in init, but we can verify)
-        // Note: We can't easily test the actual scanning behavior without mocking Kable Scanner,
-        // but we can verify that stopScanning is called by checking the state transition
-        viewModel.pairDevice(testCamera)
-
-        // Should be in Pairing state, not Scanning
-        val state = viewModel.state.value
-        assertTrue(state is PairingScreenState.Pairing)
-        assertFalse(state is PairingScreenState.Scanning)
-    }
-
-    @Test
     fun `pairDevice transitions to AlreadyBonded when device is bonded at system level`() =
         runTest {
             bluetoothBondingChecker.setBonded(testCamera.macAddress, bonded = true)
@@ -325,7 +287,7 @@ class PairingViewModelTest {
         }
 
     @Test
-    fun `removeBondAndRetry removes bond and retries pairing`() = runTest {
+    fun `removeBondAndRetry removes bond and restarts system pairing`() = runTest {
         bluetoothBondingChecker.setBonded(testCamera.macAddress, bonded = true)
 
         viewModel.pairDevice(testCamera)
@@ -334,17 +296,13 @@ class PairingViewModelTest {
         // Should be in AlreadyBonded state
         assertTrue(viewModel.state.value is PairingScreenState.AlreadyBonded)
 
-        // Set up the callback to simulate OS re-bonding the device after the retry connect
-        cameraRepository.onConnectSuccess = { camera ->
-            bluetoothBondingChecker.setBonded(camera.macAddress, bonded = true)
-        }
-
         // Remove bond and retry
         viewModel.removeBondAndRetry(testCamera)
         advanceUntilIdle()
 
-        // Should have paired successfully
-        assertTrue(pairedDevicesRepository.isDevicePaired(testCamera.macAddress))
+        verify { companionDeviceManagerHelper.requestAssociation(any()) }
+        assertEquals(PairingScreenState.Idle, viewModel.state.value)
+        assertFalse(pairedDevicesRepository.isDevicePaired(testCamera.macAddress))
     }
 
     @Test
@@ -368,11 +326,6 @@ class PairingViewModelTest {
 
     @Test
     fun `multiple pairDevice calls emit navigation event for each successful pairing`() = runTest {
-        // Simulate OS bonding the device after each BLE connection
-        cameraRepository.onConnectSuccess = { camera ->
-            bluetoothBondingChecker.setBonded(camera.macAddress, bonded = true)
-        }
-
         val events = mutableListOf<PairingNavigationEvent>()
 
         // Collect events in background
@@ -385,8 +338,7 @@ class PairingViewModelTest {
         // Ensure first event was received before starting second pairing
         assertEquals("First pairing should emit an event", 1, events.size)
 
-        // Second pairing - need to unbond first since device is now bonded
-        bluetoothBondingChecker.setBonded(testCamera.macAddress, bonded = false)
+        // Second pairing - device is already paired in repository
         viewModel.pairDevice(testCamera)
         advanceUntilIdle()
 

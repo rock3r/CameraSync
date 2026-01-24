@@ -57,7 +57,13 @@ class KableCameraRepository(private val vendorRegistry: CameraVendorRegistry) : 
     }
 
     override val discoveredCameras: Flow<Camera>
-        get() = scanner.advertisements.mapNotNull { it.toCamera() }
+        get() =
+            scanner.advertisements.mapNotNull { advertisement ->
+                Log.debug(tag = TAG) {
+                    "Scan advertisement: ${advertisement.identifier} (${advertisement.peripheralName})"
+                }
+                advertisement.toCamera()
+            }
 
     override fun startScanning() {
         // Scanner is lazy and starts when advertisements flow is collected
@@ -70,6 +76,7 @@ class KableCameraRepository(private val vendorRegistry: CameraVendorRegistry) : 
     }
 
     override fun findCameraByMacAddress(macAddress: String): Flow<Camera> {
+        Log.info(tag = TAG) { "Scanning for camera by MAC: $macAddress" }
         @OptIn(ObsoleteKableApi::class)
         val scanner =
             com.juul.kable.Scanner {
@@ -85,12 +92,16 @@ class KableCameraRepository(private val vendorRegistry: CameraVendorRegistry) : 
     override suspend fun connect(camera: Camera, onFound: (() -> Unit)?): CameraConnection {
         // We need to scan for the device first to get the Advertisement
         // This is a limitation of Kable - we need the Advertisement to create a Peripheral
+        Log.info(tag = TAG) { "Looking for ${camera.name ?: camera.macAddress} (${camera.macAddress})" }
         val scanner =
             com.juul.kable.Scanner {
                 @OptIn(ObsoleteKableApi::class) filters { match { address = camera.macAddress } }
             }
 
         val advertisement = scanner.advertisements.first()
+        Log.info(tag = TAG) {
+            "Found advertisement for ${camera.name ?: camera.macAddress}: ${advertisement.identifier} (${advertisement.peripheralName})"
+        }
         onFound?.invoke()
 
         val peripheral =
@@ -230,14 +241,23 @@ internal class KableCameraConnection(
             )
         }
 
+        Log.debug(tag = TAG) { "Reading firmware version for ${camera.macAddress}" }
         val service =
-            peripheral.services.value.orEmpty().first {
+            peripheral.services.value.orEmpty().firstOrNull {
                 it.serviceUuid == gattSpec.firmwareServiceUuid
             }
+                ?: throw IllegalStateException(
+                    "Firmware service not found. Service UUID: ${gattSpec.firmwareServiceUuid}. " +
+                        "Available services: ${peripheral.services.value?.map { it.serviceUuid } ?: "N/A"}"
+                )
         val char =
-            service.characteristics.first {
+            service.characteristics.firstOrNull {
                 it.characteristicUuid == gattSpec.firmwareVersionCharacteristicUuid
             }
+                ?: throw IllegalStateException(
+                    "Firmware characteristic not found. Characteristic UUID: ${gattSpec.firmwareVersionCharacteristicUuid}. " +
+                        "Available characteristics in service ${service.serviceUuid}: ${service.characteristics.map { it.characteristicUuid }}"
+                )
 
         val firmwareBytes = peripheral.read(char)
         val version = firmwareBytes.decodeToString().trimEnd(Char(0))
@@ -308,6 +328,7 @@ internal class KableCameraConnection(
             )
         }
 
+        Log.debug(tag = TAG) { "Syncing date/time for ${camera.macAddress}" }
         val service =
             peripheral.services.value.orEmpty().first {
                 it.serviceUuid == gattSpec.dateTimeServiceUuid
@@ -319,7 +340,7 @@ internal class KableCameraConnection(
 
         val data = protocol.encodeDateTime(dateTime)
         Log.info(tag = TAG) { "Syncing date/time: ${protocol.decodeDateTime(data)}" }
-        peripheral.write(char, data, WriteType.WithResponse)
+        peripheral.write(char, data, locationWriteType())
     }
 
     override suspend fun readDateTime(): ByteArray {
@@ -404,6 +425,7 @@ internal class KableCameraConnection(
             )
         }
 
+        Log.debug(tag = TAG) { "Syncing location for ${camera.macAddress}" }
         val service =
             peripheral.services.value.orEmpty().firstOrNull {
                 it.serviceUuid == gattSpec.locationServiceUuid
@@ -424,7 +446,7 @@ internal class KableCameraConnection(
 
         val data = protocol.encodeLocation(location)
         Log.info(tag = TAG) { "Syncing location: ${protocol.decodeLocation(data)}" }
-        peripheral.write(char, data, WriteType.WithResponse)
+        peripheral.write(char, data, locationWriteType())
     }
 
     @OptIn(ExperimentalApi::class)
@@ -436,4 +458,10 @@ internal class KableCameraConnection(
     companion object {
         private const val TAG = "KableCameraConnection"
     }
+
+    private fun locationWriteType(): WriteType =
+        when (camera.vendor.vendorId) {
+            "sony" -> WriteType.WithoutResponse
+            else -> WriteType.WithResponse
+        }
 }

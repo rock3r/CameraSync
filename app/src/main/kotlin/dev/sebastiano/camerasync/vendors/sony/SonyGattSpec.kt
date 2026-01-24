@@ -22,24 +22,25 @@ object SonyGattSpec : CameraGattSpec {
 
     /** Location Status Notify Characteristic (DD01) - subscribe for status notifications. */
     val LOCATION_STATUS_NOTIFY_CHARACTERISTIC_UUID: Uuid =
-        Uuid.parse("8000DD01-DD01-FFFF-FFFF-FFFFFFFFFFFF")
+        Uuid.parse("0000DD01-0000-1000-8000-00805f9b34fb")
 
     /** Location Data Write Characteristic (DD11) - write location and time data here. */
     val LOCATION_DATA_WRITE_CHARACTERISTIC_UUID: Uuid =
-        Uuid.parse("8000DD11-DD11-FFFF-FFFF-FFFFFFFFFFFF")
+        Uuid.parse("0000DD11-0000-1000-8000-00805f9b34fb")
 
     /**
      * Configuration Read Characteristic (DD21) - read to check if timezone/DST data is required.
      */
     val LOCATION_CONFIG_READ_CHARACTERISTIC_UUID: Uuid =
-        Uuid.parse("8000DD21-DD21-FFFF-FFFF-FFFFFFFFFFFF")
+        Uuid.parse("0000DD21-0000-1000-8000-00805f9b34fb")
 
     /** Lock Location Endpoint (DD30) - firmware 3.02+ only. */
-    val LOCATION_LOCK_CHARACTERISTIC_UUID: Uuid = Uuid.parse("8000DD30-DD30-FFFF-FFFF-FFFFFFFFFFFF")
+    val LOCATION_LOCK_CHARACTERISTIC_UUID: Uuid =
+        Uuid.parse("0000DD30-0000-1000-8000-00805f9b34fb")
 
     /** Enable Location Update (DD31) - firmware 3.02+ only. */
     val LOCATION_ENABLE_CHARACTERISTIC_UUID: Uuid =
-        Uuid.parse("8000DD31-DD31-FFFF-FFFF-FFFFFFFFFFFF")
+        Uuid.parse("0000DD31-0000-1000-8000-00805f9b34fb")
 
     /** Pairing Service UUID. */
     val PAIRING_SERVICE_UUID: Uuid = Uuid.parse("8000EE00-EE00-FFFF-FFFF-FFFFFFFFFFFF")

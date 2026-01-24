@@ -28,7 +28,7 @@ class SonyGattSpecTest {
     @Test
     fun `location status notify characteristic UUID matches documentation`() {
         assertEquals(
-            Uuid.parse("8000DD01-DD01-FFFF-FFFF-FFFFFFFFFFFF"),
+            Uuid.parse("0000DD01-0000-1000-8000-00805f9b34fb"),
             SonyGattSpec.LOCATION_STATUS_NOTIFY_CHARACTERISTIC_UUID,
         )
     }
@@ -36,7 +36,7 @@ class SonyGattSpecTest {
     @Test
     fun `location data write characteristic UUID matches documentation`() {
         assertEquals(
-            Uuid.parse("8000DD11-DD11-FFFF-FFFF-FFFFFFFFFFFF"),
+            Uuid.parse("0000DD11-0000-1000-8000-00805f9b34fb"),
             SonyGattSpec.LOCATION_DATA_WRITE_CHARACTERISTIC_UUID,
         )
     }
@@ -44,7 +44,7 @@ class SonyGattSpecTest {
     @Test
     fun `location config read characteristic UUID matches documentation`() {
         assertEquals(
-            Uuid.parse("8000DD21-DD21-FFFF-FFFF-FFFFFFFFFFFF"),
+            Uuid.parse("0000DD21-0000-1000-8000-00805f9b34fb"),
             SonyGattSpec.LOCATION_CONFIG_READ_CHARACTERISTIC_UUID,
         )
     }
@@ -52,7 +52,7 @@ class SonyGattSpecTest {
     @Test
     fun `location lock characteristic UUID matches documentation`() {
         assertEquals(
-            Uuid.parse("8000DD30-DD30-FFFF-FFFF-FFFFFFFFFFFF"),
+            Uuid.parse("0000DD30-0000-1000-8000-00805f9b34fb"),
             SonyGattSpec.LOCATION_LOCK_CHARACTERISTIC_UUID,
         )
     }
@@ -60,7 +60,7 @@ class SonyGattSpecTest {
     @Test
     fun `location enable characteristic UUID matches documentation`() {
         assertEquals(
-            Uuid.parse("8000DD31-DD31-FFFF-FFFF-FFFFFFFFFFFF"),
+            Uuid.parse("0000DD31-0000-1000-8000-00805f9b34fb"),
             SonyGattSpec.LOCATION_ENABLE_CHARACTERISTIC_UUID,
         )
     }

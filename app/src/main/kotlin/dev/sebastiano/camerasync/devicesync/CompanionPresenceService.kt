@@ -3,6 +3,7 @@ package dev.sebastiano.camerasync.devicesync
 import android.companion.AssociationInfo
 import android.companion.CompanionDeviceService
 import androidx.core.content.ContextCompat
+import com.juul.khronicle.Log
 import dev.sebastiano.camerasync.domain.repository.PairedDevicesRepository
 import dev.zacsweers.metro.Inject
 import kotlinx.coroutines.CoroutineScope
@@ -28,7 +29,8 @@ class CompanionPresenceService(private val pairedDevicesRepository: PairedDevice
     }
 
     private fun handlePresenceChange(associationInfo: AssociationInfo, isPresent: Boolean) {
-        val macAddress = associationInfo.deviceMacAddress?.toString() ?: return
+        val macAddress = associationInfo.deviceMacAddress?.toString()?.uppercase() ?: return
+        Log.info(tag = TAG) { "Companion presence event for $macAddress: isPresent=$isPresent" }
         val appContext = applicationContext
         scope.launch {
             val handler =
@@ -74,7 +76,12 @@ internal class PresenceSyncHandler(
     suspend fun handlePresence(macAddress: String, isPresent: Boolean) {
         val device = repository.getDevice(macAddress) ?: return
         val syncEnabled = repository.isSyncEnabled.first()
-        if (!syncEnabled || !device.isEnabled) return
+        if (!syncEnabled || !device.isEnabled) {
+            Log.info(tag = TAG) {
+                "Ignoring presence for $macAddress (syncEnabled=$syncEnabled, deviceEnabled=${device.isEnabled})"
+            }
+            return
+        }
 
         if (isPresent) {
             startPresenceSync(macAddress, true)
@@ -83,3 +90,5 @@ internal class PresenceSyncHandler(
         }
     }
 }
+
+private const val TAG = "CompanionPresenceService"

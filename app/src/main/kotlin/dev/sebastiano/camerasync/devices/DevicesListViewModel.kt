@@ -67,12 +67,15 @@ class DevicesListViewModel(
     private var scanningCollectionJob: Job? = null
     private var serviceRunningJob: Job? = null
     private var presenceObservationJob: Job? = null
+    private var autoStartJob: Job? = null
+    private var autoStartTriggered = false
     private var observedPresenceMacs = emptySet<String>()
 
     init {
         observeDevices()
         observeServiceRunning()
         observePresenceRequests()
+        observeAutoStartSync()
         locationRepository.startLocationUpdates()
         checkBatteryOptimizationStatus()
     }
@@ -234,6 +237,42 @@ class DevicesListViewModel(
             }
     }
 
+    private fun observeAutoStartSync() {
+        if (autoStartJob != null) return
+        autoStartJob =
+            viewModelScope.launch(ioDispatcher) {
+                combine(
+                        pairedDevicesRepository.enabledDevices,
+                        pairedDevicesRepository.isSyncEnabled,
+                    ) { enabledDevices, isSyncEnabled ->
+                        enabledDevices.isNotEmpty() && isSyncEnabled
+                    }
+                    .collect { shouldStart ->
+                        if (shouldStart && !autoStartTriggered) {
+                            Log.info(tag = TAG) { "Auto-starting sync service" }
+                            val canStartService =
+                                context is android.app.Application ||
+                                    context is android.app.Activity ||
+                                    context is android.app.Service ||
+                                    context is android.content.ContextWrapper
+                            if (!canStartService) {
+                                Log.debug(tag = TAG) { "Skipping auto-start in test context" }
+                                return@collect
+                            }
+                            try {
+                                val intent = MultiDeviceSyncService.createRefreshIntent(context)
+                                context.startService(intent)
+                                autoStartTriggered = true
+                            } catch (e: Exception) {
+                                Log.warn(tag = TAG, throwable = e) {
+                                    "Failed to auto-start sync service"
+                                }
+                            }
+                        }
+                    }
+            }
+    }
+
     /** Sets whether a device is enabled for sync. */
     fun setDeviceEnabled(macAddress: String, enabled: Boolean) {
         viewModelScope.launch(ioDispatcher) {
@@ -343,6 +382,7 @@ class DevicesListViewModel(
         locationRepository.stopLocationUpdates()
         stateCollectionJob?.cancel()
         scanningCollectionJob?.cancel()
+        autoStartJob?.cancel()
         serviceConnection?.let { connection ->
             try {
                 context.unbindService(connection)
