@@ -6,10 +6,13 @@ import dev.sebastiano.camerasync.fakes.FakeBluetoothBondingChecker
 import dev.sebastiano.camerasync.fakes.FakeCameraConnection
 import dev.sebastiano.camerasync.fakes.FakeCameraRepository
 import dev.sebastiano.camerasync.fakes.FakeCameraVendor
+import dev.sebastiano.camerasync.fakes.FakeIssueReporter
 import dev.sebastiano.camerasync.fakes.FakeKhronicleLogger
 import dev.sebastiano.camerasync.fakes.FakeLoggingEngine
 import dev.sebastiano.camerasync.fakes.FakePairedDevicesRepository
 import dev.sebastiano.camerasync.fakes.FakeVendorRegistry
+import dev.sebastiano.camerasync.pairing.CompanionDeviceManagerHelper
+import io.mockk.mockk
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.take
@@ -32,6 +35,7 @@ class PairingViewModelTest {
     private lateinit var pairedDevicesRepository: FakePairedDevicesRepository
     private lateinit var cameraRepository: FakeCameraRepository
     private lateinit var bluetoothBondingChecker: FakeBluetoothBondingChecker
+    private lateinit var issueReporter: FakeIssueReporter
     private lateinit var viewModel: PairingViewModel
     private val testDispatcher = UnconfinedTestDispatcher()
 
@@ -54,6 +58,7 @@ class PairingViewModelTest {
         pairedDevicesRepository = FakePairedDevicesRepository()
         cameraRepository = FakeCameraRepository()
         bluetoothBondingChecker = FakeBluetoothBondingChecker()
+        issueReporter = FakeIssueReporter()
         val vendorRegistry = FakeVendorRegistry()
         // Inject FakeLoggingEngine instead of using KhronicleLogEngine
         viewModel =
@@ -62,6 +67,8 @@ class PairingViewModelTest {
                 cameraRepository = cameraRepository,
                 vendorRegistry = vendorRegistry,
                 bluetoothBondingChecker = bluetoothBondingChecker,
+                companionDeviceManagerHelper = mockk(),
+                issueReporter = issueReporter,
                 loggingEngine = FakeLoggingEngine,
                 ioDispatcher = testDispatcher, // Inject test dispatcher
             )
@@ -377,5 +384,13 @@ class PairingViewModelTest {
 
         // Device should be paired
         assertTrue(pairedDevicesRepository.isDevicePaired(testCamera.macAddress))
+    }
+
+    @Test
+    fun `sendFeedback calls issueReporter`() = runTest {
+        viewModel.sendFeedback()
+        advanceUntilIdle()
+
+        assertTrue("Issue report should have been sent", issueReporter.sendIssueReportCalled)
     }
 }

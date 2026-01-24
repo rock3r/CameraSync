@@ -5,6 +5,7 @@ import android.companion.CompanionDeviceManager
 import android.content.Intent
 import android.content.IntentSender
 import android.os.Parcelable
+import dev.sebastiano.camerasync.feedback.IssueReporter
 import dev.sebastiano.camerasync.pairing.CompanionDeviceManagerHelper
 import android.bluetooth.le.ScanResult
 import androidx.compose.runtime.State
@@ -59,6 +60,7 @@ class PairingViewModel(
     private val vendorRegistry: CameraVendorRegistry,
     private val bluetoothBondingChecker: BluetoothBondingChecker,
     private val companionDeviceManagerHelper: CompanionDeviceManagerHelper,
+    private val issueReporter: IssueReporter,
     private val loggingEngine: LogEngine = KhronicleLogEngine,
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) : ViewModel() {
@@ -377,6 +379,25 @@ class PairingViewModel(
         pairingJob?.cancel()
         pairingJob = null
         _state.value = PairingScreenState.Idle
+    }
+
+    /** Sends feedback report with current pairing context. */
+    fun sendFeedback() {
+        viewModelScope.launch(ioDispatcher) {
+            val currentState = _state.value
+            val extraInfo = buildString {
+                appendLine("Pairing State Info:")
+                appendLine("Current State: $currentState")
+                if (currentState is PairingScreenState.Scanning) {
+                    appendLine("Discovered Devices: ${currentState.discoveredDevices.map { "${it.name} (${it.macAddress})" }}")
+                }
+                if (currentState is PairingScreenState.Pairing) {
+                    appendLine("Target Camera: ${currentState.camera.name} (${currentState.camera.macAddress})")
+                    appendLine("Error: ${currentState.error}")
+                }
+            }
+            issueReporter.sendIssueReport(extraInfo = extraInfo)
+        }
     }
 
     /** Converts a BLE advertisement to a Camera by identifying the vendor. */

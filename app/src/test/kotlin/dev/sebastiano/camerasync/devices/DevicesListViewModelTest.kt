@@ -5,6 +5,7 @@ import dev.sebastiano.camerasync.CameraSyncApp
 import dev.sebastiano.camerasync.domain.model.PairedDevice
 import dev.sebastiano.camerasync.fakes.FakeBatteryOptimizationChecker
 import dev.sebastiano.camerasync.fakes.FakeBluetoothBondingChecker
+import dev.sebastiano.camerasync.fakes.FakeIssueReporter
 import dev.sebastiano.camerasync.fakes.FakeKhronicleLogger
 import dev.sebastiano.camerasync.fakes.FakeLocationRepository
 import dev.sebastiano.camerasync.fakes.FakePairedDevicesRepository
@@ -35,6 +36,7 @@ class DevicesListViewModelTest {
     private lateinit var vendorRegistry: FakeVendorRegistry
     private lateinit var bluetoothBondingChecker: FakeBluetoothBondingChecker
     private lateinit var batteryOptimizationChecker: FakeBatteryOptimizationChecker
+    private lateinit var issueReporter: FakeIssueReporter
     private lateinit var viewModel: DevicesListViewModel
     private val testDispatcher = UnconfinedTestDispatcher()
 
@@ -51,6 +53,7 @@ class DevicesListViewModelTest {
         vendorRegistry = FakeVendorRegistry()
         bluetoothBondingChecker = FakeBluetoothBondingChecker()
         batteryOptimizationChecker = FakeBatteryOptimizationChecker()
+        issueReporter = FakeIssueReporter()
 
         viewModel =
             DevicesListViewModel(
@@ -60,6 +63,7 @@ class DevicesListViewModelTest {
                 vendorRegistry = vendorRegistry,
                 bluetoothBondingChecker = bluetoothBondingChecker,
                 batteryOptimizationChecker = batteryOptimizationChecker,
+                issueReporter = issueReporter,
                 ioDispatcher = testDispatcher, // Inject test dispatcher for IO operations
             )
     }
@@ -383,6 +387,14 @@ class DevicesListViewModelTest {
                 finalState.isIgnoringBatteryOptimizations,
             )
         }
+
+    @Test
+    fun `sendFeedback calls issueReporter`() = runTest {
+        viewModel.sendFeedback()
+        advanceUntilIdle()
+
+        assertTrue("Issue report should have been sent", issueReporter.sendIssueReportCalled)
+    }
 
     private fun mockContext(): Context {
         // Return a relaxed mock context that won't crash

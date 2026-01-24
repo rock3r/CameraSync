@@ -71,6 +71,7 @@ This is an Android project built with:
 6. **GPS & Time Sync**: Real-time location and timestamp synchronization.
 7. **Manual Control**: Notification actions to "Refresh" (restart sync) or "Stop All" (persistent stop).
 8. **Battery Optimization Warnings**: Proactive UI warnings when battery optimizations are enabled, with direct links to disable them (including OEM-specific settings).
+9. **Issue Reporting**: Integrated feedback system that collects system info, BLE metadata (bonding state, firmware version, hardware revision), and app logs to troubleshoot connectivity issues.
 
 ### Testing
 - Unit tests use coroutine test dispatchers with `TestScope`

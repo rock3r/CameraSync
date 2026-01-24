@@ -18,6 +18,7 @@ import dev.sebastiano.camerasync.domain.model.PairedDeviceWithState
 import dev.sebastiano.camerasync.domain.repository.LocationRepository
 import dev.sebastiano.camerasync.domain.repository.PairedDevicesRepository
 import dev.sebastiano.camerasync.domain.vendor.CameraVendorRegistry
+import dev.sebastiano.camerasync.feedback.IssueReporter
 import dev.sebastiano.camerasync.pairing.BluetoothBondingChecker
 import dev.sebastiano.camerasync.util.AndroidBatteryOptimizationChecker
 import dev.sebastiano.camerasync.util.BatteryOptimizationChecker
@@ -46,6 +47,7 @@ class DevicesListViewModel(
     private val bindingContextProvider: () -> Context,
     private val vendorRegistry: CameraVendorRegistry,
     private val bluetoothBondingChecker: BluetoothBondingChecker,
+    private val issueReporter: IssueReporter,
     private val batteryOptimizationChecker: BatteryOptimizationChecker =
         AndroidBatteryOptimizationChecker(),
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
@@ -231,6 +233,26 @@ class DevicesListViewModel(
             val context = bindingContextProvider()
             val intent = MultiDeviceSyncService.createRefreshIntent(context)
             context.startService(intent)
+        }
+    }
+
+    /** Sends a feedback report. */
+    fun sendFeedback() {
+        viewModelScope.launch(ioDispatcher) {
+             // For devices list, we might want to attach info about all devices or just general state
+             // The IssueReporter handles general state. We can pass extra info about paired devices status.
+             val extraInfo = buildString {
+                 appendLine("Paired Devices Status:")
+                 val states = _state.value
+                 if (states is DevicesListState.HasDevices) {
+                     states.devices.forEach { deviceWithState ->
+                         appendLine("- ${deviceWithState.device.name} (${deviceWithState.device.macAddress}): ${deviceWithState.connectionState}")
+                     }
+                 } else {
+                     appendLine("No devices or loading.")
+                 }
+             }
+             issueReporter.sendIssueReport(extraInfo = extraInfo)
         }
     }
 

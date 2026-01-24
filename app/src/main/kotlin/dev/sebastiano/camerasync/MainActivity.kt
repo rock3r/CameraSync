@@ -30,6 +30,7 @@ import dev.sebastiano.camerasync.domain.repository.CameraRepository
 import dev.sebastiano.camerasync.domain.repository.LocationRepository
 import dev.sebastiano.camerasync.domain.repository.PairedDevicesRepository
 import dev.sebastiano.camerasync.domain.vendor.CameraVendorRegistry
+import dev.sebastiano.camerasync.feedback.IssueReporter
 import dev.sebastiano.camerasync.pairing.BluetoothBondingChecker
 import dev.sebastiano.camerasync.pairing.CompanionDeviceManagerHelper
 import dev.sebastiano.camerasync.pairing.PairingScreen
@@ -46,6 +47,7 @@ class MainActivity : ComponentActivity() {
     @Inject lateinit var bluetoothBondingChecker: BluetoothBondingChecker
     @Inject lateinit var cameraRepository: CameraRepository
     @Inject lateinit var companionDeviceManagerHelper: CompanionDeviceManagerHelper
+    @Inject lateinit var issueReporter: IssueReporter
 
     private val appGraph: AppGraph by lazy { (application as CameraSyncApp).appGraph }
 
@@ -64,6 +66,7 @@ class MainActivity : ComponentActivity() {
                 bluetoothBondingChecker = bluetoothBondingChecker,
                 cameraRepository = cameraRepository,
                 companionDeviceManagerHelper = companionDeviceManagerHelper,
+                issueReporter = issueReporter,
                 context = this
             )
         }
@@ -79,6 +82,7 @@ private fun RootComposable(
     bluetoothBondingChecker: BluetoothBondingChecker,
     cameraRepository: CameraRepository,
     companionDeviceManagerHelper: CompanionDeviceManagerHelper,
+    issueReporter: IssueReporter,
     context: Context,
 ) {
     CameraSyncTheme {
@@ -139,6 +143,7 @@ private fun RootComposable(
                                 bindingContextProvider = { context.applicationContext },
                                 vendorRegistry = vendorRegistry,
                                 bluetoothBondingChecker = bluetoothBondingChecker,
+                                issueReporter = issueReporter,
                             )
                         }
 
@@ -156,6 +161,7 @@ private fun RootComposable(
                                 vendorRegistry = vendorRegistry,
                                 bluetoothBondingChecker = bluetoothBondingChecker,
                                 companionDeviceManagerHelper = companionDeviceManagerHelper,
+                                issueReporter = issueReporter,
                             )
                         }
 

@@ -121,6 +121,14 @@ interface CameraGattSpec {
     /** Pairing characteristic UUID, or null if vendor-specific pairing is not required. */
     val pairingCharacteristicUuid: Uuid?
         get() = null
+
+    /** Hardware revision service UUID, or null if not supported. Defaults to standard Device Information Service. */
+    val hardwareRevisionServiceUuid: Uuid?
+        get() = Uuid.parse("0000180a-0000-1000-8000-00805f9b34fb")
+
+    /** Hardware revision characteristic UUID, or null if not supported. Defaults to standard Hardware Revision String. */
+    val hardwareRevisionCharacteristicUuid: Uuid?
+        get() = Uuid.parse("00002a27-0000-1000-8000-00805f9b34fb")
 }
 
 /** Handles encoding and decoding of data for a camera vendor's BLE protocol. */
@@ -200,4 +208,7 @@ data class CameraCapabilities(
      * complete the pairing process.
      */
     val requiresVendorPairing: Boolean = false,
+
+    /** Whether the camera supports reading hardware revision. */
+    val supportsHardwareRevision: Boolean = false,
 )

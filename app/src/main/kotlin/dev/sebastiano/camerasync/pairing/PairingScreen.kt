@@ -141,6 +141,19 @@ fun PairingScreen(
                 )
             }
         },
+        bottomBar = {
+            Box(
+                modifier = Modifier.fillMaxWidth().padding(16.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    text = "Having issues? Let us know",
+                    color = MaterialTheme.colorScheme.primary,
+                    style = MaterialTheme.typography.bodyMedium,
+                    modifier = Modifier.clickable { viewModel.sendFeedback() },
+                )
+            }
+        },
     ) { innerPadding ->
         Box(modifier = Modifier.padding(innerPadding)) {
             when (currentState) {

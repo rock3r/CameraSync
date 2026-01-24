@@ -22,6 +22,9 @@ class FakeCameraConnection(override val camera: Camera) : CameraConnection {
     var geoTaggingEnabled = false
         private set
 
+    var hardwareRevision = "1.0.0"
+        private set
+
     var lastSyncedLocation: GpsLocation? = null
         private set
 
@@ -32,6 +35,9 @@ class FakeCameraConnection(override val camera: Camera) : CameraConnection {
         private set
 
     var readFirmwareVersionCalled = false
+        private set
+
+    var readHardwareRevisionCalled = false
         private set
 
     var initializePairingCalled = false
@@ -47,6 +53,11 @@ class FakeCameraConnection(override val camera: Camera) : CameraConnection {
     override suspend fun readFirmwareVersion(): String {
         readFirmwareVersionCalled = true
         return firmwareVersion
+    }
+
+    override suspend fun readHardwareRevision(): String {
+        readHardwareRevisionCalled = true
+        return hardwareRevision
     }
 
     override suspend fun setPairedDeviceName(name: String) {

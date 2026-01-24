@@ -12,6 +12,7 @@ The app allows you to select your camera from nearby BLE devices on the first st
 - **Automatic Synchronization**: Real-time GPS location and date/time sync.
 - **Auto-reconnection**: Automatically reconnects to paired cameras when they are within range.
 - **Background Operation**: Continues to sync even when the app is backgrounded (using a foreground service).
+- **Feedback & Issue Reporting**: Integrated system to collect BLE metadata and system info for troubleshooting.
 - **Material 3 UI**: Modern and clean interface built with Jetpack Compose.
 
 ## Supported cameras

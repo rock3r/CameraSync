@@ -245,6 +245,36 @@ internal class KableCameraConnection(
         return version
     }
 
+    override suspend fun readHardwareRevision(): String {
+        if (!capabilities.supportsHardwareRevision) {
+            throw UnsupportedOperationException(
+                "${camera.vendor.vendorName} cameras do not support hardware revision reading"
+            )
+        }
+
+        val serviceUuid = gattSpec.hardwareRevisionServiceUuid
+        val charUuid = gattSpec.hardwareRevisionCharacteristicUuid
+
+        if (serviceUuid == null || charUuid == null) {
+            throw UnsupportedOperationException(
+                "${camera.vendor.vendorName} cameras do not support hardware revision reading (UUIDs not configured)"
+            )
+        }
+
+        val service =
+            peripheral.services.value.orEmpty().firstOrNull { it.serviceUuid == serviceUuid }
+                ?: throw IllegalStateException("Hardware revision service not found: $serviceUuid")
+
+        val char =
+            service.characteristics.firstOrNull { it.characteristicUuid == charUuid }
+                ?: throw IllegalStateException("Hardware revision characteristic not found: $charUuid")
+
+        val bytes = peripheral.read(char)
+        val revision = bytes.decodeToString().trimEnd(Char(0))
+        Log.info(tag = TAG) { "Hardware revision: $revision" }
+        return revision
+    }
+
     override suspend fun setPairedDeviceName(name: String) {
         if (!capabilities.supportsDeviceName) {
             throw UnsupportedOperationException(

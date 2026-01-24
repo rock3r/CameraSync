@@ -93,6 +93,7 @@ object SonyCameraVendor : CameraVendor {
             supportsGeoTagging = false, // No separate toggle; location data includes time
             supportsLocationSync = true,
             requiresVendorPairing = true, // Sony requires writing to EE01 characteristic
+            supportsHardwareRevision = true,
         )
     }
 

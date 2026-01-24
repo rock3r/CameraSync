@@ -19,6 +19,8 @@ import dev.sebastiano.camerasync.domain.repository.LocationRepository
 import dev.sebastiano.camerasync.domain.repository.PairedDevicesRepository
 import dev.sebastiano.camerasync.domain.vendor.CameraVendorRegistry
 import dev.sebastiano.camerasync.domain.vendor.DefaultCameraVendorRegistry
+import dev.sebastiano.camerasync.feedback.AndroidIssueReporter
+import dev.sebastiano.camerasync.feedback.IssueReporter
 import dev.sebastiano.camerasync.pairing.AndroidBluetoothBondingChecker
 import dev.sebastiano.camerasync.pairing.BluetoothBondingChecker
 import dev.sebastiano.camerasync.pairing.CompanionDeviceManagerHelper
@@ -99,6 +101,9 @@ interface AppGraph {
         vendorRegistry: CameraVendorRegistry,
     ): CompanionDeviceManagerHelper =
         CompanionDeviceManagerHelper(context, vendorRegistry)
+
+    @Provides
+    fun provideIssueReporter(context: Context): IssueReporter = AndroidIssueReporter(context)
 
     @DependencyGraph.Factory
     interface Factory {
