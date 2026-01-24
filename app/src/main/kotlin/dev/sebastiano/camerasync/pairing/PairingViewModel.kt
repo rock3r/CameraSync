@@ -111,7 +111,7 @@ class PairingViewModel(
     fun requestCompanionPairing() {
         companionDeviceManagerHelper.requestAssociation(
             object : CompanionDeviceManager.Callback() {
-                override fun onDeviceFound(chooserLauncher: IntentSender) {
+                override fun onAssociationPending(chooserLauncher: IntentSender) {
                     viewModelScope.launch { _associationRequest.send(chooserLauncher) }
                 }
 
