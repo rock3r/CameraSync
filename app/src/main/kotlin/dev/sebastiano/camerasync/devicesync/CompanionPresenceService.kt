@@ -3,9 +3,8 @@ package dev.sebastiano.camerasync.devicesync
 import android.companion.AssociationInfo
 import android.companion.CompanionDeviceService
 import androidx.core.content.ContextCompat
-import dev.sebastiano.camerasync.data.repository.DataStorePairedDevicesRepository
-import dev.sebastiano.camerasync.data.repository.pairedDevicesDataStoreV2
 import dev.sebastiano.camerasync.domain.repository.PairedDevicesRepository
+import dev.zacsweers.metro.Inject
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -13,7 +12,10 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
-class CompanionPresenceService : CompanionDeviceService() {
+class CompanionPresenceService
+@Inject
+constructor(private val pairedDevicesRepository: PairedDevicesRepository) :
+    CompanionDeviceService() {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     override fun onDeviceAppeared(associationInfo: AssociationInfo) {
@@ -28,10 +30,9 @@ class CompanionPresenceService : CompanionDeviceService() {
         val macAddress = associationInfo.deviceMacAddress?.toString() ?: return
         val appContext = applicationContext
         scope.launch {
-            val repository = DataStorePairedDevicesRepository(appContext.pairedDevicesDataStoreV2)
             val handler =
                 PresenceSyncHandler(
-                    repository = repository,
+                    repository = pairedDevicesRepository,
                     isServiceRunning = { MultiDeviceSyncService.isRunning.value },
                     startPresenceSync = { deviceAddress, shouldStart ->
                         if (shouldStart) {

@@ -21,8 +21,8 @@ import dev.sebastiano.camerasync.domain.vendor.CameraVendorRegistry
 import dev.sebastiano.camerasync.feedback.IssueReporter
 import dev.sebastiano.camerasync.pairing.BluetoothBondingChecker
 import dev.sebastiano.camerasync.pairing.CompanionDeviceManagerHelper
-import dev.sebastiano.camerasync.util.AndroidBatteryOptimizationChecker
 import dev.sebastiano.camerasync.util.BatteryOptimizationChecker
+import dev.zacsweers.metro.Inject
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -38,20 +38,21 @@ private const val TAG = "DevicesListViewModel"
  * Manages the list of paired devices and their connection states. Communicates with the
  * [MultiDeviceSyncService] to control device sync.
  *
- * @param ioDispatcher The dispatcher to use for IO operations. Defaults to [Dispatchers.IO]. Can be
- *   overridden in tests to use a test dispatcher.
+ * @param ioDispatcher The dispatcher to use for IO operations. Can be overridden in tests to use a
+ *   test dispatcher.
  */
-class DevicesListViewModel(
+class DevicesListViewModel
+@Inject
+constructor(
     private val pairedDevicesRepository: PairedDevicesRepository,
     private val locationRepository: LocationRepository,
-    private val bindingContextProvider: () -> Context,
+    private val context: Context,
     private val vendorRegistry: CameraVendorRegistry,
     private val bluetoothBondingChecker: BluetoothBondingChecker,
     private val companionDeviceManagerHelper: CompanionDeviceManagerHelper,
     private val issueReporter: IssueReporter,
-    private val batteryOptimizationChecker: BatteryOptimizationChecker =
-        AndroidBatteryOptimizationChecker(),
-    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
+    private val batteryOptimizationChecker: BatteryOptimizationChecker,
+    private val ioDispatcher: CoroutineDispatcher,
 ) : ViewModel() {
 
     private val _state = mutableStateOf<DevicesListState>(DevicesListState.Loading)
@@ -129,7 +130,6 @@ class DevicesListViewModel(
     /** Checks and updates the battery optimization status. Call when returning from settings. */
     fun checkBatteryOptimizationStatus() {
         viewModelScope.launch(ioDispatcher) {
-            val context = bindingContextProvider()
             val isIgnoring = batteryOptimizationChecker.isIgnoringBatteryOptimizations(context)
             batteryOptimizationStatus.value = isIgnoring
         }
@@ -151,7 +151,6 @@ class DevicesListViewModel(
     }
 
     private fun bindToRunningService() {
-        val context = bindingContextProvider()
         val intent = Intent(context, MultiDeviceSyncService::class.java)
         if (serviceConnection != null) return
 
@@ -192,7 +191,6 @@ class DevicesListViewModel(
     }
 
     private fun unbindFromService() {
-        val context = bindingContextProvider()
         serviceConnection?.let { connection ->
             try {
                 context.unbindService(connection)
@@ -278,7 +276,6 @@ class DevicesListViewModel(
     fun refreshConnections() {
         viewModelScope.launch(ioDispatcher) {
             pairedDevicesRepository.setSyncEnabled(true)
-            val context = bindingContextProvider()
             val intent = MultiDeviceSyncService.createRefreshIntent(context)
             context.startService(intent)
         }
@@ -349,7 +346,7 @@ class DevicesListViewModel(
         scanningCollectionJob?.cancel()
         serviceConnection?.let { connection ->
             try {
-                bindingContextProvider().unbindService(connection)
+                context.unbindService(connection)
             } catch (e: Exception) {
                 Log.warn(tag = TAG, throwable = e) { "Error unbinding service" }
             }

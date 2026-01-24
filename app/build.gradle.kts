@@ -89,6 +89,7 @@ dependencies {
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.dataStore)
     implementation(libs.androidx.lifecycle.runtime.ktx)
+    implementation(libs.androidx.lifecycle.viewmodel.compose)
     implementation(libs.androidx.lifecycle.process)
     implementation(libs.androidx.material3)
     implementation(libs.androidx.navigation3.runtime)
@@ -105,7 +106,6 @@ dependencies {
     implementation(libs.maplibre.material3)
     implementation(libs.maplibre.spatialk)
     implementation(libs.protobuf.kotlin.lite)
-    implementation(libs.javax.inject)
 
     debugImplementation(libs.androidx.ui.test.manifest)
     debugImplementation(libs.androidx.ui.tooling)

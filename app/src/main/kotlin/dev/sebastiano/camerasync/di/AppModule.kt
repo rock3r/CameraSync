@@ -7,9 +7,12 @@ import dev.sebastiano.camerasync.data.repository.DataStorePairedDevicesRepositor
 import dev.sebastiano.camerasync.data.repository.FusedLocationRepository
 import dev.sebastiano.camerasync.data.repository.KableCameraRepository
 import dev.sebastiano.camerasync.data.repository.pairedDevicesDataStoreV2
+import dev.sebastiano.camerasync.devices.DevicesListViewModel
 import dev.sebastiano.camerasync.devicesync.AndroidIntentFactory
 import dev.sebastiano.camerasync.devicesync.AndroidNotificationBuilder
 import dev.sebastiano.camerasync.devicesync.AndroidPendingIntentFactory
+import dev.sebastiano.camerasync.devicesync.CompanionPresenceService
+import dev.sebastiano.camerasync.devicesync.DefaultLocationCollector
 import dev.sebastiano.camerasync.devicesync.IntentFactory
 import dev.sebastiano.camerasync.devicesync.MultiDeviceSyncService
 import dev.sebastiano.camerasync.devicesync.NotificationBuilder
@@ -24,10 +27,15 @@ import dev.sebastiano.camerasync.feedback.IssueReporter
 import dev.sebastiano.camerasync.pairing.AndroidBluetoothBondingChecker
 import dev.sebastiano.camerasync.pairing.BluetoothBondingChecker
 import dev.sebastiano.camerasync.pairing.CompanionDeviceManagerHelper
+import dev.sebastiano.camerasync.pairing.PairingViewModel
+import dev.sebastiano.camerasync.util.AndroidBatteryOptimizationChecker
+import dev.sebastiano.camerasync.util.BatteryOptimizationChecker
 import dev.sebastiano.camerasync.vendors.ricoh.RicohCameraVendor
 import dev.sebastiano.camerasync.vendors.sony.SonyCameraVendor
 import dev.zacsweers.metro.DependencyGraph
 import dev.zacsweers.metro.Provides
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.Dispatchers
 
 /**
  * Metro dependency graph for production dependencies.
@@ -38,11 +46,27 @@ import dev.zacsweers.metro.Provides
  */
 @DependencyGraph
 interface AppGraph {
-    fun inject(service: MultiDeviceSyncService)
+    fun mainActivity(): MainActivity
 
-    fun inject(activity: MainActivity)
+    fun multiDeviceSyncService(): MultiDeviceSyncService
+
+    fun companionPresenceService(): CompanionPresenceService
+
+    fun devicesListViewModel(): DevicesListViewModel
+
+    fun pairingViewModel(): PairingViewModel
+
+    fun viewModelFactory(): MetroViewModelFactory = MetroViewModelFactory(this)
+
+    fun locationCollectorFactory(): DefaultLocationCollector.Factory
 
     @Provides fun provideApplicationContext(application: Application): Context = application
+
+    @Provides
+    fun provideBatteryOptimizationChecker(): BatteryOptimizationChecker =
+        AndroidBatteryOptimizationChecker()
+
+    @Provides fun provideIoDispatcher(): CoroutineDispatcher = Dispatchers.IO
 
     /**
      * Creates the default camera vendor registry with all supported vendors.

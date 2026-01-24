@@ -63,7 +63,7 @@ class DevicesListViewModelTest {
             DevicesListViewModel(
                 pairedDevicesRepository = pairedDevicesRepository,
                 locationRepository = locationRepository,
-                bindingContextProvider = { mockContext() },
+                context = mockContext(),
                 vendorRegistry = vendorRegistry,
                 bluetoothBondingChecker = bluetoothBondingChecker,
                 companionDeviceManagerHelper = companionDeviceManagerHelper,
@@ -354,7 +354,7 @@ class DevicesListViewModelTest {
                 DevicesListViewModel(
                     pairedDevicesRepository = pairedDevicesRepository,
                     locationRepository = locationRepository,
-                    bindingContextProvider = { mockContext() },
+                    context = mockContext(),
                     vendorRegistry = vendorRegistry,
                     bluetoothBondingChecker = bluetoothBondingChecker,
                     companionDeviceManagerHelper = companionDeviceManagerHelper,

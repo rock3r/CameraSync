@@ -24,10 +24,10 @@ import dev.sebastiano.camerasync.domain.repository.PairedDevicesRepository
 import dev.sebastiano.camerasync.domain.vendor.CameraVendorRegistry
 import dev.sebastiano.camerasync.feedback.IssueReporter
 import dev.sebastiano.camerasync.logging.KhronicleLogEngine
+import dev.zacsweers.metro.Inject
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 import kotlinx.coroutines.CoroutineDispatcher
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.channels.Channel
@@ -50,19 +50,21 @@ private const val TAG = "PairingViewModel"
  * already-paired devices from the scan results.
  */
 /**
- * @param ioDispatcher The dispatcher to use for IO operations. Defaults to [Dispatchers.IO]. Can be
- *   overridden in tests to use a test dispatcher.
+ * @param ioDispatcher The dispatcher to use for IO operations. Can be overridden in tests to use a
+ *   test dispatcher.
  */
 @OptIn(ExperimentalUuidApi::class)
-class PairingViewModel(
+class PairingViewModel
+@Inject
+constructor(
     private val pairedDevicesRepository: PairedDevicesRepository,
     private val cameraRepository: CameraRepository,
     private val vendorRegistry: CameraVendorRegistry,
     private val bluetoothBondingChecker: BluetoothBondingChecker,
     private val companionDeviceManagerHelper: CompanionDeviceManagerHelper,
     private val issueReporter: IssueReporter,
+    private val ioDispatcher: CoroutineDispatcher,
     private val loggingEngine: LogEngine = KhronicleLogEngine,
-    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) : ViewModel() {
 
     private val _state = mutableStateOf<PairingScreenState>(PairingScreenState.Idle)

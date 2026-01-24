@@ -17,7 +17,6 @@ import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.ProcessLifecycleOwner
 import com.juul.khronicle.Log
-import dev.sebastiano.camerasync.CameraSyncApp
 import dev.sebastiano.camerasync.domain.model.DeviceConnectionState
 import dev.sebastiano.camerasync.domain.model.PairedDevice
 import dev.sebastiano.camerasync.domain.repository.CameraRepository
@@ -25,7 +24,7 @@ import dev.sebastiano.camerasync.domain.repository.LocationRepository
 import dev.sebastiano.camerasync.domain.repository.PairedDevicesRepository
 import dev.sebastiano.camerasync.domain.vendor.CameraVendorRegistry
 import dev.sebastiano.camerasync.pairing.CompanionDeviceManagerHelper
-import javax.inject.Inject
+import dev.zacsweers.metro.Inject
 import kotlin.coroutines.CoroutineContext
 import kotlinx.coroutines.CoroutineName
 import kotlinx.coroutines.CoroutineScope
@@ -53,22 +52,24 @@ private const val TAG = "MultiDeviceSyncService"
  * The service starts automatically when there are enabled paired devices and stops when all devices
  * are disabled or disconnected.
  */
-class MultiDeviceSyncService : Service(), CoroutineScope {
+class MultiDeviceSyncService
+@Inject
+constructor(
+    private val vendorRegistry: CameraVendorRegistry,
+    private val locationRepository: LocationRepository,
+    private val cameraRepository: CameraRepository,
+    private val pairedDevicesRepository: PairedDevicesRepository,
+    private val notificationBuilder: NotificationBuilder,
+    private val intentFactory: IntentFactory,
+    private val pendingIntentFactory: PendingIntentFactory,
+    private val companionDeviceManagerHelper: CompanionDeviceManagerHelper,
+    private val locationCollectorFactory: DefaultLocationCollector.Factory,
+) : Service(), CoroutineScope {
 
     override val coroutineContext: CoroutineContext =
         Dispatchers.IO + CoroutineName("MultiDeviceSyncService") + SupervisorJob()
 
     private val binder by lazy { MultiDeviceSyncServiceBinder() }
-
-    @Inject lateinit var vendorRegistry: CameraVendorRegistry
-    @Inject lateinit var locationRepository: LocationRepository
-    @Inject lateinit var cameraRepository: CameraRepository
-    @Inject lateinit var pairedDevicesRepository: PairedDevicesRepository
-    @Inject lateinit var notificationBuilder: NotificationBuilder
-    @Inject lateinit var intentFactory: IntentFactory
-    @Inject lateinit var pendingIntentFactory: PendingIntentFactory
-    @Inject lateinit var companionDeviceManagerHelper: CompanionDeviceManagerHelper
-    @Inject lateinit var locationCollectorFactory: DefaultLocationCollector.Factory
 
     private val locationCollector by lazy { locationCollectorFactory.create(this) }
 
@@ -104,7 +105,6 @@ class MultiDeviceSyncService : Service(), CoroutineScope {
 
     override fun onCreate() {
         super.onCreate()
-        (applicationContext as CameraSyncApp).appGraph.inject(this)
         _isRunning.value = true
 
         ProcessLifecycleOwner.get()

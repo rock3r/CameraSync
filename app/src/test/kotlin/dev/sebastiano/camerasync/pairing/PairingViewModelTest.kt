@@ -68,8 +68,8 @@ class PairingViewModelTest {
                 bluetoothBondingChecker = bluetoothBondingChecker,
                 companionDeviceManagerHelper = mockk(),
                 issueReporter = issueReporter,
-                loggingEngine = FakeLoggingEngine,
                 ioDispatcher = testDispatcher, // Inject test dispatcher
+                loggingEngine = FakeLoggingEngine,
             )
     }
 
