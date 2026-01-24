@@ -24,6 +24,9 @@ import dev.sebastiano.camerasync.domain.vendor.CameraVendorRegistry
 import dev.sebastiano.camerasync.domain.vendor.DefaultCameraVendorRegistry
 import dev.sebastiano.camerasync.feedback.AndroidIssueReporter
 import dev.sebastiano.camerasync.feedback.IssueReporter
+import dev.sebastiano.camerasync.logging.LogViewerViewModel
+import dev.sebastiano.camerasync.logging.LogRepository
+import dev.sebastiano.camerasync.logging.LogcatLogRepository
 import dev.sebastiano.camerasync.pairing.AndroidBluetoothBondingChecker
 import dev.sebastiano.camerasync.pairing.BluetoothBondingChecker
 import dev.sebastiano.camerasync.pairing.CompanionDeviceManagerHelper
@@ -55,6 +58,8 @@ interface AppGraph {
     fun devicesListViewModel(): DevicesListViewModel
 
     fun pairingViewModel(): PairingViewModel
+
+    fun logViewerViewModel(): LogViewerViewModel
 
     fun viewModelFactory(): MetroViewModelFactory = MetroViewModelFactory(this)
 
@@ -128,6 +133,15 @@ interface AppGraph {
 
     @Provides
     fun provideIssueReporter(context: Context): IssueReporter = AndroidIssueReporter(context)
+
+    @Provides
+    fun provideLogRepository(context: Context): LogRepository = LogcatLogRepository(context)
+
+    @Provides
+    fun provideLogViewerViewModel(
+        logRepository: LogRepository,
+        ioDispatcher: CoroutineDispatcher
+    ): LogViewerViewModel = LogViewerViewModel(logRepository, ioDispatcher)
 
     @DependencyGraph.Factory
     interface Factory {

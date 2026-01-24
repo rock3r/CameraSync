@@ -34,6 +34,8 @@ import dev.sebastiano.camerasync.domain.repository.LocationRepository
 import dev.sebastiano.camerasync.domain.repository.PairedDevicesRepository
 import dev.sebastiano.camerasync.domain.vendor.CameraVendorRegistry
 import dev.sebastiano.camerasync.feedback.IssueReporter
+import dev.sebastiano.camerasync.logging.LogViewerScreen
+import dev.sebastiano.camerasync.logging.LogViewerViewModel
 import dev.sebastiano.camerasync.pairing.BluetoothBondingChecker
 import dev.sebastiano.camerasync.pairing.CompanionDeviceManagerHelper
 import dev.sebastiano.camerasync.pairing.PairingScreen
@@ -125,6 +127,19 @@ private fun RootComposable(viewModelFactory: ViewModelProvider.Factory) {
                         DevicesListScreen(
                             viewModel = devicesListViewModel,
                             onAddDeviceClick = { backStack.add(NavRoute.Pairing) },
+                            onViewLogsClick = { backStack.add(NavRoute.LogViewer) },
+                        )
+                    }
+
+                    NavRoute.LogViewer -> {
+                        val logViewerViewModel: LogViewerViewModel =
+                            viewModel(factory = viewModelFactory)
+
+                        LogViewerScreen(
+                            viewModel = logViewerViewModel,
+                            onNavigateBack = {
+                                if (backStack.size > 1) backStack.removeAt(backStack.lastIndex)
+                            },
                         )
                     }
 

@@ -13,4 +13,7 @@ sealed interface NavRoute {
 
     /** Pairing screen for adding new devices. */
     @Serializable data object Pairing : NavRoute
+
+    /** Log viewer screen. */
+    @Serializable data object LogViewer : NavRoute
 }

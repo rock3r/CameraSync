@@ -3,6 +3,7 @@ package dev.sebastiano.camerasync.di
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import dev.sebastiano.camerasync.devices.DevicesListViewModel
+import dev.sebastiano.camerasync.logging.LogViewerViewModel
 import dev.sebastiano.camerasync.pairing.PairingViewModel
 
 /**
@@ -20,6 +21,8 @@ class MetroViewModelFactory(private val appGraph: AppGraph) : ViewModelProvider.
                 appGraph.devicesListViewModel() as T
             modelClass.isAssignableFrom(PairingViewModel::class.java) ->
                 appGraph.pairingViewModel() as T
+            modelClass.isAssignableFrom(LogViewerViewModel::class.java) ->
+                appGraph.logViewerViewModel() as T
             else -> throw IllegalArgumentException("Unknown ViewModel class: ${modelClass.name}")
         }
     }

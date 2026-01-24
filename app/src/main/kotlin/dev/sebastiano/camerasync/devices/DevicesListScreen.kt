@@ -123,7 +123,11 @@ import org.maplibre.spatialk.geojson.Position
 /** Main screen showing the list of paired devices with their sync status. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun DevicesListScreen(viewModel: DevicesListViewModel, onAddDeviceClick: () -> Unit) {
+fun DevicesListScreen(
+    viewModel: DevicesListViewModel,
+    onAddDeviceClick: () -> Unit,
+    onViewLogsClick: () -> Unit
+) {
     val state by viewModel.state
     var deviceToUnpair by remember { mutableStateOf<PairedDeviceWithState?>(null) }
     var showBatteryOptimizationDialog by remember { mutableStateOf(false) }
@@ -175,6 +179,13 @@ fun DevicesListScreen(viewModel: DevicesListViewModel, onAddDeviceClick: () -> U
                             )
                         }
                         DropdownMenu(expanded = showMenu, onDismissRequest = { showMenu = false }) {
+                            DropdownMenuItem(
+                                text = { Text("View Logs") },
+                                onClick = {
+                                    showMenu = false
+                                    onViewLogsClick()
+                                },
+                            )
                             DropdownMenuItem(
                                 text = { Text("Send Feedback") },
                                 onClick = {
