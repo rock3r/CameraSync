@@ -35,7 +35,6 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withTimeout
 
 private const val TAG = "MultiDeviceSyncCoordinator"
-private const val PERIODIC_SCAN_INTERVAL_MS = 60_000L // 1 minute
 
 /**
  * Coordinates synchronization with multiple camera devices simultaneously.
@@ -69,6 +68,7 @@ class MultiDeviceSyncCoordinator(
     val deviceStates: StateFlow<Map<String, DeviceConnectionState>> = _deviceStates.asStateFlow()
 
     private val _isScanning = MutableStateFlow(false)
+    private val _presentDevices = MutableStateFlow<Set<String>>(emptySet())
 
     /** Flow that emits true when a scan/discovery pass is in progress. */
     val isScanning: StateFlow<Boolean> =
@@ -81,6 +81,9 @@ class MultiDeviceSyncCoordinator(
             }
             .stateIn(coroutineScope, SharingStarted.Eagerly, false)
 
+    /** Flow of devices reported as present by Companion Device Manager. */
+    val presentDevices: StateFlow<Set<String>> = _presentDevices.asStateFlow()
+
     private val deviceJobs = mutableMapOf<String, Job>()
     private val deviceConnections = mutableMapOf<String, CameraConnection>()
     private val jobsMutex = Mutex()
@@ -91,8 +94,8 @@ class MultiDeviceSyncCoordinator(
     private val enabledDevicesFlow = MutableStateFlow<List<PairedDevice>>(emptyList())
 
     /**
-     * Starts background monitoring of enabled devices. This will periodically scan for and connect
-     * to devices that are enabled but not connected.
+     * Starts background monitoring of enabled devices. Connections are triggered by presence events
+     * or explicit refresh requests.
      *
      * @param enabledDevices Flow of enabled devices from the repository.
      */
@@ -101,21 +104,9 @@ class MultiDeviceSyncCoordinator(
 
         backgroundMonitoringJob =
             coroutineScope.launch {
-                // Job for observing enabled devices
-                launch {
-                    enabledDevices.collect { devices ->
-                        enabledDevicesFlow.value = devices
-                        checkAndConnectEnabledDevices()
-                    }
-                }
-
-                // Job for periodic scanning
-                launch {
-                    while (true) {
-                        delay(PERIODIC_SCAN_INTERVAL_MS)
-                        Log.debug(tag = TAG) { "Running periodic scan for enabled devices..." }
-                        checkAndConnectEnabledDevices()
-                    }
+                enabledDevices.collect { devices ->
+                    enabledDevicesFlow.value = devices
+                    checkAndConnectEnabledDevices()
                 }
             }
     }
@@ -123,15 +114,17 @@ class MultiDeviceSyncCoordinator(
     /** Manually triggers a scan for all enabled but disconnected devices. */
     fun refreshConnections() {
         Log.info(tag = TAG) { "Manual refresh requested" }
-        coroutineScope.launch { checkAndConnectEnabledDevices() }
+        coroutineScope.launch { checkAndConnectEnabledDevices(ignorePresence = true) }
     }
 
-    private suspend fun checkAndConnectEnabledDevices() {
+    private suspend fun checkAndConnectEnabledDevices(ignorePresence: Boolean = false) {
         _isScanning.value = true
         try {
             scanMutex.withLock {
                 val enabledDevices = enabledDevicesFlow.value
                 val enabledMacAddresses = enabledDevices.map { it.macAddress }.toSet()
+                val presentMacAddresses =
+                    if (ignorePresence) enabledMacAddresses else _presentDevices.value
 
                 // First, collect devices to disconnect while holding the mutex
                 // We must NOT call stopDeviceSync while holding jobsMutex to avoid deadlock
@@ -141,7 +134,11 @@ class MultiDeviceSyncCoordinator(
                     jobsMutex.withLock {
                         deviceConnections.keys
                             .filter { macAddress ->
-                                if (!enabledMacAddresses.contains(macAddress)) {
+                                if (
+                                    !enabledMacAddresses.contains(macAddress) ||
+                                        (!ignorePresence &&
+                                            !presentMacAddresses.contains(macAddress))
+                                ) {
                                     val state = getDeviceState(macAddress)
                                     state is DeviceConnectionState.Connected ||
                                         state is DeviceConnectionState.Syncing ||
@@ -157,7 +154,7 @@ class MultiDeviceSyncCoordinator(
                 // Now disconnect outside the mutex to avoid deadlock
                 devicesToDisconnect.forEach { macAddress ->
                     Log.info(tag = TAG) {
-                        "Device $macAddress is connected but no longer enabled, disconnecting..."
+                        "Device $macAddress is no longer eligible for sync, disconnecting..."
                     }
                     stopDeviceSync(macAddress)
                 }
@@ -166,11 +163,13 @@ class MultiDeviceSyncCoordinator(
                 enabledDevices.forEach { device ->
                     val macAddress = device.macAddress
                     val state = getDeviceState(macAddress)
+                    val isPresent = presentMacAddresses.contains(macAddress)
 
                     if (
-                        state is DeviceConnectionState.Disconnected ||
-                            state is DeviceConnectionState.Unreachable ||
-                            (state is DeviceConnectionState.Error && state.isRecoverable)
+                        isPresent &&
+                            (state is DeviceConnectionState.Disconnected ||
+                                state is DeviceConnectionState.Unreachable ||
+                                (state is DeviceConnectionState.Error && state.isRecoverable))
                     ) {
                         Log.debug(tag = TAG) {
                             "Device $macAddress is enabled but not connected (state: $state), attempting sync..."
@@ -182,6 +181,14 @@ class MultiDeviceSyncCoordinator(
         } finally {
             _isScanning.value = false
         }
+    }
+
+    /** Updates whether a device is currently present (in range). */
+    fun setDevicePresence(macAddress: String, isPresent: Boolean) {
+        _presentDevices.update { current ->
+            if (isPresent) current + macAddress else current - macAddress
+        }
+        coroutineScope.launch { checkAndConnectEnabledDevices() }
     }
 
     /**

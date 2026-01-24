@@ -35,6 +35,7 @@
     <uses-permission android:name="android.permission.REQUEST_OBSERVE_COMPANION_DEVICE_PRESENCE" />
     <uses-permission android:name="android.permission.REQUEST_COMPANION_RUN_IN_BACKGROUND" />
     <uses-permission android:name="android.permission.REQUEST_COMPANION_USE_DATA_IN_BACKGROUND" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
 
     <uses-feature android:name="android.software.companion_device_setup" android:required="true"/>
 
@@ -99,6 +100,27 @@
             android:name=".devicesync.MultiDeviceSyncService"
             android:exported="false"
             android:foregroundServiceType="connectedDevice|location" />
+
+        <service
+            android:name=".devicesync.CompanionPresenceService"
+            android:exported="true"
+            android:permission="android.permission.BIND_COMPANION_DEVICE_SERVICE">
+            <intent-filter>
+                <action android:name="android.companion.CompanionDeviceService" />
+            </intent-filter>
+            <property
+                android:name="android.companion.PROPERTY_PRIMARY_COMPANION_DEVICE_SERVICE"
+                android:value="true" />
+        </service>
+
+        <receiver
+            android:name=".devicesync.SyncStartupReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+            </intent-filter>
+        </receiver>
 
         <activity
             android:name=".MainActivity"

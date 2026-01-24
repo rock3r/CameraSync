@@ -147,6 +147,38 @@ class MultiDeviceSyncCoordinatorTest {
         }
 
     @Test
+    fun `background monitoring connects only when device is present`() =
+        testScope.runTest {
+            pairedDevicesRepository.setTestDevices(listOf(testDevice1))
+            cameraRepository.connectionToReturn = FakeCameraConnection(testDevice1.toTestCamera())
+
+            coordinator.startBackgroundMonitoring(pairedDevicesRepository.enabledDevices)
+            advanceUntilIdle()
+
+            assertEquals(0, cameraRepository.connectCallCount)
+
+            coordinator.setDevicePresence(testDevice1.macAddress, true)
+            advanceUntilIdle()
+
+            assertEquals(1, cameraRepository.connectCallCount)
+        }
+
+    @Test
+    fun `refreshConnections ignores presence gating`() =
+        testScope.runTest {
+            pairedDevicesRepository.setTestDevices(listOf(testDevice1))
+            cameraRepository.connectionToReturn = FakeCameraConnection(testDevice1.toTestCamera())
+
+            coordinator.startBackgroundMonitoring(pairedDevicesRepository.enabledDevices)
+            advanceUntilIdle()
+
+            coordinator.refreshConnections()
+            advanceUntilIdle()
+
+            assertEquals(1, cameraRepository.connectCallCount)
+        }
+
+    @Test
     fun `multiple devices can be synced simultaneously`() =
         testScope.runTest {
             val connection1 = FakeCameraConnection(testDevice1.toTestCamera())
@@ -485,6 +517,9 @@ class MultiDeviceSyncCoordinatorTest {
 
             assertTrue(coordinator.isDeviceConnected(testDevice1.macAddress))
 
+            coordinator.setDevicePresence(testDevice1.macAddress, true)
+            advanceUntilIdle()
+
             // Start background monitoring
             coordinator.startBackgroundMonitoring(pairedDevicesRepository.enabledDevices)
             advanceUntilIdle()
@@ -525,20 +560,22 @@ class MultiDeviceSyncCoordinatorTest {
             pairedDevicesRepository.addTestDevice(testDevice1)
             pairedDevicesRepository.addTestDevice(testDevice2)
 
-            cameraRepository.connectionToReturn = connection1
-            coordinator.startDeviceSync(testDevice1)
+            // Start background monitoring
+            coordinator.startBackgroundMonitoring(pairedDevicesRepository.enabledDevices)
             advanceUntilIdle()
 
+            // Connect device1 via presence
+            cameraRepository.connectionToReturn = connection1
+            coordinator.setDevicePresence(testDevice1.macAddress, true)
+            advanceUntilIdle()
+
+            // Connect device2 via presence
             cameraRepository.connectionToReturn = connection2
-            coordinator.startDeviceSync(testDevice2)
+            coordinator.setDevicePresence(testDevice2.macAddress, true)
             advanceUntilIdle()
 
             assertTrue(coordinator.isDeviceConnected(testDevice1.macAddress))
             assertTrue(coordinator.isDeviceConnected(testDevice2.macAddress))
-
-            // Start background monitoring
-            coordinator.startBackgroundMonitoring(pairedDevicesRepository.enabledDevices)
-            advanceUntilIdle()
 
             // Disable device1 - this will trigger the enabledDevices flow to emit
             // The background monitoring collector should automatically call
@@ -623,22 +660,22 @@ class MultiDeviceSyncCoordinatorTest {
             pairedDevicesRepository.addTestDevice(testDevice1)
             pairedDevicesRepository.addTestDevice(testDevice2)
 
+            // Start background monitoring
+            coordinator.startBackgroundMonitoring(pairedDevicesRepository.enabledDevices)
+            advanceUntilIdle()
+
             cameraRepository.connectionToReturn = connection1
-            coordinator.startDeviceSync(testDevice1)
+            coordinator.setDevicePresence(testDevice1.macAddress, true)
             advanceUntilIdle()
 
             cameraRepository.connectionToReturn = connection2
-            coordinator.startDeviceSync(testDevice2)
+            coordinator.setDevicePresence(testDevice2.macAddress, true)
             advanceUntilIdle()
 
             // Both should be connected
             assertEquals(2, coordinator.getConnectedDeviceCount())
             assertTrue(coordinator.isDeviceConnected(testDevice1.macAddress))
             assertTrue(coordinator.isDeviceConnected(testDevice2.macAddress))
-
-            // Start background monitoring
-            coordinator.startBackgroundMonitoring(pairedDevicesRepository.enabledDevices)
-            advanceUntilIdle()
 
             // Disable device1 - this will trigger the enabledDevices flow to emit
             // The background monitoring collector should automatically call
@@ -676,6 +713,10 @@ class MultiDeviceSyncCoordinatorTest {
             // Make connection fail when no connection is set
             cameraRepository.failIfConnectionNull = true
             cameraRepository.connectionToReturn = null
+
+            coordinator.setDevicePresence(testDevice1.macAddress, true)
+            coordinator.setDevicePresence(testDevice2.macAddress, true)
+            advanceUntilIdle()
 
             // Start background monitoring to track enabled devices
             coordinator.startBackgroundMonitoring(pairedDevicesRepository.enabledDevices)

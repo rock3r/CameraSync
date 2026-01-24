@@ -20,6 +20,7 @@ import dev.sebastiano.camerasync.domain.repository.PairedDevicesRepository
 import dev.sebastiano.camerasync.domain.vendor.CameraVendorRegistry
 import dev.sebastiano.camerasync.feedback.IssueReporter
 import dev.sebastiano.camerasync.pairing.BluetoothBondingChecker
+import dev.sebastiano.camerasync.pairing.CompanionDeviceManagerHelper
 import dev.sebastiano.camerasync.util.AndroidBatteryOptimizationChecker
 import dev.sebastiano.camerasync.util.BatteryOptimizationChecker
 import kotlinx.coroutines.CoroutineDispatcher
@@ -27,7 +28,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
 private const val TAG = "DevicesListViewModel"
@@ -47,6 +47,7 @@ class DevicesListViewModel(
     private val bindingContextProvider: () -> Context,
     private val vendorRegistry: CameraVendorRegistry,
     private val bluetoothBondingChecker: BluetoothBondingChecker,
+    private val companionDeviceManagerHelper: CompanionDeviceManagerHelper,
     private val issueReporter: IssueReporter,
     private val batteryOptimizationChecker: BatteryOptimizationChecker =
         AndroidBatteryOptimizationChecker(),
@@ -64,10 +65,14 @@ class DevicesListViewModel(
     private val batteryOptimizationStatus = MutableStateFlow(false)
     private var stateCollectionJob: Job? = null
     private var scanningCollectionJob: Job? = null
+    private var serviceRunningJob: Job? = null
+    private var presenceObservationJob: Job? = null
+    private var observedPresenceMacs = emptySet<String>()
 
     init {
         observeDevices()
-        bindToService()
+        observeServiceRunning()
+        observePresenceRequests()
         locationRepository.startLocationUpdates()
         checkBatteryOptimizationStatus()
     }
@@ -130,72 +135,112 @@ class DevicesListViewModel(
         }
     }
 
-    private fun bindToService() {
+    private fun observeServiceRunning() {
         viewModelScope.launch(Dispatchers.Main) {
-            val context = bindingContextProvider()
-            val intent = Intent(context, MultiDeviceSyncService::class.java)
+            serviceRunningJob =
+                viewModelScope.launch(ioDispatcher) {
+                    MultiDeviceSyncService.isRunning.collect { isRunning ->
+                        if (isRunning) {
+                            bindToRunningService()
+                        } else {
+                            unbindFromService()
+                        }
+                    }
+                }
+        }
+    }
 
-            // Start the service if there are enabled devices AND global sync is enabled
-            viewModelScope.launch(ioDispatcher) {
-                if (
-                    pairedDevicesRepository.hasEnabledDevices() &&
-                        pairedDevicesRepository.isSyncEnabled.first()
-                ) {
-                    context.startService(intent)
+    private fun bindToRunningService() {
+        val context = bindingContextProvider()
+        val intent = Intent(context, MultiDeviceSyncService::class.java)
+        if (serviceConnection != null) return
+
+        val connection =
+            object : ServiceConnection {
+                override fun onServiceConnected(name: ComponentName?, binder: IBinder?) {
+                    Log.info(tag = TAG) { "Connected to MultiDeviceSyncService" }
+                    service = MultiDeviceSyncService.getInstanceFrom(binder as android.os.Binder)
+
+                    // Observe device states from service
+                    stateCollectionJob =
+                        viewModelScope.launch(ioDispatcher) {
+                            service?.deviceStates?.collect { states ->
+                                deviceStatesFromService.value = states
+                            }
+                        }
+
+                    // Observe scanning state from service
+                    scanningCollectionJob =
+                        viewModelScope.launch(ioDispatcher) {
+                            service?.isScanning?.collect { isScanning ->
+                                isScanningFromService.value = isScanning
+                            }
+                        }
+                }
+
+                override fun onServiceDisconnected(name: ComponentName?) {
+                    Log.info(tag = TAG) { "Disconnected from MultiDeviceSyncService" }
+                    unbindFromService()
                 }
             }
 
-            val connection =
-                object : ServiceConnection {
-                    override fun onServiceConnected(name: ComponentName?, binder: IBinder?) {
-                        Log.info(tag = TAG) { "Connected to MultiDeviceSyncService" }
-                        service =
-                            MultiDeviceSyncService.getInstanceFrom(binder as android.os.Binder)
-
-                        // Observe device states from service
-                        stateCollectionJob =
-                            viewModelScope.launch(ioDispatcher) {
-                                service?.deviceStates?.collect { states ->
-                                    deviceStatesFromService.value = states
-                                }
-                            }
-
-                        // Observe scanning state from service
-                        scanningCollectionJob =
-                            viewModelScope.launch(ioDispatcher) {
-                                service?.isScanning?.collect { isScanning ->
-                                    isScanningFromService.value = isScanning
-                                }
-                            }
-                    }
-
-                    override fun onServiceDisconnected(name: ComponentName?) {
-                        Log.info(tag = TAG) { "Disconnected from MultiDeviceSyncService" }
-                        service = null
-                        stateCollectionJob?.cancel()
-                        scanningCollectionJob?.cancel()
-                        deviceStatesFromService.value = emptyMap()
-                        isScanningFromService.value = false
-                    }
-                }
-
-            serviceConnection = connection
-            context.bindService(intent, connection, Context.BIND_AUTO_CREATE)
+        serviceConnection = connection
+        val bound = context.bindService(intent, connection, 0)
+        if (!bound) {
+            serviceConnection = null
         }
+    }
+
+    private fun unbindFromService() {
+        val context = bindingContextProvider()
+        serviceConnection?.let { connection ->
+            try {
+                context.unbindService(connection)
+            } catch (e: Exception) {
+                Log.warn(tag = TAG, throwable = e) { "Error unbinding service" }
+            }
+        }
+        serviceConnection = null
+        service = null
+        stateCollectionJob?.cancel()
+        scanningCollectionJob?.cancel()
+        deviceStatesFromService.value = emptyMap()
+        isScanningFromService.value = false
+    }
+
+    private fun observePresenceRequests() {
+        presenceObservationJob =
+            viewModelScope.launch(ioDispatcher) {
+                combine(
+                        pairedDevicesRepository.enabledDevices,
+                        pairedDevicesRepository.isSyncEnabled,
+                    ) { enabledDevices, isSyncEnabled ->
+                        if (!isSyncEnabled) {
+                            emptySet()
+                        } else {
+                            enabledDevices.map { it.macAddress }.toSet()
+                        }
+                    }
+                    .collect { newMacs ->
+                        val toStart = newMacs - observedPresenceMacs
+                        val toStop = observedPresenceMacs - newMacs
+
+                        toStart.forEach { macAddress ->
+                            companionDeviceManagerHelper.startObservingDevicePresence(macAddress)
+                        }
+                        toStop.forEach { macAddress ->
+                            companionDeviceManagerHelper.stopObservingDevicePresence(macAddress)
+                        }
+
+                        observedPresenceMacs = newMacs
+                    }
+            }
     }
 
     /** Sets whether a device is enabled for sync. */
     fun setDeviceEnabled(macAddress: String, enabled: Boolean) {
         viewModelScope.launch(ioDispatcher) {
             pairedDevicesRepository.setDeviceEnabled(macAddress, enabled)
-
-            // Start service if we just enabled a device AND global sync is enabled
-            // We call startService even if service is already bound, to ensure onStartCommand is
-            // triggered and monitoring starts if it was stopped.
-            if (enabled && pairedDevicesRepository.isSyncEnabled.first()) {
-                val context = bindingContextProvider()
-                context.startService(Intent(context, MultiDeviceSyncService::class.java))
-            }
         }
     }
 
@@ -204,6 +249,9 @@ class DevicesListViewModel(
         viewModelScope.launch(ioDispatcher) {
             // First disconnect if connected
             service?.disconnectDevice(macAddress)
+
+            // Stop observing presence for this device
+            companionDeviceManagerHelper.stopObservingDevicePresence(macAddress)
 
             // Remove the OS-level Bluetooth bond
             val bondRemoved = bluetoothBondingChecker.removeBond(macAddress)

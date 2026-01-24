@@ -105,6 +105,7 @@ class MultiDeviceSyncService : Service(), CoroutineScope {
     override fun onCreate() {
         super.onCreate()
         (applicationContext as CameraSyncApp).appGraph.inject(this)
+        _isRunning.value = true
 
         ProcessLifecycleOwner.get()
             .lifecycle
@@ -140,6 +141,25 @@ class MultiDeviceSyncService : Service(), CoroutineScope {
                 startForegroundService()
                 startDeviceMonitoring()
                 launch { refreshConnections() }
+            }
+            ACTION_DEVICE_APPEARED -> {
+                Log.info(tag = TAG) { "Device presence appeared, starting sync..." }
+                if (!checkPermissions()) return START_NOT_STICKY
+                startForegroundService()
+                startDeviceMonitoring()
+                intent.getStringExtra(EXTRA_DEVICE_ADDRESS)?.let { macAddress ->
+                    syncCoordinator.setDevicePresence(macAddress, true)
+                }
+            }
+            ACTION_DEVICE_DISAPPEARED -> {
+                Log.info(tag = TAG) { "Device presence disappeared, stopping sync..." }
+                if (!checkPermissions()) return START_NOT_STICKY
+                startForegroundService()
+                startDeviceMonitoring()
+                intent.getStringExtra(EXTRA_DEVICE_ADDRESS)?.let { macAddress ->
+                    syncCoordinator.setDevicePresence(macAddress, false)
+                    launch { syncCoordinator.stopDeviceSync(macAddress) }
+                }
             }
             else -> {
                 if (!checkPermissions()) return START_NOT_STICKY
@@ -201,14 +221,18 @@ class MultiDeviceSyncService : Service(), CoroutineScope {
 
         // Start state collection for notification updates
         stateCollectionJob = launch {
-            combine(syncCoordinator.deviceStates, pairedDevicesRepository.enabledDevices) {
-                    deviceStates,
-                    enabledDevices ->
+            combine(
+                    syncCoordinator.deviceStates,
+                    pairedDevicesRepository.enabledDevices,
+                    syncCoordinator.presentDevices,
+                    syncCoordinator.isScanning,
+                ) { deviceStates, enabledDevices, presentDevices, isScanning ->
                     val connectedCount =
                         deviceStates.count { (_, state) ->
                             state is DeviceConnectionState.Connected ||
                                 state is DeviceConnectionState.Syncing
                         }
+                    val presentCount = presentDevices.size
 
                     // Get last sync time from any syncing device
                     val lastSyncTime =
@@ -222,9 +246,19 @@ class MultiDeviceSyncService : Service(), CoroutineScope {
                         vibrator.vibrate()
                     }
 
-                    Triple(connectedCount, enabledDevices.size, lastSyncTime)
+                    Quintuple(
+                        connectedCount,
+                        enabledDevices.size,
+                        presentCount,
+                        isScanning,
+                        lastSyncTime,
+                    )
                 }
-                .collect { (connectedCount, enabledCount, lastSyncTime) ->
+                .collect { (connectedCount, enabledCount, presentCount, isScanning, lastSyncTime) ->
+                    if (presentCount == 0 && connectedCount == 0 && !isScanning) {
+                        stopAllAndShutdown()
+                        return@collect
+                    }
                     updateNotification(connectedCount, enabledCount, lastSyncTime)
                     _serviceState.value =
                         MultiDeviceSyncServiceState.Running(
@@ -336,6 +370,7 @@ class MultiDeviceSyncService : Service(), CoroutineScope {
         super.onDestroy()
         deviceMonitorJob?.cancel()
         stateCollectionJob?.cancel()
+        _isRunning.value = false
     }
 
     inner class MultiDeviceSyncServiceBinder : Binder() {
@@ -347,8 +382,14 @@ class MultiDeviceSyncService : Service(), CoroutineScope {
         private const val ERROR_NOTIFICATION_ID = 124
         private const val LOCATION_UPDATE_INTERVAL_SECONDS = 60L
 
+        private val _isRunning = MutableStateFlow(false)
+        val isRunning: StateFlow<Boolean> = _isRunning.asStateFlow()
+
         const val ACTION_STOP = "dev.sebastiano.camerasync.STOP_ALL_SYNC"
         const val ACTION_REFRESH = "dev.sebastiano.camerasync.REFRESH_CONNECTIONS"
+        const val ACTION_DEVICE_APPEARED = "dev.sebastiano.camerasync.DEVICE_APPEARED"
+        const val ACTION_DEVICE_DISAPPEARED = "dev.sebastiano.camerasync.DEVICE_DISAPPEARED"
+        const val EXTRA_DEVICE_ADDRESS = "device_address"
 
         const val STOP_REQUEST_CODE = 667
         const val REFRESH_REQUEST_CODE = 668
@@ -362,10 +403,24 @@ class MultiDeviceSyncService : Service(), CoroutineScope {
         fun createRefreshIntent(context: Context): Intent =
             Intent(context, MultiDeviceSyncService::class.java).apply { action = ACTION_REFRESH }
 
+        fun createPresenceIntent(context: Context, macAddress: String, isPresent: Boolean): Intent =
+            Intent(context, MultiDeviceSyncService::class.java).apply {
+                action = if (isPresent) ACTION_DEVICE_APPEARED else ACTION_DEVICE_DISAPPEARED
+                putExtra(EXTRA_DEVICE_ADDRESS, macAddress)
+            }
+
         fun createStartIntent(context: Context): Intent =
             Intent(context, MultiDeviceSyncService::class.java)
     }
 }
+
+private data class Quintuple<A, B, C, D, E>(
+    val first: A,
+    val second: B,
+    val third: C,
+    val fourth: D,
+    val fifth: E,
+)
 
 /** Represents the state of the multi-device sync service. */
 sealed interface MultiDeviceSyncServiceState {

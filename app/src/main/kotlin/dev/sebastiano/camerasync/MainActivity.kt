@@ -143,6 +143,7 @@ private fun RootComposable(
                                 bindingContextProvider = { context.applicationContext },
                                 vendorRegistry = vendorRegistry,
                                 bluetoothBondingChecker = bluetoothBondingChecker,
+                                companionDeviceManagerHelper = companionDeviceManagerHelper,
                                 issueReporter = issueReporter,
                             )
                         }

@@ -10,8 +10,10 @@ import dev.sebastiano.camerasync.fakes.FakeKhronicleLogger
 import dev.sebastiano.camerasync.fakes.FakeLocationRepository
 import dev.sebastiano.camerasync.fakes.FakePairedDevicesRepository
 import dev.sebastiano.camerasync.fakes.FakeVendorRegistry
+import dev.sebastiano.camerasync.pairing.CompanionDeviceManagerHelper
 import io.mockk.every
 import io.mockk.mockk
+import io.mockk.verify
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
@@ -35,6 +37,7 @@ class DevicesListViewModelTest {
     private lateinit var locationRepository: FakeLocationRepository
     private lateinit var vendorRegistry: FakeVendorRegistry
     private lateinit var bluetoothBondingChecker: FakeBluetoothBondingChecker
+    private lateinit var companionDeviceManagerHelper: CompanionDeviceManagerHelper
     private lateinit var batteryOptimizationChecker: FakeBatteryOptimizationChecker
     private lateinit var issueReporter: FakeIssueReporter
     private lateinit var viewModel: DevicesListViewModel
@@ -52,6 +55,7 @@ class DevicesListViewModelTest {
         locationRepository = FakeLocationRepository()
         vendorRegistry = FakeVendorRegistry()
         bluetoothBondingChecker = FakeBluetoothBondingChecker()
+        companionDeviceManagerHelper = mockk(relaxed = true)
         batteryOptimizationChecker = FakeBatteryOptimizationChecker()
         issueReporter = FakeIssueReporter()
 
@@ -62,6 +66,7 @@ class DevicesListViewModelTest {
                 bindingContextProvider = { mockContext() },
                 vendorRegistry = vendorRegistry,
                 bluetoothBondingChecker = bluetoothBondingChecker,
+                companionDeviceManagerHelper = companionDeviceManagerHelper,
                 batteryOptimizationChecker = batteryOptimizationChecker,
                 issueReporter = issueReporter,
                 ioDispatcher = testDispatcher, // Inject test dispatcher for IO operations
@@ -207,6 +212,41 @@ class DevicesListViewModelTest {
     }
 
     @Test
+    fun `presence observation starts for enabled devices when sync is enabled`() = runTest {
+        val device =
+            PairedDevice(
+                macAddress = "CC:DD:EE:FF:00:11",
+                name = "Test Camera",
+                vendorId = "fake",
+                isEnabled = true,
+            )
+
+        pairedDevicesRepository.addTestDevice(device)
+        advanceUntilIdle()
+
+        verify { companionDeviceManagerHelper.startObservingDevicePresence(device.macAddress) }
+    }
+
+    @Test
+    fun `presence observation stops when sync is disabled`() = runTest {
+        val device =
+            PairedDevice(
+                macAddress = "11:00:FF:EE:DD:CC",
+                name = "Test Camera",
+                vendorId = "fake",
+                isEnabled = true,
+            )
+
+        pairedDevicesRepository.addTestDevice(device)
+        advanceUntilIdle()
+
+        pairedDevicesRepository.setSyncEnabled(false)
+        advanceUntilIdle()
+
+        verify { companionDeviceManagerHelper.stopObservingDevicePresence(device.macAddress) }
+    }
+
+    @Test
     fun `computeDeviceDisplayInfo handles null device name`() = runTest {
         val device =
             PairedDevice(
@@ -317,7 +357,9 @@ class DevicesListViewModelTest {
                     bindingContextProvider = { mockContext() },
                     vendorRegistry = vendorRegistry,
                     bluetoothBondingChecker = bluetoothBondingChecker,
+                    companionDeviceManagerHelper = companionDeviceManagerHelper,
                     batteryOptimizationChecker = batteryOptimizationChecker,
+                    issueReporter = issueReporter,
                     ioDispatcher = testDispatcher,
                 )
 
