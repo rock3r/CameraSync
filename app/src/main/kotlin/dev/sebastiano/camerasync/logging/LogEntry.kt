@@ -32,5 +32,5 @@ data class LogEntry(
     val tag: String,
     val message: String,
     val pid: Int? = null,
-    val tid: Int? = null
+    val tid: Int? = null,
 )

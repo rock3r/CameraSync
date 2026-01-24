@@ -16,7 +16,7 @@ import kotlinx.coroutines.launch
 /** ViewModel for the Log Viewer screen. */
 class LogViewerViewModel(
     private val logRepository: LogRepository,
-    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO
+    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) : ViewModel() {
 
     private val _filterText = MutableStateFlow("")
@@ -32,9 +32,10 @@ class LogViewerViewModel(
     val logs: StateFlow<List<LogEntry>> =
         combine(logRepository.getLogs(), _filterText, _filterLevel) { allLogs, text, level ->
                 allLogs.filter { entry ->
-                    val matchesText = text.isBlank() || 
-                        entry.message.contains(text, ignoreCase = true) || 
-                        entry.tag.contains(text, ignoreCase = true)
+                    val matchesText =
+                        text.isBlank() ||
+                            entry.message.contains(text, ignoreCase = true) ||
+                            entry.tag.contains(text, ignoreCase = true)
                     val matchesLevel = level == null || entry.level == level
                     matchesText && matchesLevel
                 }
@@ -42,7 +43,7 @@ class LogViewerViewModel(
             .stateIn(
                 scope = viewModelScope,
                 started = SharingStarted.WhileSubscribed(5000),
-                initialValue = emptyList()
+                initialValue = emptyList(),
             )
 
     init {

@@ -170,7 +170,9 @@ class PairingViewModel(
                     return@launch
                 }
 
-                if (!allowExistingBond && bluetoothBondingChecker.isDeviceBonded(camera.macAddress)) {
+                if (
+                    !allowExistingBond && bluetoothBondingChecker.isDeviceBonded(camera.macAddress)
+                ) {
                     Log.warn(tag = TAG) {
                         "Device ${camera.macAddress} is already bonded at system level"
                     }

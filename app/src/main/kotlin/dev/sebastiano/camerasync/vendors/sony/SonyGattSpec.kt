@@ -35,8 +35,7 @@ object SonyGattSpec : CameraGattSpec {
         Uuid.parse("0000DD21-0000-1000-8000-00805f9b34fb")
 
     /** Lock Location Endpoint (DD30) - firmware 3.02+ only. */
-    val LOCATION_LOCK_CHARACTERISTIC_UUID: Uuid =
-        Uuid.parse("0000DD30-0000-1000-8000-00805f9b34fb")
+    val LOCATION_LOCK_CHARACTERISTIC_UUID: Uuid = Uuid.parse("0000DD30-0000-1000-8000-00805f9b34fb")
 
     /** Enable Location Update (DD31) - firmware 3.02+ only. */
     val LOCATION_ENABLE_CHARACTERISTIC_UUID: Uuid =

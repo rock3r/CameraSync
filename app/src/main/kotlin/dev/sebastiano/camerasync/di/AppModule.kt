@@ -24,8 +24,8 @@ import dev.sebastiano.camerasync.domain.vendor.CameraVendorRegistry
 import dev.sebastiano.camerasync.domain.vendor.DefaultCameraVendorRegistry
 import dev.sebastiano.camerasync.feedback.AndroidIssueReporter
 import dev.sebastiano.camerasync.feedback.IssueReporter
-import dev.sebastiano.camerasync.logging.LogViewerViewModel
 import dev.sebastiano.camerasync.logging.LogRepository
+import dev.sebastiano.camerasync.logging.LogViewerViewModel
 import dev.sebastiano.camerasync.logging.LogcatLogRepository
 import dev.sebastiano.camerasync.pairing.AndroidBluetoothBondingChecker
 import dev.sebastiano.camerasync.pairing.BluetoothBondingChecker
@@ -37,6 +37,7 @@ import dev.sebastiano.camerasync.vendors.ricoh.RicohCameraVendor
 import dev.sebastiano.camerasync.vendors.sony.SonyCameraVendor
 import dev.zacsweers.metro.DependencyGraph
 import dev.zacsweers.metro.Provides
+import dev.zacsweers.metro.SingleIn
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 
@@ -48,6 +49,7 @@ import kotlinx.coroutines.Dispatchers
  * into @Provides methods that need it.
  */
 @DependencyGraph
+@SingleIn(AppGraph::class)
 interface AppGraph {
     fun mainActivity(): MainActivity
 
@@ -65,13 +67,18 @@ interface AppGraph {
 
     fun locationCollectorFactory(): DefaultLocationCollector.Factory
 
-    @Provides fun provideApplicationContext(application: Application): Context = application
+    @Provides
+    @SingleIn(AppGraph::class)
+    fun provideApplicationContext(application: Application): Context = application
 
     @Provides
+    @SingleIn(AppGraph::class)
     fun provideBatteryOptimizationChecker(): BatteryOptimizationChecker =
         AndroidBatteryOptimizationChecker()
 
-    @Provides fun provideIoDispatcher(): CoroutineDispatcher = Dispatchers.IO
+    @Provides
+    @SingleIn(AppGraph::class)
+    fun provideIoDispatcher(): CoroutineDispatcher = Dispatchers.IO
 
     /**
      * Creates the default camera vendor registry with all supported vendors.
@@ -86,6 +93,7 @@ interface AppGraph {
      * 3. Add the vendor to this list
      */
     @Provides
+    @SingleIn(AppGraph::class)
     fun provideVendorRegistry(): CameraVendorRegistry =
         DefaultCameraVendorRegistry(
             vendors =
@@ -99,48 +107,58 @@ interface AppGraph {
         )
 
     @Provides
+    @SingleIn(AppGraph::class)
     fun providePairedDevicesRepository(context: Context): PairedDevicesRepository =
         DataStorePairedDevicesRepository(context.pairedDevicesDataStoreV2)
 
     @Provides
+    @SingleIn(AppGraph::class)
     fun provideLocationRepository(context: Context): LocationRepository =
         FusedLocationRepository(context)
 
     @Provides
+    @SingleIn(AppGraph::class)
     fun provideCameraRepository(vendorRegistry: CameraVendorRegistry): CameraRepository =
         KableCameraRepository(vendorRegistry = vendorRegistry)
 
     @Provides
+    @SingleIn(AppGraph::class)
     fun provideNotificationBuilder(context: Context): NotificationBuilder =
         AndroidNotificationBuilder(context)
 
     @Provides
+    @SingleIn(AppGraph::class)
     fun provideIntentFactory(): IntentFactory =
         AndroidIntentFactory(MultiDeviceSyncService::class.java)
 
     @Provides
+    @SingleIn(AppGraph::class)
     fun providePendingIntentFactory(): PendingIntentFactory = AndroidPendingIntentFactory()
 
     @Provides
+    @SingleIn(AppGraph::class)
     fun provideBluetoothBondingChecker(context: Context): BluetoothBondingChecker =
         AndroidBluetoothBondingChecker(context)
 
     @Provides
+    @SingleIn(AppGraph::class)
     fun provideCompanionDeviceManagerHelper(
         context: Context,
         vendorRegistry: CameraVendorRegistry,
     ): CompanionDeviceManagerHelper = CompanionDeviceManagerHelper(context, vendorRegistry)
 
     @Provides
+    @SingleIn(AppGraph::class)
     fun provideIssueReporter(context: Context): IssueReporter = AndroidIssueReporter(context)
 
     @Provides
+    @SingleIn(AppGraph::class)
     fun provideLogRepository(context: Context): LogRepository = LogcatLogRepository(context)
 
     @Provides
     fun provideLogViewerViewModel(
         logRepository: LogRepository,
-        ioDispatcher: CoroutineDispatcher
+        ioDispatcher: CoroutineDispatcher,
     ): LogViewerViewModel = LogViewerViewModel(logRepository, ioDispatcher)
 
     @DependencyGraph.Factory

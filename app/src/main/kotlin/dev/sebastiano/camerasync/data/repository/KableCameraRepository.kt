@@ -92,7 +92,9 @@ class KableCameraRepository(private val vendorRegistry: CameraVendorRegistry) : 
     override suspend fun connect(camera: Camera, onFound: (() -> Unit)?): CameraConnection {
         // We need to scan for the device first to get the Advertisement
         // This is a limitation of Kable - we need the Advertisement to create a Peripheral
-        Log.info(tag = TAG) { "Looking for ${camera.name ?: camera.macAddress} (${camera.macAddress})" }
+        Log.info(tag = TAG) {
+            "Looking for ${camera.name ?: camera.macAddress} (${camera.macAddress})"
+        }
         val scanner =
             com.juul.kable.Scanner {
                 @OptIn(ObsoleteKableApi::class) filters { match { address = camera.macAddress } }

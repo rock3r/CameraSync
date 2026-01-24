@@ -43,9 +43,7 @@ class LogViewerViewModelTest {
 
     @Test
     fun `logs are filtered by text`() = runTest {
-        backgroundScope.launch(testDispatcher) {
-            viewModel.logs.collect { }
-        }
+        backgroundScope.launch(testDispatcher) { viewModel.logs.collect {} }
 
         val entry1 = LogEntry("01-01 12:00:00", LogLevel.INFO, "Tag1", "Hello world")
         val entry2 = LogEntry("01-01 12:01:00", LogLevel.DEBUG, "Tag2", "Something else")
@@ -67,9 +65,7 @@ class LogViewerViewModelTest {
 
     @Test
     fun `logs are filtered by level`() = runTest {
-        backgroundScope.launch(testDispatcher) {
-            viewModel.logs.collect { }
-        }
+        backgroundScope.launch(testDispatcher) { viewModel.logs.collect {} }
 
         val entry1 = LogEntry("01-01 12:00:00", LogLevel.INFO, "Tag1", "Message 1")
         val entry2 = LogEntry("01-01 12:01:00", LogLevel.DEBUG, "Tag2", "Message 2")

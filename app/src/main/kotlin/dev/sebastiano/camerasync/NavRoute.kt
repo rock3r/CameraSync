@@ -1,19 +1,21 @@
 package dev.sebastiano.camerasync
 
+import android.os.Parcelable
+import kotlinx.parcelize.Parcelize
 import kotlinx.serialization.Serializable
 
 /** Navigation routes for the application. */
-sealed interface NavRoute {
+sealed interface NavRoute : Parcelable {
 
     /** Permissions need to be requested. */
-    @Serializable data object NeedsPermissions : NavRoute
+    @Parcelize @Serializable data object NeedsPermissions : NavRoute
 
     /** Main screen showing paired devices list. */
-    @Serializable data object DevicesList : NavRoute
+    @Parcelize @Serializable data object DevicesList : NavRoute
 
     /** Pairing screen for adding new devices. */
-    @Serializable data object Pairing : NavRoute
+    @Parcelize @Serializable data object Pairing : NavRoute
 
     /** Log viewer screen. */
-    @Serializable data object LogViewer : NavRoute
+    @Parcelize @Serializable data object LogViewer : NavRoute
 }

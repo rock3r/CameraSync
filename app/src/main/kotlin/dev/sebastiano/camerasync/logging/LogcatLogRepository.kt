@@ -10,16 +10,18 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.withContext
 
 /** Implementation of [LogRepository] that reads from Android's logcat. */
-class LogcatLogRepository(
-    private val context: Context
-) : LogRepository {
+class LogcatLogRepository(private val context: Context) : LogRepository {
 
     private val _logs = MutableStateFlow<List<LogEntry>>(emptyList())
+
     override fun getLogs(): Flow<List<LogEntry>> = _logs.asStateFlow()
 
     // Regex for logcat -v threadtime:
     // 01-24 16:35:45.321  1234  5678 I Tag: message
-    private val logRegex = Regex("""^(\d{2}-\d{2}\s\d{2}:\d{2}:\d{2}\.\d{3})\s+(\d+)\s+(\d+)\s([VDIWEA])\s+(.*?):\s?(.*)$""")
+    private val logRegex =
+        Regex(
+            """^(\d{2}-\d{2}\s\d{2}:\d{2}:\d{2}\.\d{3})\s+(\d+)\s+(\d+)\s([VDIWEA])\s+(.*?):\s?(.*)$"""
+        )
 
     override suspend fun refresh() {
         withContext(Dispatchers.IO) {
@@ -40,12 +42,12 @@ class LogcatLogRepository(
                                 tag = tag.trim(),
                                 message = message,
                                 pid = pid.toIntOrNull(),
-                                tid = tid.toIntOrNull()
+                                tid = tid.toIntOrNull(),
                             )
                         )
                     }
                 }
-                
+
                 // We want newest logs first in the viewer
                 _logs.value = newLogs.reversed()
             } catch (e: Exception) {

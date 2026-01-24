@@ -126,7 +126,7 @@ import org.maplibre.spatialk.geojson.Position
 fun DevicesListScreen(
     viewModel: DevicesListViewModel,
     onAddDeviceClick: () -> Unit,
-    onViewLogsClick: () -> Unit
+    onViewLogsClick: () -> Unit,
 ) {
     val state by viewModel.state
     var deviceToUnpair by remember { mutableStateOf<PairedDeviceWithState?>(null) }

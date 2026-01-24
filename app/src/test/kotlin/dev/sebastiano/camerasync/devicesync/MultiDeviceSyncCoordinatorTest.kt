@@ -185,7 +185,8 @@ class MultiDeviceSyncCoordinatorTest {
         testScope.runTest {
             val neverSyncedDevice = testDevice1.copy(lastSyncedAt = null)
             pairedDevicesRepository.setTestDevices(listOf(neverSyncedDevice))
-            cameraRepository.connectionToReturn = FakeCameraConnection(neverSyncedDevice.toTestCamera())
+            cameraRepository.connectionToReturn =
+                FakeCameraConnection(neverSyncedDevice.toTestCamera())
 
             coordinator.startBackgroundMonitoring(pairedDevicesRepository.enabledDevices)
             advanceUntilIdle()

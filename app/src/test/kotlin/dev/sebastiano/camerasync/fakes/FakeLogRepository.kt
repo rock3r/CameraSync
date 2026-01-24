@@ -9,6 +9,7 @@ import kotlinx.coroutines.flow.asStateFlow
 /** Fake implementation of [LogRepository] for testing. */
 class FakeLogRepository : LogRepository {
     private val _logs = MutableStateFlow<List<LogEntry>>(emptyList())
+
     override fun getLogs(): Flow<List<LogEntry>> = _logs.asStateFlow()
 
     var refreshCalled = false

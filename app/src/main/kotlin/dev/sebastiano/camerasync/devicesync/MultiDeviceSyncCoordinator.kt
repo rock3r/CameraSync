@@ -118,9 +118,7 @@ class MultiDeviceSyncCoordinator(
     }
 
     private suspend fun checkAndConnectEnabledDevices(ignorePresence: Boolean = false) {
-        Log.debug(tag = TAG) {
-            "Checking enabled devices (ignorePresence=$ignorePresence)"
-        }
+        Log.debug(tag = TAG) { "Checking enabled devices (ignorePresence=$ignorePresence)" }
         _isScanning.value = true
         try {
             scanMutex.withLock {
@@ -392,9 +390,7 @@ class MultiDeviceSyncCoordinator(
                 if (!connection.isConnected.first()) {
                     throw IllegalStateException("Connection lost before date/time sync")
                 }
-                Log.debug(tag = TAG) {
-                    "Syncing date/time for ${connection.camera.macAddress}"
-                }
+                Log.debug(tag = TAG) { "Syncing date/time for ${connection.camera.macAddress}" }
                 connection.syncDateTime(ZonedDateTime.now())
             } catch (e: Exception) {
                 Log.warn(tag = TAG, throwable = e) { "Failed to sync date/time" }
@@ -407,9 +403,7 @@ class MultiDeviceSyncCoordinator(
                 if (!connection.isConnected.first()) {
                     throw IllegalStateException("Connection lost before enabling geo-tagging")
                 }
-                Log.debug(tag = TAG) {
-                    "Enabling geo-tagging for ${connection.camera.macAddress}"
-                }
+                Log.debug(tag = TAG) { "Enabling geo-tagging for ${connection.camera.macAddress}" }
                 connection.setGeoTaggingEnabled(true)
             } catch (e: Exception) {
                 Log.warn(tag = TAG, throwable = e) { "Failed to enable geo-tagging" }

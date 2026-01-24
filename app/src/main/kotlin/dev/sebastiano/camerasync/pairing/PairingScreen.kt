@@ -152,7 +152,6 @@ fun PairingScreen(
                     )
                 }
             }
-
         }
     }
 }
@@ -169,7 +168,7 @@ private fun IdleContent(modifier: Modifier = Modifier, onStartPairing: () -> Uni
             Spacer(Modifier.height(24.dp))
 
             Text(
-            "Ready to pair",
+                "Ready to pair",
                 style = MaterialTheme.typography.headlineMedium,
                 fontWeight = FontWeight.Bold,
             )
@@ -177,23 +176,23 @@ private fun IdleContent(modifier: Modifier = Modifier, onStartPairing: () -> Uni
             Spacer(Modifier.height(12.dp))
 
             Text(
-            "Use Android's pairing flow to select a camera from the system list.",
+                "Use Android's pairing flow to select a camera from the system list.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center,
             )
 
-        Spacer(Modifier.height(24.dp))
+            Spacer(Modifier.height(24.dp))
 
-        Button(onClick = onStartPairing) {
-            Icon(
-                painterResource(R.drawable.ic_bluetooth_searching_24dp),
-                contentDescription = null,
-                modifier = Modifier.size(18.dp),
-            )
-            Spacer(Modifier.width(8.dp))
-            Text("Pair using Android System")
-        }
+            Button(onClick = onStartPairing) {
+                Icon(
+                    painterResource(R.drawable.ic_bluetooth_searching_24dp),
+                    contentDescription = null,
+                    modifier = Modifier.size(18.dp),
+                )
+                Spacer(Modifier.width(8.dp))
+                Text("Pair using Android System")
+            }
         }
     }
 }

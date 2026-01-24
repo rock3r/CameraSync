@@ -16,7 +16,9 @@ import androidx.compose.animation.togetherWith
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateListOf
-import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.listSaver
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.toMutableStateList
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -77,7 +79,12 @@ private fun RootComposable(viewModelFactory: ViewModelProvider.Factory) {
             rememberMultiplePermissionsState(permissions = allPermissions)
 
         // Initialize backStack - will be updated if permissions are already granted
-        val backStack = remember { mutableStateListOf<NavRoute>(NavRoute.NeedsPermissions) }
+        val backStack =
+            rememberSaveable(
+                saver = listSaver(save = { it.toList() }, restore = { it.toMutableStateList() })
+            ) {
+                mutableStateListOf<NavRoute>(NavRoute.NeedsPermissions)
+            }
 
         // Check if permissions are already granted and navigate to DevicesList
         // This handles both startup (when permissions are already granted) and runtime (when user
@@ -161,7 +168,8 @@ private fun RootComposable(viewModelFactory: ViewModelProvider.Factory) {
                                 // Ensure we don't remove the last item (must keep at least one
                                 // route)
                                 if (backStack.size > 1) backStack.removeAt(backStack.lastIndex)
-                                // Trigger a refresh so the newly paired device connects immediately.
+                                // Trigger a refresh so the newly paired device connects
+                                // immediately.
                                 context.startService(
                                     MultiDeviceSyncService.createRefreshIntent(context)
                                 )
