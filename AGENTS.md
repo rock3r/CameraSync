@@ -1,3 +1,21 @@
+---
+description: 
+globs: **/NONE-disabled.kt
+alwaysApply: false
+---
+
+---
+description: 
+globs: none.disabled
+alwaysApply: false
+---
+
+---
+description: 
+globs: NONE.jola
+alwaysApply: false
+---
+
 # CameraSync - Claude AI Assistant Guide
 
 ## Project Overview

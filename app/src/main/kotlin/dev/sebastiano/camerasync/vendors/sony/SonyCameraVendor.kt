@@ -121,17 +121,19 @@ object SonyCameraVendor : CameraVendor {
     }
 
     override fun getCompanionDeviceFilters(): List<DeviceFilter<*>> {
-        val serviceFilter = BluetoothLeDeviceFilter.Builder()
-            .setScanFilter(
-                ScanFilter.Builder()
-                    .setServiceUuid(ParcelUuid(SonyGattSpec.REMOTE_CONTROL_SERVICE_UUID.toJavaUuid()))
-                    .build()
-            )
-            .build()
+        val serviceFilter =
+            BluetoothLeDeviceFilter.Builder()
+                .setScanFilter(
+                    ScanFilter.Builder()
+                        .setServiceUuid(
+                            ParcelUuid(SonyGattSpec.REMOTE_CONTROL_SERVICE_UUID.toJavaUuid())
+                        )
+                        .build()
+                )
+                .build()
 
-        val nameFilter = BluetoothLeDeviceFilter.Builder()
-             .setNamePattern(Pattern.compile("ILCE-.*"))
-             .build()
+        val nameFilter =
+            BluetoothLeDeviceFilter.Builder().setNamePattern(Pattern.compile("ILCE-.*")).build()
 
         return listOf(serviceFilter, nameFilter)
     }

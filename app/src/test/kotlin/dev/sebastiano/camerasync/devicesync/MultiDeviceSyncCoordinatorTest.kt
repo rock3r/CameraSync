@@ -12,10 +12,7 @@ import dev.sebastiano.camerasync.fakes.FakeLocationCollector
 import dev.sebastiano.camerasync.fakes.FakePairedDevicesRepository
 import dev.sebastiano.camerasync.fakes.FakeVendorRegistry
 import dev.sebastiano.camerasync.pairing.CompanionDeviceManagerHelper
-import io.mockk.every
 import io.mockk.mockk
-import io.mockk.just
-import io.mockk.Runs
 import java.time.ZoneId
 import java.time.ZonedDateTime
 import kotlinx.coroutines.ExperimentalCoroutinesApi

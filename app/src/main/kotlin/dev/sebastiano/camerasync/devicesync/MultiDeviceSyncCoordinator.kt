@@ -58,7 +58,8 @@ class MultiDeviceSyncCoordinator(
     private val locationCollector: LocationCollectionCoordinator,
     private val vendorRegistry: CameraVendorRegistry,
     private val pairedDevicesRepository: PairedDevicesRepository,
-    private val companionDeviceManagerHelper: dev.sebastiano.camerasync.pairing.CompanionDeviceManagerHelper,
+    private val companionDeviceManagerHelper:
+        dev.sebastiano.camerasync.pairing.CompanionDeviceManagerHelper,
     private val coroutineScope: CoroutineScope,
     private val deviceNameProvider: () -> String = { "${Build.MODEL} CameraSync" },
 ) {

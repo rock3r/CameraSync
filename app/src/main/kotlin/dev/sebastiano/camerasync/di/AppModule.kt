@@ -39,6 +39,7 @@ import dev.zacsweers.metro.Provides
 @DependencyGraph
 interface AppGraph {
     fun inject(service: MultiDeviceSyncService)
+
     fun inject(activity: MainActivity)
 
     @Provides fun provideApplicationContext(application: Application): Context = application
@@ -99,8 +100,7 @@ interface AppGraph {
     fun provideCompanionDeviceManagerHelper(
         context: Context,
         vendorRegistry: CameraVendorRegistry,
-    ): CompanionDeviceManagerHelper =
-        CompanionDeviceManagerHelper(context, vendorRegistry)
+    ): CompanionDeviceManagerHelper = CompanionDeviceManagerHelper(context, vendorRegistry)
 
     @Provides
     fun provideIssueReporter(context: Context): IssueReporter = AndroidIssueReporter(context)

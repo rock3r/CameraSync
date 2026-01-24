@@ -1,5 +1,9 @@
 package dev.sebastiano.camerasync.pairing
 
+import android.app.Activity
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.IntentSenderRequest
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.EaseInOut
 import androidx.compose.animation.core.InfiniteRepeatableSpec
@@ -62,10 +66,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import android.app.Activity
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.IntentSenderRequest
-import androidx.activity.result.contract.ActivityResultContracts
 import dev.sebastiano.camerasync.R
 import dev.sebastiano.camerasync.domain.model.Camera
 import dev.sebastiano.camerasync.ui.theme.CameraSyncTheme
@@ -248,12 +248,15 @@ private fun ScanningContent(
     onSystemPairingClick: () -> Unit,
 ) {
     Column(modifier = modifier.fillMaxSize()) {
-        Box(modifier = Modifier.fillMaxWidth().padding(16.dp), contentAlignment = Alignment.Center) {
+        Box(
+            modifier = Modifier.fillMaxWidth().padding(16.dp),
+            contentAlignment = Alignment.Center,
+        ) {
             Button(onClick = onSystemPairingClick, modifier = Modifier.fillMaxWidth()) {
                 Icon(
                     painterResource(R.drawable.ic_bluetooth_searching_24dp),
                     contentDescription = null,
-                    modifier = Modifier.size(18.dp)
+                    modifier = Modifier.size(18.dp),
                 )
                 Spacer(Modifier.width(8.dp))
                 Text("Pair using Android System")

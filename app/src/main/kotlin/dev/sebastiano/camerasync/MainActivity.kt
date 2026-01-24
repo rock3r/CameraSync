@@ -67,7 +67,7 @@ class MainActivity : ComponentActivity() {
                 cameraRepository = cameraRepository,
                 companionDeviceManagerHelper = companionDeviceManagerHelper,
                 issueReporter = issueReporter,
-                context = this
+                context = this,
             )
         }
     }

@@ -101,17 +101,21 @@ object RicohCameraVendor : CameraVendor {
     }
 
     override fun getCompanionDeviceFilters(): List<DeviceFilter<*>> {
-        val serviceFilter = BluetoothLeDeviceFilter.Builder()
-            .setScanFilter(
-                ScanFilter.Builder()
-                    .setServiceUuid(ParcelUuid(RicohGattSpec.SCAN_FILTER_SERVICE_UUID.toJavaUuid()))
-                    .build()
-            )
-            .build()
+        val serviceFilter =
+            BluetoothLeDeviceFilter.Builder()
+                .setScanFilter(
+                    ScanFilter.Builder()
+                        .setServiceUuid(
+                            ParcelUuid(RicohGattSpec.SCAN_FILTER_SERVICE_UUID.toJavaUuid())
+                        )
+                        .build()
+                )
+                .build()
 
-        val nameFilter = BluetoothLeDeviceFilter.Builder()
-            .setNamePattern(Pattern.compile("(GR|RICOH).*"))
-            .build()
+        val nameFilter =
+            BluetoothLeDeviceFilter.Builder()
+                .setNamePattern(Pattern.compile("(GR|RICOH).*"))
+                .build()
 
         return listOf(serviceFilter, nameFilter)
     }

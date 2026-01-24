@@ -18,7 +18,6 @@ import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.ProcessLifecycleOwner
 import com.juul.khronicle.Log
 import dev.sebastiano.camerasync.CameraSyncApp
-import dev.sebastiano.camerasync.di.AppGraph
 import dev.sebastiano.camerasync.domain.model.DeviceConnectionState
 import dev.sebastiano.camerasync.domain.model.PairedDevice
 import dev.sebastiano.camerasync.domain.repository.CameraRepository
@@ -71,9 +70,7 @@ class MultiDeviceSyncService : Service(), CoroutineScope {
     @Inject lateinit var companionDeviceManagerHelper: CompanionDeviceManagerHelper
     @Inject lateinit var locationCollectorFactory: DefaultLocationCollector.Factory
 
-    private val locationCollector by lazy {
-        locationCollectorFactory.create(this)
-    }
+    private val locationCollector by lazy { locationCollectorFactory.create(this) }
 
     private val syncCoordinator by lazy {
         MultiDeviceSyncCoordinator(

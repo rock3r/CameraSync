@@ -1,13 +1,11 @@
 package dev.sebastiano.camerasync.pairing
 
 import android.bluetooth.BluetoothDevice
+import android.bluetooth.le.ScanResult
+import android.bluetooth.le.ScanSettings
 import android.companion.CompanionDeviceManager
 import android.content.Intent
 import android.content.IntentSender
-import android.os.Parcelable
-import dev.sebastiano.camerasync.feedback.IssueReporter
-import dev.sebastiano.camerasync.pairing.CompanionDeviceManagerHelper
-import android.bluetooth.le.ScanResult
 import androidx.compose.runtime.State
 import androidx.compose.runtime.mutableStateOf
 import androidx.lifecycle.ViewModel
@@ -24,8 +22,10 @@ import dev.sebastiano.camerasync.domain.repository.CameraConnection
 import dev.sebastiano.camerasync.domain.repository.CameraRepository
 import dev.sebastiano.camerasync.domain.repository.PairedDevicesRepository
 import dev.sebastiano.camerasync.domain.vendor.CameraVendorRegistry
+import dev.sebastiano.camerasync.feedback.IssueReporter
 import dev.sebastiano.camerasync.logging.KhronicleLogEngine
 import kotlin.uuid.ExperimentalUuidApi
+import kotlin.uuid.Uuid
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -112,9 +112,7 @@ class PairingViewModel(
         companionDeviceManagerHelper.requestAssociation(
             object : CompanionDeviceManager.Callback() {
                 override fun onDeviceFound(chooserLauncher: IntentSender) {
-                    viewModelScope.launch {
-                        _associationRequest.send(chooserLauncher)
-                    }
+                    viewModelScope.launch { _associationRequest.send(chooserLauncher) }
                 }
 
                 override fun onFailure(error: CharSequence?) {
@@ -132,12 +130,17 @@ class PairingViewModel(
             data.getParcelableExtra(CompanionDeviceManager.EXTRA_DEVICE, ScanResult::class.java)
 
         val device =
-            data.getParcelableExtra(CompanionDeviceManager.EXTRA_DEVICE, BluetoothDevice::class.java)
+            data.getParcelableExtra(
+                CompanionDeviceManager.EXTRA_DEVICE,
+                BluetoothDevice::class.java,
+            )
 
         val camera = scanResult?.toCamera() ?: device?.toCamera()
 
         if (camera != null) {
-            Log.info(tag = TAG) { "Companion device selected: ${camera.name} (${camera.macAddress})" }
+            Log.info(tag = TAG) {
+                "Companion device selected: ${camera.name} (${camera.macAddress})"
+            }
             pairDevice(camera)
         } else {
             Log.warn(tag = TAG) { "Could not convert companion device result to Camera" }
@@ -153,17 +156,17 @@ class PairingViewModel(
             mfrMap[mfrData.keyAt(i)] = mfrData.valueAt(i)
         }
 
-        val serviceUuids = record.serviceUuids?.map {
-            Uuid.parse(it.uuid.toString())
-        } ?: emptyList()
+        val serviceUuids =
+            record.serviceUuids?.map { Uuid.parse(it.uuid.toString()) } ?: emptyList()
 
         val name = device.name ?: record.deviceName
 
-        val vendor = vendorRegistry.identifyVendor(
-            deviceName = name,
-            serviceUuids = serviceUuids,
-            manufacturerData = mfrMap
-        )
+        val vendor =
+            vendorRegistry.identifyVendor(
+                deviceName = name,
+                serviceUuids = serviceUuids,
+                manufacturerData = mfrMap,
+            )
 
         if (vendor == null) return null
 
@@ -171,27 +174,23 @@ class PairingViewModel(
             identifier = device.address,
             name = name,
             macAddress = device.address,
-            vendor = vendor
+            vendor = vendor,
         )
     }
 
     private fun BluetoothDevice.toCamera(): Camera? {
         val name = name
         // Try to identify based on name only (vendor registry supports it fallback)
-        val vendor = vendorRegistry.identifyVendor(
-            deviceName = name,
-            serviceUuids = emptyList(),
-            manufacturerData = emptyMap()
-        )
+        val vendor =
+            vendorRegistry.identifyVendor(
+                deviceName = name,
+                serviceUuids = emptyList(),
+                manufacturerData = emptyMap(),
+            )
 
         if (vendor == null) return null
 
-        return Camera(
-            identifier = address,
-            name = name,
-            macAddress = address,
-            vendor = vendor
-        )
+        return Camera(identifier = address, name = name, macAddress = address, vendor = vendor)
     }
 
     /** Starts scanning for cameras. */
@@ -389,10 +388,14 @@ class PairingViewModel(
                 appendLine("Pairing State Info:")
                 appendLine("Current State: $currentState")
                 if (currentState is PairingScreenState.Scanning) {
-                    appendLine("Discovered Devices: ${currentState.discoveredDevices.map { "${it.name} (${it.macAddress})" }}")
+                    appendLine(
+                        "Discovered Devices: ${currentState.discoveredDevices.map { "${it.name} (${it.macAddress})" }}"
+                    )
                 }
                 if (currentState is PairingScreenState.Pairing) {
-                    appendLine("Target Camera: ${currentState.camera.name} (${currentState.camera.macAddress})")
+                    appendLine(
+                        "Target Camera: ${currentState.camera.name} (${currentState.camera.macAddress})"
+                    )
                     appendLine("Error: ${currentState.error}")
                 }
             }

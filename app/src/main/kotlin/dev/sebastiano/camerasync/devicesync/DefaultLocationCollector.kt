@@ -25,7 +25,9 @@ private const val TAG = "LocationCollector"
  * @param locationRepository The repository providing location updates.
  * @param coroutineScope Scope for launching collection coroutines.
  */
-class DefaultLocationCollector @AssistedInject constructor(
+class DefaultLocationCollector
+@AssistedInject
+constructor(
     private val locationRepository: LocationRepository,
     @Assisted private val coroutineScope: CoroutineScope,
 ) : LocationCollectionCoordinator {

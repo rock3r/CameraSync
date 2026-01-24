@@ -267,7 +267,9 @@ internal class KableCameraConnection(
 
         val char =
             service.characteristics.firstOrNull { it.characteristicUuid == charUuid }
-                ?: throw IllegalStateException("Hardware revision characteristic not found: $charUuid")
+                ?: throw IllegalStateException(
+                    "Hardware revision characteristic not found: $charUuid"
+                )
 
         val bytes = peripheral.read(char)
         val revision = bytes.decodeToString().trimEnd(Char(0))

@@ -239,20 +239,24 @@ class DevicesListViewModel(
     /** Sends a feedback report. */
     fun sendFeedback() {
         viewModelScope.launch(ioDispatcher) {
-             // For devices list, we might want to attach info about all devices or just general state
-             // The IssueReporter handles general state. We can pass extra info about paired devices status.
-             val extraInfo = buildString {
-                 appendLine("Paired Devices Status:")
-                 val states = _state.value
-                 if (states is DevicesListState.HasDevices) {
-                     states.devices.forEach { deviceWithState ->
-                         appendLine("- ${deviceWithState.device.name} (${deviceWithState.device.macAddress}): ${deviceWithState.connectionState}")
-                     }
-                 } else {
-                     appendLine("No devices or loading.")
-                 }
-             }
-             issueReporter.sendIssueReport(extraInfo = extraInfo)
+            // For devices list, we might want to attach info about all devices or just general
+            // state
+            // The IssueReporter handles general state. We can pass extra info about paired devices
+            // status.
+            val extraInfo = buildString {
+                appendLine("Paired Devices Status:")
+                val states = _state.value
+                if (states is DevicesListState.HasDevices) {
+                    states.devices.forEach { deviceWithState ->
+                        appendLine(
+                            "- ${deviceWithState.device.name} (${deviceWithState.device.macAddress}): ${deviceWithState.connectionState}"
+                        )
+                    }
+                } else {
+                    appendLine("No devices or loading.")
+                }
+            }
+            issueReporter.sendIssueReport(extraInfo = extraInfo)
         }
     }
 

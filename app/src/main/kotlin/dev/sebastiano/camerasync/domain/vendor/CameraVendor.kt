@@ -122,11 +122,17 @@ interface CameraGattSpec {
     val pairingCharacteristicUuid: Uuid?
         get() = null
 
-    /** Hardware revision service UUID, or null if not supported. Defaults to standard Device Information Service. */
+    /**
+     * Hardware revision service UUID, or null if not supported. Defaults to standard Device
+     * Information Service.
+     */
     val hardwareRevisionServiceUuid: Uuid?
         get() = Uuid.parse("0000180a-0000-1000-8000-00805f9b34fb")
 
-    /** Hardware revision characteristic UUID, or null if not supported. Defaults to standard Hardware Revision String. */
+    /**
+     * Hardware revision characteristic UUID, or null if not supported. Defaults to standard
+     * Hardware Revision String.
+     */
     val hardwareRevisionCharacteristicUuid: Uuid?
         get() = Uuid.parse("00002a27-0000-1000-8000-00805f9b34fb")
 }
