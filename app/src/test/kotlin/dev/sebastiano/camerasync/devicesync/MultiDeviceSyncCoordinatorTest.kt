@@ -157,11 +157,14 @@ class MultiDeviceSyncCoordinatorTest {
             coordinator.startBackgroundMonitoring(pairedDevicesRepository.enabledDevices)
             advanceUntilIdle()
 
-            assertEquals(0, cameraRepository.connectCallCount)
+            // We now expect 1 connection attempt even without presence because of the
+            // proactive startup connect logic.
+            assertEquals(1, cameraRepository.connectCallCount)
 
             coordinator.setDevicePresence(testDevice1.macAddress, true)
             advanceUntilIdle()
 
+            // Still 1, as it was already connected
             assertEquals(1, cameraRepository.connectCallCount)
         }
 
@@ -572,37 +575,33 @@ class MultiDeviceSyncCoordinatorTest {
             val connection1 = FakeCameraConnection(testDevice1.toTestCamera())
             val connection2 = FakeCameraConnection(testDevice2.toTestCamera())
 
-            // Add both devices as enabled
-            pairedDevicesRepository.addTestDevice(testDevice1)
-            pairedDevicesRepository.addTestDevice(testDevice2)
-
-            // Start background monitoring
+            // Start with NO devices to avoid proactive connect at startup
+            pairedDevicesRepository.setTestDevices(emptyList())
             coordinator.startBackgroundMonitoring(pairedDevicesRepository.enabledDevices)
             advanceUntilIdle()
 
+            // Setup connections in the repository BEFORE adding devices
+            cameraRepository.setConnectionForMac(testDevice1.macAddress, connection1)
+            cameraRepository.setConnectionForMac(testDevice2.macAddress, connection2)
+
+            // Now add both devices as enabled
+            pairedDevicesRepository.addTestDevice(testDevice1)
+            pairedDevicesRepository.addTestDevice(testDevice2)
+            advanceUntilIdle()
+
             // Connect device1 via presence
-            cameraRepository.connectionToReturn = connection1
             coordinator.setDevicePresence(testDevice1.macAddress, true)
             advanceUntilIdle()
 
             // Connect device2 via presence
-            cameraRepository.connectionToReturn = connection2
             coordinator.setDevicePresence(testDevice2.macAddress, true)
             advanceUntilIdle()
 
             assertTrue(coordinator.isDeviceConnected(testDevice1.macAddress))
             assertTrue(coordinator.isDeviceConnected(testDevice2.macAddress))
 
-            // Disable device1 - this will trigger the enabledDevices flow to emit
-            // The background monitoring collector should automatically call
-            // checkAndConnectEnabledDevices()
-            // when the flow emits, so we don't need to call refreshConnections() explicitly
+            // Disable device1
             pairedDevicesRepository.setDeviceEnabled(testDevice1.macAddress, false)
-            advanceUntilIdle()
-
-            // The collector should have processed the update and called
-            // checkAndConnectEnabledDevices()
-            // Give it a bit more time to complete
             advanceUntilIdle()
 
             // Device1 should be disconnected, device2 should remain connected

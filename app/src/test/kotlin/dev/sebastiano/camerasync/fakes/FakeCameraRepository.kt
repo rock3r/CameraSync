@@ -54,12 +54,25 @@ class FakeCameraRepository : CameraRepository {
         if (connectDelay > 0) delay(connectDelay)
         onFound?.invoke()
         connectException?.let { throw it }
-        if (failIfConnectionNull && connectionToReturn == null) {
+        if (
+            failIfConnectionNull &&
+                connectionToReturn == null &&
+                !connectionsByMac.containsKey(camera.macAddress)
+        ) {
             throw RuntimeException("Connection not available (connectionToReturn is null)")
         }
-        val connection = connectionToReturn ?: FakeCameraConnection(camera)
+        val connection =
+            connectionsByMac[camera.macAddress]
+                ?: connectionToReturn
+                ?: FakeCameraConnection(camera)
         onConnectSuccess?.invoke(camera)
         return connection
+    }
+
+    private val connectionsByMac = mutableMapOf<String, FakeCameraConnection>()
+
+    fun setConnectionForMac(macAddress: String, connection: FakeCameraConnection) {
+        connectionsByMac[macAddress] = connection
     }
 
     suspend fun emitDiscoveredCamera(camera: Camera) {

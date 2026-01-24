@@ -104,9 +104,27 @@ class MultiDeviceSyncCoordinator(
 
         backgroundMonitoringJob =
             coroutineScope.launch {
+                var initialRefreshDone = false
                 enabledDevices.collect { devices ->
                     enabledDevicesFlow.value = devices
-                    checkAndConnectEnabledDevices()
+                    // Ensure we are observing presence for all enabled devices
+                    devices.forEach {
+                        companionDeviceManagerHelper.startObservingDevicePresence(it.macAddress)
+                    }
+
+                    // We perform an initial refresh (ignoring presence) the first time we see
+                    // enabled devices to ensure we try to connect to them even if Companion
+                    // Device Manager hasn't reported them as present yet.
+                    val shouldIgnorePresence = !initialRefreshDone && devices.isNotEmpty()
+                    if (shouldIgnorePresence) {
+                        Log.info(tag = TAG) {
+                            "Performing initial proactive refresh for ${devices.size} devices"
+                        }
+                    }
+                    checkAndConnectEnabledDevices(ignorePresence = shouldIgnorePresence)
+                    if (devices.isNotEmpty()) {
+                        initialRefreshDone = true
+                    }
                 }
             }
     }
@@ -114,26 +132,42 @@ class MultiDeviceSyncCoordinator(
     /** Manually triggers a scan for all enabled but disconnected devices. */
     fun refreshConnections() {
         Log.info(tag = TAG) { "Manual refresh requested" }
-        coroutineScope.launch { checkAndConnectEnabledDevices(ignorePresence = true) }
+        coroutineScope.launch {
+            // Ensure we have loaded devices from the repository before refreshing
+            if (enabledDevicesFlow.value.isEmpty()) {
+                val devices = pairedDevicesRepository.enabledDevices.first()
+                enabledDevicesFlow.value = devices
+            }
+            checkAndConnectEnabledDevices(ignorePresence = true)
+        }
     }
 
     private suspend fun checkAndConnectEnabledDevices(ignorePresence: Boolean = false) {
         Log.debug(tag = TAG) { "Checking enabled devices (ignorePresence=$ignorePresence)" }
+
+        // Ensure we have loaded devices from the repository before checking
+        if (enabledDevicesFlow.value.isEmpty()) {
+            Log.debug(tag = TAG) { "Enabled devices list empty, waiting for initial load..." }
+            val devices = pairedDevicesRepository.enabledDevices.first()
+            enabledDevicesFlow.value = devices
+        }
+
         _isScanning.value = true
         try {
             scanMutex.withLock {
                 val enabledDevices = enabledDevicesFlow.value
-                val enabledMacAddresses = enabledDevices.map { it.macAddress }.toSet()
+                val enabledMacAddresses = enabledDevices.map { it.macAddress.uppercase() }.toSet()
                 val presentMacAddresses =
                     if (ignorePresence) enabledMacAddresses else _presentDevices.value
                 val allowUnknownPresence = !ignorePresence && presentMacAddresses.isEmpty()
+
                 if (allowUnknownPresence) {
                     Log.debug(tag = TAG) {
-                        "Presence list empty; allowing initial connect for never-synced devices"
+                        "Presence list empty; allowing initial connect for disconnected devices"
                     }
                 }
                 Log.debug(tag = TAG) {
-                    "Enabled devices: ${enabledMacAddresses.size}, present devices: ${presentMacAddresses.size}"
+                    "Enabled devices: ${enabledMacAddresses.size} ($enabledMacAddresses), present devices: ${presentMacAddresses.size} ($presentMacAddresses)"
                 }
 
                 // First, collect devices to disconnect while holding the mutex
@@ -144,11 +178,7 @@ class MultiDeviceSyncCoordinator(
                     jobsMutex.withLock {
                         deviceConnections.keys
                             .filter { macAddress ->
-                                if (
-                                    !enabledMacAddresses.contains(macAddress) ||
-                                        (!ignorePresence &&
-                                            !presentMacAddresses.contains(macAddress))
-                                ) {
+                                if (!enabledMacAddresses.contains(macAddress)) {
                                     val state = getDeviceState(macAddress)
                                     state is DeviceConnectionState.Connected ||
                                         state is DeviceConnectionState.Syncing ||
@@ -171,11 +201,11 @@ class MultiDeviceSyncCoordinator(
 
                 // Then, connect devices that are enabled but not connected
                 enabledDevices.forEach { device ->
-                    val macAddress = device.macAddress
+                    val macAddress = device.macAddress.uppercase()
                     val state = getDeviceState(macAddress)
                     val isPresent =
                         presentMacAddresses.contains(macAddress) ||
-                            (allowUnknownPresence && device.lastSyncedAt == null)
+                            (allowUnknownPresence && state is DeviceConnectionState.Disconnected)
 
                     val eligibleState =
                         state is DeviceConnectionState.Disconnected ||
@@ -225,7 +255,7 @@ class MultiDeviceSyncCoordinator(
      * @param device The paired device to connect to.
      */
     fun startDeviceSync(device: PairedDevice) {
-        val macAddress = device.macAddress
+        val macAddress = device.macAddress.uppercase()
 
         Log.info(tag = TAG) {
             "Starting sync for $macAddress (enabled=${device.isEnabled}, vendorId=${device.vendorId})"
@@ -478,9 +508,10 @@ class MultiDeviceSyncCoordinator(
      * @param macAddress The MAC address of the device to stop.
      */
     suspend fun stopDeviceSync(macAddress: String) {
-        Log.info(tag = TAG) { "Stopping sync for $macAddress" }
+        val normalizedMac = macAddress.uppercase()
+        Log.info(tag = TAG) { "Stopping sync for $normalizedMac" }
 
-        val job = synchronized(deviceJobs) { deviceJobs[macAddress] }
+        val job = synchronized(deviceJobs) { deviceJobs[normalizedMac] }
 
         if (job != null) {
             job.cancel()
@@ -551,12 +582,12 @@ class MultiDeviceSyncCoordinator(
 
     /** Gets the current connection state for a device. */
     fun getDeviceState(macAddress: String): DeviceConnectionState {
-        return _deviceStates.value[macAddress] ?: DeviceConnectionState.Disconnected
+        return _deviceStates.value[macAddress.uppercase()] ?: DeviceConnectionState.Disconnected
     }
 
     /** Checks if a device is currently connected. */
     fun isDeviceConnected(macAddress: String): Boolean {
-        val state = getDeviceState(macAddress)
+        val state = getDeviceState(macAddress.uppercase())
         return state is DeviceConnectionState.Connected || state is DeviceConnectionState.Syncing
     }
 
@@ -568,27 +599,30 @@ class MultiDeviceSyncCoordinator(
     }
 
     private fun updateDeviceState(macAddress: String, state: DeviceConnectionState) {
-        _deviceStates.update { currentStates -> currentStates + (macAddress to state) }
+        val normalizedMac = macAddress.uppercase()
+        _deviceStates.update { currentStates -> currentStates + (normalizedMac to state) }
     }
 
     private inline fun updateDeviceState(
         macAddress: String,
         transform: (DeviceConnectionState) -> DeviceConnectionState,
     ) {
+        val normalizedMac = macAddress.uppercase()
         _deviceStates.update { currentStates ->
-            val currentState = currentStates[macAddress] ?: DeviceConnectionState.Disconnected
-            currentStates + (macAddress to transform(currentState))
+            val currentState = currentStates[normalizedMac] ?: DeviceConnectionState.Disconnected
+            currentStates + (normalizedMac to transform(currentState))
         }
     }
 
     /** Removes a device state entry (used when device is unpaired). */
     fun clearDeviceState(macAddress: String) {
-        _deviceStates.update { currentStates -> currentStates - macAddress }
+        val normalizedMac = macAddress.uppercase()
+        _deviceStates.update { currentStates -> currentStates - normalizedMac }
     }
 
     /** Attempts to reconnect to a device that failed. */
     fun retryDeviceConnection(device: PairedDevice) {
-        val macAddress = device.macAddress
+        val macAddress = device.macAddress.uppercase()
         val currentState = getDeviceState(macAddress)
 
         if (
