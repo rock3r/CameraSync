@@ -48,4 +48,18 @@ class FakePendingIntentFactory : PendingIntentFactory {
         // PendingIntent itself
         return mockk<PendingIntent>(relaxed = true)
     }
+
+    override fun createActivityPendingIntent(
+        context: Context,
+        requestCode: Int,
+        intent: Intent,
+        flags: Int,
+    ): PendingIntent {
+        // Context is passed but not used in fake - just track the call
+        val call = PendingIntentCall(requestCode, intent, flags)
+        _calls.add(call)
+        lastRequestCode = requestCode
+        lastIntent = intent
+        return mockk<PendingIntent>(relaxed = true)
+    }
 }

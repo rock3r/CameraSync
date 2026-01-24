@@ -165,6 +165,14 @@ internal fun createMultiDeviceNotification(
             ),
         )
 
+    val contentIntent =
+        pendingIntentFactory.createActivityPendingIntent(
+            context,
+            MultiDeviceSyncService.MAIN_ACTIVITY_REQUEST_CODE,
+            intentFactory.createMainActivityIntent(context),
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+        )
+
     return notificationBuilder.build(
         channelId = NOTIFICATION_CHANNEL,
         title = title,
@@ -175,5 +183,6 @@ internal fun createMultiDeviceNotification(
         category = Notification.CATEGORY_LOCATION_SHARING,
         isSilent = true,
         actions = actions,
+        contentIntent = contentIntent,
     )
 }

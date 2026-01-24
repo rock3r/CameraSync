@@ -18,6 +18,7 @@ interface NotificationBuilder {
         category: String? = null,
         isSilent: Boolean = false,
         actions: List<NotificationAction> = emptyList(),
+        contentIntent: PendingIntent? = null,
     ): Notification
 }
 

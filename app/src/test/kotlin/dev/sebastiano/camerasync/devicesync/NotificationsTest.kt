@@ -244,8 +244,11 @@ class NotificationsTest {
         assertEquals("Refresh", buildCall.actions[0].title)
         assertEquals("Stop all", buildCall.actions[1].title)
 
-        // Verify PendingIntentFactory was called twice with correct request codes
-        assertEquals(2, pendingIntentFactory.calls.size)
+        // Verify content intent was set
+        assertNotNull(buildCall.contentIntent)
+
+        // Verify PendingIntentFactory was called 3 times (2 actions + 1 content intent)
+        assertEquals(3, pendingIntentFactory.calls.size)
         assertEquals(
             dev.sebastiano.camerasync.devicesync.MultiDeviceSyncService.REFRESH_REQUEST_CODE,
             pendingIntentFactory.calls[0].requestCode,
@@ -254,9 +257,14 @@ class NotificationsTest {
             dev.sebastiano.camerasync.devicesync.MultiDeviceSyncService.STOP_REQUEST_CODE,
             pendingIntentFactory.calls[1].requestCode,
         )
+        assertEquals(
+            dev.sebastiano.camerasync.devicesync.MultiDeviceSyncService.MAIN_ACTIVITY_REQUEST_CODE,
+            pendingIntentFactory.calls[2].requestCode,
+        )
 
         // Verify the intents were created correctly
         assertNotNull(intentFactory.lastRefreshIntent)
         assertNotNull(intentFactory.lastStopIntent)
+        assertNotNull(intentFactory.lastMainActivityIntent)
     }
 }

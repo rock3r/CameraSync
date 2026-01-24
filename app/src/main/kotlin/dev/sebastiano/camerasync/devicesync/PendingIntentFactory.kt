@@ -12,4 +12,11 @@ interface PendingIntentFactory {
         intent: Intent,
         flags: Int,
     ): PendingIntent
+
+    fun createActivityPendingIntent(
+        context: Context,
+        requestCode: Int,
+        intent: Intent,
+        flags: Int,
+    ): PendingIntent
 }

@@ -16,11 +16,15 @@ class FakeIntentFactory : IntentFactory {
     var lastStartIntent: Intent? = null
         private set
 
+    var lastMainActivityIntent: Intent? = null
+        private set
+
     /** Reset the factory state between tests. */
     fun reset() {
         lastRefreshIntent = null
         lastStopIntent = null
         lastStartIntent = null
+        lastMainActivityIntent = null
     }
 
     override fun createRefreshIntent(context: Context): Intent {
@@ -41,6 +45,13 @@ class FakeIntentFactory : IntentFactory {
         // Context is passed but not used in fake - just track the call
         val intent = mockk<Intent>(relaxed = true)
         lastStartIntent = intent
+        return intent
+    }
+
+    override fun createMainActivityIntent(context: Context): Intent {
+        // Context is passed but not used in fake - just track the call
+        val intent = mockk<Intent>(relaxed = true)
+        lastMainActivityIntent = intent
         return intent
     }
 }

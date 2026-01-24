@@ -1,6 +1,7 @@
 package dev.sebastiano.camerasync.devicesync
 
 import android.app.Notification
+import android.app.PendingIntent
 import android.content.Context
 import androidx.core.app.NotificationCompat
 
@@ -16,6 +17,7 @@ class AndroidNotificationBuilder(private val context: Context) : NotificationBui
         category: String?,
         isSilent: Boolean,
         actions: List<NotificationAction>,
+        contentIntent: PendingIntent?,
     ): Notification {
         val builder =
             NotificationCompat.Builder(context, channelId)
@@ -28,6 +30,10 @@ class AndroidNotificationBuilder(private val context: Context) : NotificationBui
 
         if (category != null) {
             builder.setCategory(category)
+        }
+
+        if (contentIntent != null) {
+            builder.setContentIntent(contentIntent)
         }
 
         actions.forEach { action ->

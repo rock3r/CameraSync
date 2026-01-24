@@ -10,4 +10,6 @@ interface IntentFactory {
     fun createStopIntent(context: Context): Intent
 
     fun createStartIntent(context: Context): Intent
+
+    fun createMainActivityIntent(context: Context): Intent
 }

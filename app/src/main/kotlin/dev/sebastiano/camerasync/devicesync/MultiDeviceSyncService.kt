@@ -348,6 +348,15 @@ class MultiDeviceSyncService(
             createErrorNotificationBuilder(this)
                 .setContentTitle("Missing permission")
                 .setContentText("Cannot sync with cameras: $missingPermission is required")
+                .setContentIntent(
+                    pendingIntentFactory.createActivityPendingIntent(
+                        this,
+                        MAIN_ACTIVITY_REQUEST_CODE,
+                        intentFactory.createMainActivityIntent(this),
+                        android.app.PendingIntent.FLAG_IMMUTABLE or
+                            android.app.PendingIntent.FLAG_UPDATE_CURRENT,
+                    )
+                )
                 .build()
 
         val hasNotificationPermission =
@@ -392,6 +401,7 @@ class MultiDeviceSyncService(
 
         const val STOP_REQUEST_CODE = 667
         const val REFRESH_REQUEST_CODE = 668
+        const val MAIN_ACTIVITY_REQUEST_CODE = 669
 
         fun getInstanceFrom(binder: Binder): MultiDeviceSyncService =
             (binder as MultiDeviceSyncServiceBinder).getService()

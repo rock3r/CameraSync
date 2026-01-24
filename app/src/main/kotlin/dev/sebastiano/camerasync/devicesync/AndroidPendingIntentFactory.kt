@@ -12,4 +12,11 @@ class AndroidPendingIntentFactory : PendingIntentFactory {
         intent: Intent,
         flags: Int,
     ): PendingIntent = PendingIntent.getService(context, requestCode, intent, flags)
+
+    override fun createActivityPendingIntent(
+        context: Context,
+        requestCode: Int,
+        intent: Intent,
+        flags: Int,
+    ): PendingIntent = PendingIntent.getActivity(context, requestCode, intent, flags)
 }

@@ -22,6 +22,7 @@ class FakeNotificationBuilder : NotificationBuilder {
         val category: String?,
         val isSilent: Boolean,
         val actions: List<NotificationAction>,
+        val contentIntent: android.app.PendingIntent?,
     )
 
     var lastBuildCall: BuildCall? = null
@@ -42,6 +43,7 @@ class FakeNotificationBuilder : NotificationBuilder {
         category: String?,
         isSilent: Boolean,
         actions: List<NotificationAction>,
+        contentIntent: android.app.PendingIntent?,
     ): Notification {
         lastBuildCall =
             BuildCall(
@@ -54,6 +56,7 @@ class FakeNotificationBuilder : NotificationBuilder {
                 category = category,
                 isSilent = isSilent,
                 actions = actions,
+                contentIntent = contentIntent,
             )
 
         // Create notification with proper extras for test helpers
