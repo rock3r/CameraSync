@@ -1,9 +1,11 @@
 package dev.sebastiano.camerasync
 
+import android.Manifest.permission.ACCESS_BACKGROUND_LOCATION
 import android.Manifest.permission.ACCESS_FINE_LOCATION
 import android.Manifest.permission.BLUETOOTH_CONNECT
 import android.Manifest.permission.BLUETOOTH_SCAN
 import android.Manifest.permission.POST_NOTIFICATIONS
+import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -15,9 +17,12 @@ import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.listSaver
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.toMutableStateList
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.ViewModelProvider
@@ -25,7 +30,9 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation3.runtime.NavEntry
 import androidx.navigation3.ui.NavDisplay
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
+import com.google.accompanist.permissions.isGranted
 import com.google.accompanist.permissions.rememberMultiplePermissionsState
+import com.google.accompanist.permissions.rememberPermissionState
 import dev.sebastiano.camerasync.devices.DevicesListScreen
 import dev.sebastiano.camerasync.devices.DevicesListViewModel
 import dev.sebastiano.camerasync.devicesync.MultiDeviceSyncService
@@ -58,6 +65,7 @@ class MainActivity(
 ) : ComponentActivity() {
 
     private val appGraph: AppGraph by lazy { (application as CameraSyncApp).appGraph }
+    private var shouldShowPermissionsState by mutableStateOf(false)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -65,20 +73,40 @@ class MainActivity(
         enableEdgeToEdge()
         registerNotificationChannel(this)
 
-        setContent { RootComposable(viewModelFactory = appGraph.viewModelFactory()) }
+        shouldShowPermissionsState =
+            intent.getBooleanExtra(MultiDeviceSyncService.EXTRA_SHOW_PERMISSIONS, false)
+
+        setContent {
+            RootComposable(
+                viewModelFactory = appGraph.viewModelFactory(),
+                shouldShowPermissions = shouldShowPermissionsState,
+            )
+        }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        shouldShowPermissionsState =
+            intent.getBooleanExtra(MultiDeviceSyncService.EXTRA_SHOW_PERMISSIONS, false)
     }
 }
 
 @OptIn(ExperimentalPermissionsApi::class)
 @Composable
-private fun RootComposable(viewModelFactory: ViewModelProvider.Factory) {
+private fun RootComposable(
+    viewModelFactory: ViewModelProvider.Factory,
+    shouldShowPermissions: Boolean = false,
+) {
     CameraSyncTheme {
-        val allPermissions =
+        val basePermissions =
             listOf(ACCESS_FINE_LOCATION, BLUETOOTH_SCAN, BLUETOOTH_CONNECT, POST_NOTIFICATIONS)
         val multiplePermissionsState =
-            rememberMultiplePermissionsState(permissions = allPermissions)
+            rememberMultiplePermissionsState(permissions = basePermissions)
+        val backgroundPermissionState =
+            rememberPermissionState(permission = ACCESS_BACKGROUND_LOCATION)
 
-        // Initialize backStack - will be updated if permissions are already granted
+        // Initialize backStack - validate saved state against current permissions
         val backStack =
             rememberSaveable(
                 saver = listSaver(save = { it.toList() }, restore = { it.toMutableStateList() })
@@ -86,14 +114,49 @@ private fun RootComposable(viewModelFactory: ViewModelProvider.Factory) {
                 mutableStateListOf<NavRoute>(NavRoute.NeedsPermissions)
             }
 
-        // Check if permissions are already granted and navigate to DevicesList
+        // Validate saved backStack state: if we saved DevicesList but permissions are now missing,
+        // reset to NeedsPermissions
+        LaunchedEffect(
+            multiplePermissionsState.allPermissionsGranted,
+            backgroundPermissionState.status.isGranted,
+        ) {
+            val allPermissionsGranted =
+                multiplePermissionsState.allPermissionsGranted &&
+                    backgroundPermissionState.status.isGranted
+            val currentRoute = backStack.firstOrNull()
+
+            if (!allPermissionsGranted && currentRoute == NavRoute.DevicesList) {
+                // Permissions were revoked or background location is missing - go back to
+                // permissions screen
+                backStack.clear()
+                backStack.add(NavRoute.NeedsPermissions)
+            } else if (allPermissionsGranted && currentRoute == NavRoute.NeedsPermissions) {
+                // All permissions granted - navigate to DevicesList
+                backStack[0] = NavRoute.DevicesList
+            }
+        }
+
+        // Navigate to permissions screen if requested from notification
+        LaunchedEffect(shouldShowPermissions) {
+            if (shouldShowPermissions) {
+                // Clear back stack and show permissions screen
+                backStack.clear()
+                backStack.add(NavRoute.NeedsPermissions)
+            }
+        }
+
+        // Check if ALL permissions (including background location) are granted and navigate to
+        // DevicesList
         // This handles both startup (when permissions are already granted) and runtime (when user
         // grants permissions)
-        LaunchedEffect(multiplePermissionsState.allPermissionsGranted) {
-            if (
+        LaunchedEffect(
+            multiplePermissionsState.allPermissionsGranted,
+            backgroundPermissionState.status.isGranted,
+        ) {
+            val allPermissionsGranted =
                 multiplePermissionsState.allPermissionsGranted &&
-                    backStack.contains(NavRoute.NeedsPermissions)
-            ) {
+                    backgroundPermissionState.status.isGranted
+            if (allPermissionsGranted && backStack.contains(NavRoute.NeedsPermissions)) {
                 // Replace NeedsPermissions with DevicesList
                 val needsPermissionsIndex = backStack.indexOf(NavRoute.NeedsPermissions)
                 backStack[needsPermissionsIndex] = NavRoute.DevicesList

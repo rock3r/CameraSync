@@ -14,6 +14,7 @@ import androidx.core.app.NotificationManagerCompat
 import androidx.core.app.ServiceCompat
 import androidx.core.content.PermissionChecker
 import androidx.lifecycle.DefaultLifecycleObserver
+import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.ProcessLifecycleOwner
 import com.juul.khronicle.Log
@@ -120,9 +121,9 @@ class MultiDeviceSyncService(
             )
     }
 
-    override fun onBind(intent: Intent): IBinder {
+    override fun onBind(intent: Intent): IBinder? {
         if (!checkPermissions()) {
-            throw RuntimeException("Required permissions not granted")
+            return null
         }
         return binder
     }
@@ -153,13 +154,12 @@ class MultiDeviceSyncService(
                 }
             }
             ACTION_DEVICE_DISAPPEARED -> {
-                Log.info(tag = TAG) { "Device presence disappeared, stopping sync..." }
+                Log.info(tag = TAG) { "Device presence disappeared, updating presence..." }
                 if (!checkPermissions()) return START_NOT_STICKY
                 startForegroundService()
                 startDeviceMonitoring()
                 intent.getStringExtra(EXTRA_DEVICE_ADDRESS)?.let { macAddress ->
                     syncCoordinator.setDevicePresence(macAddress, false)
-                    launch { syncCoordinator.stopDeviceSync(macAddress) }
                 }
             }
             else -> {
@@ -325,14 +325,15 @@ class MultiDeviceSyncService(
     }
 
     private fun checkPermissions(): Boolean {
-        val requiredPermissions =
-            listOf(
-                Manifest.permission.ACCESS_FINE_LOCATION,
-                Manifest.permission.ACCESS_BACKGROUND_LOCATION,
-                Manifest.permission.BLUETOOTH_SCAN,
-                Manifest.permission.BLUETOOTH_CONNECT,
-                Manifest.permission.POST_NOTIFICATIONS,
-            )
+        val requiredPermissions = buildList {
+            add(Manifest.permission.ACCESS_FINE_LOCATION)
+            if (!isAppInForeground()) {
+                add(Manifest.permission.ACCESS_BACKGROUND_LOCATION)
+            }
+            add(Manifest.permission.BLUETOOTH_SCAN)
+            add(Manifest.permission.BLUETOOTH_CONNECT)
+            add(Manifest.permission.POST_NOTIFICATIONS)
+        }
 
         for (permission in requiredPermissions) {
             val result = PermissionChecker.checkSelfPermission(this, permission)
@@ -347,6 +348,11 @@ class MultiDeviceSyncService(
     private fun stopAndNotifyMissingPermission(missingPermission: String) {
         stopSelf()
 
+        val mainIntent =
+            intentFactory.createMainActivityIntent(this).apply {
+                putExtra(EXTRA_SHOW_PERMISSIONS, true)
+            }
+
         val notification =
             createErrorNotificationBuilder(this)
                 .setContentTitle(getString(R.string.error_missing_permission_title))
@@ -357,7 +363,7 @@ class MultiDeviceSyncService(
                     pendingIntentFactory.createActivityPendingIntent(
                         this,
                         MAIN_ACTIVITY_REQUEST_CODE,
-                        intentFactory.createMainActivityIntent(this),
+                        mainIntent,
                         android.app.PendingIntent.FLAG_IMMUTABLE or
                             android.app.PendingIntent.FLAG_UPDATE_CURRENT,
                     )
@@ -378,6 +384,9 @@ class MultiDeviceSyncService(
         vibrator.vibrate()
         NotificationManagerCompat.from(this).notify(ERROR_NOTIFICATION_ID, notification)
     }
+
+    private fun isAppInForeground(): Boolean =
+        ProcessLifecycleOwner.get().lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)
 
     override fun onDestroy() {
         super.onDestroy()
@@ -403,6 +412,7 @@ class MultiDeviceSyncService(
         const val ACTION_DEVICE_APPEARED = "dev.sebastiano.camerasync.DEVICE_APPEARED"
         const val ACTION_DEVICE_DISAPPEARED = "dev.sebastiano.camerasync.DEVICE_DISAPPEARED"
         const val EXTRA_DEVICE_ADDRESS = "device_address"
+        const val EXTRA_SHOW_PERMISSIONS = "show_permissions"
 
         const val STOP_REQUEST_CODE = 667
         const val REFRESH_REQUEST_CODE = 668

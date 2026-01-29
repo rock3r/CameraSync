@@ -1,6 +1,9 @@
 package dev.sebastiano.camerasync.data.repository
 
+import android.bluetooth.BluetoothAdapter
 import android.bluetooth.le.ScanSettings
+import android.content.Context
+import androidx.core.content.ContextCompat
 import com.juul.kable.Advertisement
 import com.juul.kable.ExperimentalApi
 import com.juul.kable.ObsoleteKableApi
@@ -18,10 +21,12 @@ import dev.sebastiano.camerasync.domain.vendor.CameraVendorRegistry
 import dev.sebastiano.camerasync.logging.KhronicleLogEngine
 import java.time.ZonedDateTime
 import kotlin.uuid.ExperimentalUuidApi
+import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.mapNotNull
+import kotlinx.coroutines.withTimeout
 
 private const val TAG = "KableCameraRepository"
 
@@ -32,7 +37,10 @@ private const val TAG = "KableCameraRepository"
  * [CameraVendorRegistry].
  */
 @OptIn(ExperimentalUuidApi::class)
-class KableCameraRepository(private val vendorRegistry: CameraVendorRegistry) : CameraRepository {
+class KableCameraRepository(
+    private val vendorRegistry: CameraVendorRegistry,
+    private val context: Context,
+) : CameraRepository {
 
     @OptIn(ObsoleteKableApi::class)
     private val scanner by lazy {
@@ -90,36 +98,90 @@ class KableCameraRepository(private val vendorRegistry: CameraVendorRegistry) : 
     }
 
     override suspend fun connect(camera: Camera, onFound: (() -> Unit)?): CameraConnection {
-        // We need to scan for the device first to get the Advertisement
-        // This is a limitation of Kable - we need the Advertisement to create a Peripheral
         Log.info(tag = TAG) {
             "Looking for ${camera.name ?: camera.macAddress} (${camera.macAddress})"
         }
+
+        // Check if device is bonded - if so, it might not be advertising
+        val isBonded = isDeviceBonded(camera.macAddress)
+        if (isBonded) {
+            Log.info(tag = TAG) {
+                "Device ${camera.macAddress} is bonded. " +
+                    "If it's already connected to another app, it may not advertise. " +
+                    "Try disconnecting from other apps or turning Bluetooth off/on."
+            }
+        }
+
+        // Scan for advertisement (Kable requires an Advertisement to create a Peripheral)
+        Log.info(tag = TAG) { "Scanning for advertisement for ${camera.macAddress}..." }
         val scanner =
             com.juul.kable.Scanner {
                 @OptIn(ObsoleteKableApi::class) filters { match { address = camera.macAddress } }
             }
 
-        val advertisement = scanner.advertisements.first()
-        Log.info(tag = TAG) {
-            "Found advertisement for ${camera.name ?: camera.macAddress}: ${advertisement.identifier} (${advertisement.peripheralName})"
-        }
-        onFound?.invoke()
-
-        val peripheral =
-            Peripheral(advertisement) {
-                logging {
-                    level = Logging.Level.Events
-                    engine = KhronicleLogEngine
-                    identifier = "CameraSync:${camera.vendor.vendorName}"
-                }
+        try {
+            // Use longer timeout for bonded devices that might be slow to advertise
+            val timeout = if (isBonded) 20_000L else 10_000L
+            val advertisement = withTimeout(timeout) { scanner.advertisements.first() }
+            Log.info(tag = TAG) {
+                "Found advertisement for ${camera.name ?: camera.macAddress}: ${advertisement.identifier} (${advertisement.peripheralName})"
             }
+            onFound?.invoke()
 
-        Log.info(tag = TAG) { "Connecting to ${camera.name}..." }
-        peripheral.connect()
-        Log.info(tag = TAG) { "Connected to ${camera.name}" }
+            val peripheral =
+                Peripheral(advertisement) {
+                    logging {
+                        level = Logging.Level.Events
+                        engine = KhronicleLogEngine
+                        identifier = "CameraSync:${camera.vendor.vendorName}"
+                    }
+                }
 
-        return KableCameraConnection(camera, peripheral)
+            Log.info(tag = TAG) { "Connecting to ${camera.name}..." }
+            peripheral.connect()
+            Log.info(tag = TAG) { "Connected to ${camera.name}" }
+
+            return KableCameraConnection(camera, peripheral)
+        } catch (e: TimeoutCancellationException) {
+            val errorMessage =
+                if (isBonded) {
+                    "Timeout waiting for advertisement from ${camera.macAddress}. " +
+                        "The camera is bonded but not advertising. " +
+                        "This usually happens when the camera is already connected to another app. " +
+                        "Try: 1) Disconnect the camera from other apps, 2) Turn Bluetooth off/on, " +
+                        "or 3) Restart the camera."
+                } else {
+                    "Timeout waiting for advertisement from ${camera.macAddress}. " +
+                        "Make sure the camera is powered on, Bluetooth is enabled, " +
+                        "and the camera is in pairing/discoverable mode."
+                }
+            Log.error(tag = TAG, throwable = e) { errorMessage }
+            throw IllegalStateException(errorMessage, e)
+        }
+    }
+
+    private fun isDeviceBonded(macAddress: String): Boolean {
+        val adapter = BluetoothAdapter.getDefaultAdapter() ?: return false
+        if (!adapter.isEnabled) return false
+
+        // Check for BLUETOOTH_CONNECT permission
+        if (
+            ContextCompat.checkSelfPermission(
+                context,
+                android.Manifest.permission.BLUETOOTH_CONNECT,
+            ) != android.content.pm.PackageManager.PERMISSION_GRANTED
+        ) {
+            return false
+        }
+
+        return try {
+            adapter.bondedDevices.any { device ->
+                device.address.equals(macAddress, ignoreCase = true)
+            }
+        } catch (e: SecurityException) {
+            Log.warn(tag = TAG, throwable = e) { "SecurityException accessing bonded devices" }
+            false
+        }
     }
 
     /**

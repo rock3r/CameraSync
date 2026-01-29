@@ -1,8 +1,11 @@
 package dev.sebastiano.camerasync.devicesync
 
+import android.Manifest
 import android.companion.AssociationInfo
 import android.companion.CompanionDeviceService
+import android.content.Context
 import androidx.core.content.ContextCompat
+import androidx.core.content.PermissionChecker
 import com.juul.khronicle.Log
 import dev.sebastiano.camerasync.domain.repository.PairedDevicesRepository
 import dev.zacsweers.metro.Inject
@@ -39,6 +42,13 @@ class CompanionPresenceService(private val pairedDevicesRepository: PairedDevice
                     isServiceRunning = { MultiDeviceSyncService.isRunning.value },
                     startPresenceSync = { deviceAddress, shouldStart ->
                         if (shouldStart) {
+                            val missingPermission = findMissingRequiredPermission(appContext)
+                            if (missingPermission != null) {
+                                Log.warn(tag = TAG) {
+                                    "Skipping foreground start; missing permission: $missingPermission"
+                                }
+                                return@PresenceSyncHandler
+                            }
                             ContextCompat.startForegroundService(
                                 appContext,
                                 MultiDeviceSyncService.createPresenceIntent(
@@ -59,6 +69,22 @@ class CompanionPresenceService(private val pairedDevicesRepository: PairedDevice
                     },
                 )
             handler.handlePresence(macAddress, isPresent)
+        }
+    }
+
+    private fun findMissingRequiredPermission(context: Context): String? {
+        val requiredPermissions =
+            listOf(
+                Manifest.permission.ACCESS_FINE_LOCATION,
+                Manifest.permission.ACCESS_BACKGROUND_LOCATION,
+                Manifest.permission.BLUETOOTH_SCAN,
+                Manifest.permission.BLUETOOTH_CONNECT,
+                Manifest.permission.POST_NOTIFICATIONS,
+            )
+
+        return requiredPermissions.firstOrNull { permission ->
+            PermissionChecker.checkSelfPermission(context, permission) !=
+                PermissionChecker.PERMISSION_GRANTED
         }
     }
 

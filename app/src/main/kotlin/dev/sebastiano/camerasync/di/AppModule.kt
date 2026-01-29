@@ -118,8 +118,10 @@ interface AppGraph {
 
     @Provides
     @SingleIn(AppGraph::class)
-    fun provideCameraRepository(vendorRegistry: CameraVendorRegistry): CameraRepository =
-        KableCameraRepository(vendorRegistry = vendorRegistry)
+    fun provideCameraRepository(
+        vendorRegistry: CameraVendorRegistry,
+        context: Context,
+    ): CameraRepository = KableCameraRepository(vendorRegistry = vendorRegistry, context = context)
 
     @Provides
     @SingleIn(AppGraph::class)
