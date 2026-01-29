@@ -19,9 +19,9 @@
         android:name="android.permission.FOREGROUND_SERVICE"
         tools:ignore="ForegroundServicesPolicy" />
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
-    <uses-permission android:name="android.permission.REQUEST_OBSERVE_COMPANION_DEVICE_PRESENCE" />
-    <uses-permission android:name="android.permission.REQUEST_COMPANION_RUN_IN_BACKGROUND" />
-    <uses-permission android:name="android.permission.REQUEST_COMPANION_USE_DATA_IN_BACKGROUND" />
+    <!-- Note: Companion device background permissions removed - CDM presence callbacks don't work.
+         We use a Foreground Service with FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE which already
+         allows background starts. All service starts are from foreground user actions anyway. -->
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
 
     <uses-feature android:name="android.software.companion_device_setup" android:required="true"/>
@@ -87,18 +87,6 @@
             android:name=".devicesync.MultiDeviceSyncService"
             android:exported="false"
             android:foregroundServiceType="connectedDevice|location" />
-
-        <service
-            android:name=".devicesync.CompanionPresenceService"
-            android:exported="true"
-            android:permission="android.permission.BIND_COMPANION_DEVICE_SERVICE">
-            <intent-filter>
-                <action android:name="android.companion.CompanionDeviceService" />
-            </intent-filter>
-            <property
-                android:name="android.companion.PROPERTY_PRIMARY_COMPANION_DEVICE_SERVICE"
-                android:value="true" />
-        </service>
 
         <receiver
             android:name=".devicesync.SyncStartupReceiver"

@@ -3,13 +3,8 @@ package dev.sebastiano.camerasync.devicesync
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
-import dev.sebastiano.camerasync.data.repository.DataStorePairedDevicesRepository
-import dev.sebastiano.camerasync.data.repository.pairedDevicesDataStoreV2
 import dev.sebastiano.camerasync.domain.repository.PairedDevicesRepository
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.launch
 
 class SyncStartupReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
@@ -18,28 +13,11 @@ class SyncStartupReceiver : BroadcastReceiver() {
             return
         }
 
+        // Note: CDM presence observations removed - they don't work reliably.
+        // The periodic check in MultiDeviceSyncCoordinator handles reconnection.
+        // This receiver is kept for potential future use but doesn't do anything at boot.
         val pendingResult = goAsync()
-        val appContext = context.applicationContext
-        CoroutineScope(Dispatchers.IO).launch {
-            try {
-                val repository =
-                    DataStorePairedDevicesRepository(appContext.pairedDevicesDataStoreV2)
-                val handler =
-                    SyncStartupHandler(
-                        repository = repository,
-                        startObserving = { macAddress ->
-                            val deviceManager =
-                                appContext.getSystemService(Context.COMPANION_DEVICE_SERVICE)
-                                    as android.companion.CompanionDeviceManager
-                            @Suppress("DEPRECATION")
-                            deviceManager.startObservingDevicePresence(macAddress)
-                        },
-                    )
-                handler.registerPresenceForEnabledDevices()
-            } finally {
-                pendingResult.finish()
-            }
-        }
+        pendingResult.finish()
     }
 }
 

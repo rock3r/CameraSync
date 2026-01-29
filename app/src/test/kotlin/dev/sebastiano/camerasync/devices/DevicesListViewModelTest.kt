@@ -210,8 +210,8 @@ class DevicesListViewModelTest {
         assertEquals("Unknown Camera", displayInfo.model)
     }
 
-    // Note: Presence observation tests removed - presence observations are now managed
-    // by PresenceObservationManager in Application.onCreate(), not by DevicesListViewModel
+    // Note: Presence observation tests removed - CDM presence callbacks don't work reliably.
+    // The app uses periodic checks in MultiDeviceSyncCoordinator instead.
 
     @Test
     fun `computeDeviceDisplayInfo handles null device name`() = runTest {

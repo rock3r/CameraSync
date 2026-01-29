@@ -278,9 +278,6 @@ class DevicesListViewModel(
             // First disconnect if connected
             service?.disconnectDevice(macAddress)
 
-            // Stop observing presence for this device
-            companionDeviceManagerHelper.stopObservingDevicePresence(macAddress)
-
             // Remove the OS-level Bluetooth bond
             val bondRemoved = bluetoothBondingChecker.removeBond(macAddress)
             if (!bondRemoved) {

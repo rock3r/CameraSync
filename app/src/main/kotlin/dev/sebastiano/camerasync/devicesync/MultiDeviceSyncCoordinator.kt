@@ -97,6 +97,7 @@ class MultiDeviceSyncCoordinator(
 
     private var locationSyncJob: Job? = null
     private var backgroundMonitoringJob: Job? = null
+    private var periodicCheckJob: Job? = null
     private val enabledDevicesFlow = MutableStateFlow<List<PairedDevice>>(emptyList())
 
     /**
@@ -112,80 +113,82 @@ class MultiDeviceSyncCoordinator(
             coroutineScope.launch {
                 var initialRefreshDone = false
 
-                // Periodic check for disconnected devices (fallback when presence callbacks don't
-                // fire)
-                // Android's CDM only calls onDeviceAppeared() when devices transition from absent
-                // to present
-                // AFTER observation starts. If cameras turn on while observations are active but
-                // callbacks
-                // don't fire (known Android issue), periodic checks will catch them.
-                val periodicCheckJob = launch {
-                    Log.info(tag = TAG) {
-                        "Starting periodic device check (every 30s) as fallback for missing CDM callbacks"
-                    }
-                    while (true) {
-                        delay(30_000L) // Check every 30 seconds
-                        val devices = enabledDevicesFlow.value
-                        Log.debug(tag = TAG) {
-                            "Periodic check: ${devices.size} enabled devices, checking for disconnected ones"
-                        }
-                        if (devices.isNotEmpty()) {
-                            val disconnectedDevices =
-                                devices.filter { device ->
-                                    val state = getDeviceState(device.macAddress)
-                                    val isDisconnected =
-                                        state is DeviceConnectionState.Disconnected ||
-                                            state is DeviceConnectionState.Unreachable ||
-                                            (state is DeviceConnectionState.Error &&
-                                                state.isRecoverable)
-                                    if (isDisconnected) {
-                                        Log.debug(tag = TAG) {
-                                            "Periodic check: Device ${device.macAddress} is disconnected (state: $state)"
-                                        }
-                                    }
-                                    isDisconnected
-                                }
-                            if (disconnectedDevices.isNotEmpty()) {
-                                Log.info(tag = TAG) {
-                                    "Periodic check: Found ${disconnectedDevices.size} disconnected devices (${disconnectedDevices.map { it.macAddress }}), attempting reconnect"
-                                }
-                                checkAndConnectEnabledDevices(ignorePresence = true)
-                            } else {
-                                Log.debug(tag = TAG) {
-                                    "Periodic check: All ${devices.size} devices are connected or in-progress"
-                                }
-                            }
-                        } else {
-                            Log.debug(tag = TAG) { "Periodic check: No enabled devices" }
-                        }
-                    }
-                }
+                enabledDevices.collect { devices ->
+                    enabledDevicesFlow.value = devices
+                    // Note: Presence observations are managed by PresenceObservationManager
+                    // We don't need to start them here - they're already active for all paired
+                    // devices.
 
-                try {
-                    enabledDevices.collect { devices ->
-                        enabledDevicesFlow.value = devices
-                        // Note: Presence observations are managed by PresenceObservationManager
-                        // We don't need to start them here - they're already active for all paired
-                        // devices.
-
-                        // We perform an initial refresh (ignoring presence) the first time we see
-                        // enabled devices to ensure we try to connect to them even if Companion
-                        // Device Manager hasn't reported them as present yet.
-                        val shouldIgnorePresence = !initialRefreshDone && devices.isNotEmpty()
-                        if (shouldIgnorePresence) {
-                            Log.info(tag = TAG) {
-                                "Performing initial proactive refresh for ${devices.size} devices"
-                            }
-                        }
-                        checkAndConnectEnabledDevices(ignorePresence = shouldIgnorePresence)
-                        if (devices.isNotEmpty()) {
-                            initialRefreshDone = true
+                    // We perform an initial refresh (ignoring presence) the first time we see
+                    // enabled devices to ensure we try to connect to them even if Companion
+                    // Device Manager hasn't reported them as present yet.
+                    val shouldIgnorePresence = !initialRefreshDone && devices.isNotEmpty()
+                    if (shouldIgnorePresence) {
+                        Log.info(tag = TAG) {
+                            "Performing initial proactive refresh for ${devices.size} devices"
                         }
                     }
-                } finally {
-                    periodicCheckJob.cancel()
+                    checkAndConnectEnabledDevices(ignorePresence = shouldIgnorePresence)
+                    if (devices.isNotEmpty()) {
+                        initialRefreshDone = true
+                        // Start periodic check when we have enabled devices
+                        startPeriodicCheck()
+                    } else {
+                        // Stop periodic check when no devices are enabled
+                        stopPeriodicCheck()
+                    }
                 }
             }
+    }
+
+    /** Starts a periodic check (every 30 seconds) for disconnected/unreachable enabled devices. */
+    private fun startPeriodicCheck() {
+        if (periodicCheckJob != null) return
+
+        periodicCheckJob =
+            coroutineScope.launch {
+                while (true) {
+                    delay(30_000L) // Check every 30 seconds
+
+                    val enabledDevices = enabledDevicesFlow.value
+                    if (enabledDevices.isEmpty()) {
+                        // No enabled devices, stop periodic check
+                        stopPeriodicCheck()
+                        return@launch
+                    }
+
+                    Log.debug(tag = TAG) {
+                        "Periodic check: ${enabledDevices.size} enabled devices, checking for disconnected ones"
+                    }
+
+                    // Check for disconnected/unreachable devices and attempt reconnect
+                    val disconnectedDevices =
+                        enabledDevices.filter { device ->
+                            val state = getDeviceState(device.macAddress.uppercase())
+                            state is DeviceConnectionState.Disconnected ||
+                                state is DeviceConnectionState.Unreachable ||
+                                (state is DeviceConnectionState.Error && state.isRecoverable)
+                        }
+
+                    if (disconnectedDevices.isEmpty()) {
+                        Log.debug(tag = TAG) {
+                            "Periodic check: All ${enabledDevices.size} devices are connected or in-progress"
+                        }
+                    } else {
+                        Log.info(tag = TAG) {
+                            "Periodic check: Found ${disconnectedDevices.size} disconnected devices (${disconnectedDevices.map { it.macAddress }}), attempting reconnect"
+                        }
+                        // Use ignorePresence=true to force connection attempt even if CDM hasn't reported presence
+                        checkAndConnectEnabledDevices(ignorePresence = true)
+                    }
+                }
+            }
+    }
+
+    /** Stops the periodic check. */
+    private fun stopPeriodicCheck() {
+        periodicCheckJob?.cancel()
+        periodicCheckJob = null
     }
 
     /** Manually triggers a scan for all enabled but disconnected devices. */
@@ -366,8 +369,10 @@ class MultiDeviceSyncCoordinator(
                         locationCollector.registerDevice(macAddress)
 
                         Log.debug(tag = TAG) { "Starting connection attempt for $macAddress..." }
+                        // Increased timeout to allow for retry logic in connect():
+                        // 5s initial delay + 3 attempts × (20s timeout + 3s delay) ≈ 74s max
                         val connection =
-                            withTimeout(30_000L) {
+                            withTimeout(90_000L) {
                                 connectToCamera(
                                     camera,
                                     onFound = {
@@ -387,6 +392,13 @@ class MultiDeviceSyncCoordinator(
                             "Device $macAddress connection established, performing initial setup..."
                         }
 
+                        // Update presence state - device is clearly present since we connected
+                        // This is important because CDM callbacks may not fire reliably
+                        _presentDevices.update { current -> current + macAddress.uppercase() }
+                        Log.debug(tag = TAG) {
+                            "Marked device $macAddress as present (successfully connected)"
+                        }
+
                         val firmwareVersion = performInitialSetup(connection)
                         Log.info(tag = TAG) {
                             "Initial setup complete for $macAddress (firmware=$firmwareVersion)"
@@ -404,6 +416,11 @@ class MultiDeviceSyncCoordinator(
                         connection.isConnected.filter { !it }.first()
 
                         Log.info(tag = TAG) { "Connection lost for $macAddress" }
+                        // Update presence state - device is no longer present
+                        _presentDevices.update { current -> current - macAddress.uppercase() }
+                        Log.debug(tag = TAG) {
+                            "Marked device $macAddress as not present (connection lost)"
+                        }
                         cleanup(macAddress, preserveErrorState = false)
                     } catch (e: TimeoutCancellationException) {
                         Log.error(tag = TAG) { "Connection timed out for $macAddress" }
@@ -614,6 +631,7 @@ class MultiDeviceSyncCoordinator(
 
     /** Stops syncing with all devices and stops background monitoring. */
     suspend fun stopAllDevices() {
+        stopPeriodicCheck()
         Log.info(tag = TAG) { "Stopping all device syncs" }
 
         backgroundMonitoringJob?.cancel()

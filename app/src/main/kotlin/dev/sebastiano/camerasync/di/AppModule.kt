@@ -11,7 +11,6 @@ import dev.sebastiano.camerasync.devices.DevicesListViewModel
 import dev.sebastiano.camerasync.devicesync.AndroidIntentFactory
 import dev.sebastiano.camerasync.devicesync.AndroidNotificationBuilder
 import dev.sebastiano.camerasync.devicesync.AndroidPendingIntentFactory
-import dev.sebastiano.camerasync.devicesync.CompanionPresenceService
 import dev.sebastiano.camerasync.devicesync.DefaultLocationCollector
 import dev.sebastiano.camerasync.devicesync.IntentFactory
 import dev.sebastiano.camerasync.devicesync.MultiDeviceSyncService
@@ -54,8 +53,6 @@ interface AppGraph {
     fun mainActivity(): MainActivity
 
     fun multiDeviceSyncService(): MultiDeviceSyncService
-
-    fun companionPresenceService(): CompanionPresenceService
 
     fun devicesListViewModel(): DevicesListViewModel
 

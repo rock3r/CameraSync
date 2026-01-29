@@ -144,24 +144,8 @@ class MultiDeviceSyncService(
                 startDeviceMonitoring()
                 launch { refreshConnections() }
             }
-            ACTION_DEVICE_APPEARED -> {
-                Log.info(tag = TAG) { "Device presence appeared, starting sync..." }
-                if (!checkPermissions()) return START_NOT_STICKY
-                startForegroundService()
-                startDeviceMonitoring()
-                intent.getStringExtra(EXTRA_DEVICE_ADDRESS)?.let { macAddress ->
-                    syncCoordinator.setDevicePresence(macAddress, true)
-                }
-            }
-            ACTION_DEVICE_DISAPPEARED -> {
-                Log.info(tag = TAG) { "Device presence disappeared, updating presence..." }
-                if (!checkPermissions()) return START_NOT_STICKY
-                startForegroundService()
-                startDeviceMonitoring()
-                intent.getStringExtra(EXTRA_DEVICE_ADDRESS)?.let { macAddress ->
-                    syncCoordinator.setDevicePresence(macAddress, false)
-                }
-            }
+            // Note: ACTION_DEVICE_APPEARED and ACTION_DEVICE_DISAPPEARED removed
+            // CDM callbacks don't work reliably, so we use periodic checks instead
             else -> {
                 if (!checkPermissions()) return START_NOT_STICKY
                 startForegroundService()
@@ -417,8 +401,8 @@ class MultiDeviceSyncService(
 
         const val ACTION_STOP = "dev.sebastiano.camerasync.STOP_ALL_SYNC"
         const val ACTION_REFRESH = "dev.sebastiano.camerasync.REFRESH_CONNECTIONS"
-        const val ACTION_DEVICE_APPEARED = "dev.sebastiano.camerasync.DEVICE_APPEARED"
-        const val ACTION_DEVICE_DISAPPEARED = "dev.sebastiano.camerasync.DEVICE_DISAPPEARED"
+        // Note: ACTION_DEVICE_APPEARED and ACTION_DEVICE_DISAPPEARED removed - CDM callbacks don't
+        // work
         const val EXTRA_DEVICE_ADDRESS = "device_address"
         const val EXTRA_SHOW_PERMISSIONS = "show_permissions"
 
@@ -435,11 +419,8 @@ class MultiDeviceSyncService(
         fun createRefreshIntent(context: Context): Intent =
             Intent(context, MultiDeviceSyncService::class.java).apply { action = ACTION_REFRESH }
 
-        fun createPresenceIntent(context: Context, macAddress: String, isPresent: Boolean): Intent =
-            Intent(context, MultiDeviceSyncService::class.java).apply {
-                action = if (isPresent) ACTION_DEVICE_APPEARED else ACTION_DEVICE_DISAPPEARED
-                putExtra(EXTRA_DEVICE_ADDRESS, macAddress)
-            }
+        // Note: createPresenceIntent removed - CDM callbacks don't work, using periodic checks
+        // instead
 
         fun createStartIntent(context: Context): Intent =
             Intent(context, MultiDeviceSyncService::class.java)

@@ -117,21 +117,22 @@ class KableCameraRepository(
         }
 
         // Retry logic for bonded devices that might be slow to advertise
-        val maxRetries = if (isBonded) 3 else 1
+        // 3 total attempts (1 initial + 2 retries) with simplified fixed delays
+        val maxAttempts = if (isBonded) 3 else 1
         var lastException: Exception? = null
 
-        for (attempt in 1..maxRetries) {
+        for (attempt in 1..maxAttempts) {
             if (attempt > 1) {
-                val delayMs = 2_000L * attempt // Exponential backoff: 4s, 6s
+                val delayMs = 3_000L // Simple 3s delay between retries
                 Log.info(tag = TAG) {
-                    "Retry attempt $attempt/$maxRetries for ${camera.macAddress} after ${delayMs}ms delay"
+                    "Retry attempt $attempt/$maxAttempts for ${camera.macAddress} after ${delayMs}ms delay"
                 }
                 delay(delayMs)
             }
 
             // Scan for advertisement (Kable requires an Advertisement to create a Peripheral)
             Log.info(tag = TAG) {
-                "Scanning for advertisement for ${camera.macAddress} (attempt $attempt/$maxRetries)..."
+                "Scanning for advertisement for ${camera.macAddress} (attempt $attempt/$maxAttempts)..."
             }
             val scanner =
                 com.juul.kable.Scanner {
@@ -166,10 +167,10 @@ class KableCameraRepository(
             } catch (e: TimeoutCancellationException) {
                 lastException = e
                 Log.warn(tag = TAG) {
-                    "Timeout waiting for advertisement from ${camera.macAddress} (attempt $attempt/$maxRetries)"
+                    "Timeout waiting for advertisement from ${camera.macAddress} (attempt $attempt/$maxAttempts)"
                 }
                 // Continue to next retry if we have attempts left
-                if (attempt < maxRetries) {
+                if (attempt < maxAttempts) {
                     continue
                 }
             }
@@ -178,7 +179,7 @@ class KableCameraRepository(
         // All retries failed
         val errorMessage =
             if (isBonded) {
-                "Timeout waiting for advertisement from ${camera.macAddress} after $maxRetries attempts. " +
+                "Timeout waiting for advertisement from ${camera.macAddress} after $maxAttempts attempts. " +
                     "The camera is bonded but not advertising. " +
                     "This usually happens when: 1) The camera just turned on and needs more time, " +
                     "2) The camera is already connected to another app, " +

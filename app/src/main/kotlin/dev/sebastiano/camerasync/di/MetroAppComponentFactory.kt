@@ -8,7 +8,6 @@ import android.content.Intent
 import androidx.annotation.Keep
 import dev.sebastiano.camerasync.CameraSyncApp
 import dev.sebastiano.camerasync.MainActivity
-import dev.sebastiano.camerasync.devicesync.CompanionPresenceService
 import dev.sebastiano.camerasync.devicesync.MultiDeviceSyncService
 
 /** An [AppComponentFactory] that uses Metro for dependency injection. */
@@ -40,7 +39,6 @@ class MetroAppComponentFactory : AppComponentFactory() {
     override fun instantiateService(cl: ClassLoader, className: String, intent: Intent?): Service {
         return when (className) {
             MultiDeviceSyncService::class.java.name -> appGraph.multiDeviceSyncService()
-            CompanionPresenceService::class.java.name -> appGraph.companionPresenceService()
             else -> super.instantiateService(cl, className, intent)
         }
     }

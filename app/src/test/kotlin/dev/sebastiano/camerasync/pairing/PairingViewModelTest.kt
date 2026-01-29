@@ -100,8 +100,8 @@ class PairingViewModelTest {
         advanceUntilIdle()
 
         assertTrue(pairedDevicesRepository.isSyncEnabled.first())
-        // Note: Presence observations are now managed by PresenceObservationManager,
-        // not by PairingViewModel
+        // Note: CDM presence observations removed - callbacks don't work reliably.
+        // The app uses periodic checks in MultiDeviceSyncCoordinator instead.
     }
 
     @Test
