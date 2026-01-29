@@ -22,6 +22,7 @@ import dev.sebastiano.camerasync.logging.KhronicleLogEngine
 import java.time.ZonedDateTime
 import kotlin.uuid.ExperimentalUuidApi
 import kotlinx.coroutines.TimeoutCancellationException
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
@@ -102,62 +103,95 @@ class KableCameraRepository(
             "Looking for ${camera.name ?: camera.macAddress} (${camera.macAddress})"
         }
 
-        // Check if device is bonded - if so, it might not be advertising
+        // Check if device is bonded - if so, it might not be advertising immediately
         val isBonded = isDeviceBonded(camera.macAddress)
         if (isBonded) {
             Log.info(tag = TAG) {
                 "Device ${camera.macAddress} is bonded. " +
-                    "If it's already connected to another app, it may not advertise. " +
-                    "Try disconnecting from other apps or turning Bluetooth off/on."
+                    "Cameras may need 10-15 seconds to start advertising after being turned on."
             }
+            // Give bonded cameras time to start advertising after power-on
+            // This is especially important when cameras are turned on while the app is running
+            // We already have a delay in setDevicePresence, but add extra time here too
+            delay(5_000L)
         }
 
-        // Scan for advertisement (Kable requires an Advertisement to create a Peripheral)
-        Log.info(tag = TAG) { "Scanning for advertisement for ${camera.macAddress}..." }
-        val scanner =
-            com.juul.kable.Scanner {
-                @OptIn(ObsoleteKableApi::class) filters { match { address = camera.macAddress } }
+        // Retry logic for bonded devices that might be slow to advertise
+        val maxRetries = if (isBonded) 3 else 1
+        var lastException: Exception? = null
+
+        for (attempt in 1..maxRetries) {
+            if (attempt > 1) {
+                val delayMs = 2_000L * attempt // Exponential backoff: 4s, 6s
+                Log.info(tag = TAG) {
+                    "Retry attempt $attempt/$maxRetries for ${camera.macAddress} after ${delayMs}ms delay"
+                }
+                delay(delayMs)
             }
 
-        try {
-            // Use longer timeout for bonded devices that might be slow to advertise
-            val timeout = if (isBonded) 20_000L else 10_000L
-            val advertisement = withTimeout(timeout) { scanner.advertisements.first() }
+            // Scan for advertisement (Kable requires an Advertisement to create a Peripheral)
             Log.info(tag = TAG) {
-                "Found advertisement for ${camera.name ?: camera.macAddress}: ${advertisement.identifier} (${advertisement.peripheralName})"
+                "Scanning for advertisement for ${camera.macAddress} (attempt $attempt/$maxRetries)..."
             }
-            onFound?.invoke()
+            val scanner =
+                com.juul.kable.Scanner {
+                    @OptIn(ObsoleteKableApi::class)
+                    filters { match { address = camera.macAddress } }
+                }
 
-            val peripheral =
-                Peripheral(advertisement) {
-                    logging {
-                        level = Logging.Level.Events
-                        engine = KhronicleLogEngine
-                        identifier = "CameraSync:${camera.vendor.vendorName}"
+            try {
+                // Use longer timeout for bonded devices that might be slow to advertise
+                // Bonded devices may take longer to start advertising after power-on
+                val timeout = if (isBonded) 20_000L else 10_000L
+                val advertisement = withTimeout(timeout) { scanner.advertisements.first() }
+                Log.info(tag = TAG) {
+                    "Found advertisement for ${camera.name ?: camera.macAddress}: ${advertisement.identifier} (${advertisement.peripheralName})"
+                }
+                onFound?.invoke()
+
+                val peripheral =
+                    Peripheral(advertisement) {
+                        logging {
+                            level = Logging.Level.Events
+                            engine = KhronicleLogEngine
+                            identifier = "CameraSync:${camera.vendor.vendorName}"
+                        }
                     }
-                }
 
-            Log.info(tag = TAG) { "Connecting to ${camera.name}..." }
-            peripheral.connect()
-            Log.info(tag = TAG) { "Connected to ${camera.name}" }
+                Log.info(tag = TAG) { "Connecting to ${camera.name}..." }
+                peripheral.connect()
+                Log.info(tag = TAG) { "Connected to ${camera.name}" }
 
-            return KableCameraConnection(camera, peripheral)
-        } catch (e: TimeoutCancellationException) {
-            val errorMessage =
-                if (isBonded) {
-                    "Timeout waiting for advertisement from ${camera.macAddress}. " +
-                        "The camera is bonded but not advertising. " +
-                        "This usually happens when the camera is already connected to another app. " +
-                        "Try: 1) Disconnect the camera from other apps, 2) Turn Bluetooth off/on, " +
-                        "or 3) Restart the camera."
-                } else {
-                    "Timeout waiting for advertisement from ${camera.macAddress}. " +
-                        "Make sure the camera is powered on, Bluetooth is enabled, " +
-                        "and the camera is in pairing/discoverable mode."
+                return KableCameraConnection(camera, peripheral)
+            } catch (e: TimeoutCancellationException) {
+                lastException = e
+                Log.warn(tag = TAG) {
+                    "Timeout waiting for advertisement from ${camera.macAddress} (attempt $attempt/$maxRetries)"
                 }
-            Log.error(tag = TAG, throwable = e) { errorMessage }
-            throw IllegalStateException(errorMessage, e)
+                // Continue to next retry if we have attempts left
+                if (attempt < maxRetries) {
+                    continue
+                }
+            }
         }
+
+        // All retries failed
+        val errorMessage =
+            if (isBonded) {
+                "Timeout waiting for advertisement from ${camera.macAddress} after $maxRetries attempts. " +
+                    "The camera is bonded but not advertising. " +
+                    "This usually happens when: 1) The camera just turned on and needs more time, " +
+                    "2) The camera is already connected to another app, " +
+                    "3) Bluetooth needs to be reset. " +
+                    "Try: 1) Wait a few seconds and refresh, 2) Disconnect the camera from other apps, " +
+                    "3) Turn Bluetooth off/on, or 4) Restart the camera."
+            } else {
+                "Timeout waiting for advertisement from ${camera.macAddress}. " +
+                    "Make sure the camera is powered on, Bluetooth is enabled, " +
+                    "and the camera is in pairing/discoverable mode."
+            }
+        Log.error(tag = TAG, throwable = lastException) { errorMessage }
+        throw IllegalStateException(errorMessage, lastException)
     }
 
     private fun isDeviceBonded(macAddress: String): Boolean {

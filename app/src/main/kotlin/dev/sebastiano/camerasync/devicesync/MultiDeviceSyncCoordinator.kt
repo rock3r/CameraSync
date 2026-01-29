@@ -111,26 +111,79 @@ class MultiDeviceSyncCoordinator(
         backgroundMonitoringJob =
             coroutineScope.launch {
                 var initialRefreshDone = false
-                enabledDevices.collect { devices ->
-                    enabledDevicesFlow.value = devices
-                    // Ensure we are observing presence for all enabled devices
-                    devices.forEach {
-                        companionDeviceManagerHelper.startObservingDevicePresence(it.macAddress)
-                    }
 
-                    // We perform an initial refresh (ignoring presence) the first time we see
-                    // enabled devices to ensure we try to connect to them even if Companion
-                    // Device Manager hasn't reported them as present yet.
-                    val shouldIgnorePresence = !initialRefreshDone && devices.isNotEmpty()
-                    if (shouldIgnorePresence) {
-                        Log.info(tag = TAG) {
-                            "Performing initial proactive refresh for ${devices.size} devices"
+                // Periodic check for disconnected devices (fallback when presence callbacks don't
+                // fire)
+                // Android's CDM only calls onDeviceAppeared() when devices transition from absent
+                // to present
+                // AFTER observation starts. If cameras turn on while observations are active but
+                // callbacks
+                // don't fire (known Android issue), periodic checks will catch them.
+                val periodicCheckJob = launch {
+                    Log.info(tag = TAG) {
+                        "Starting periodic device check (every 30s) as fallback for missing CDM callbacks"
+                    }
+                    while (true) {
+                        delay(30_000L) // Check every 30 seconds
+                        val devices = enabledDevicesFlow.value
+                        Log.debug(tag = TAG) {
+                            "Periodic check: ${devices.size} enabled devices, checking for disconnected ones"
+                        }
+                        if (devices.isNotEmpty()) {
+                            val disconnectedDevices =
+                                devices.filter { device ->
+                                    val state = getDeviceState(device.macAddress)
+                                    val isDisconnected =
+                                        state is DeviceConnectionState.Disconnected ||
+                                            state is DeviceConnectionState.Unreachable ||
+                                            (state is DeviceConnectionState.Error &&
+                                                state.isRecoverable)
+                                    if (isDisconnected) {
+                                        Log.debug(tag = TAG) {
+                                            "Periodic check: Device ${device.macAddress} is disconnected (state: $state)"
+                                        }
+                                    }
+                                    isDisconnected
+                                }
+                            if (disconnectedDevices.isNotEmpty()) {
+                                Log.info(tag = TAG) {
+                                    "Periodic check: Found ${disconnectedDevices.size} disconnected devices (${disconnectedDevices.map { it.macAddress }}), attempting reconnect"
+                                }
+                                checkAndConnectEnabledDevices(ignorePresence = true)
+                            } else {
+                                Log.debug(tag = TAG) {
+                                    "Periodic check: All ${devices.size} devices are connected or in-progress"
+                                }
+                            }
+                        } else {
+                            Log.debug(tag = TAG) { "Periodic check: No enabled devices" }
                         }
                     }
-                    checkAndConnectEnabledDevices(ignorePresence = shouldIgnorePresence)
-                    if (devices.isNotEmpty()) {
-                        initialRefreshDone = true
+                }
+
+                try {
+                    enabledDevices.collect { devices ->
+                        enabledDevicesFlow.value = devices
+                        // Note: Presence observations are managed by PresenceObservationManager
+                        // We don't need to start them here - they're already active for all paired
+                        // devices.
+
+                        // We perform an initial refresh (ignoring presence) the first time we see
+                        // enabled devices to ensure we try to connect to them even if Companion
+                        // Device Manager hasn't reported them as present yet.
+                        val shouldIgnorePresence = !initialRefreshDone && devices.isNotEmpty()
+                        if (shouldIgnorePresence) {
+                            Log.info(tag = TAG) {
+                                "Performing initial proactive refresh for ${devices.size} devices"
+                            }
+                        }
+                        checkAndConnectEnabledDevices(ignorePresence = shouldIgnorePresence)
+                        if (devices.isNotEmpty()) {
+                            initialRefreshDone = true
+                        }
                     }
+                } finally {
+                    periodicCheckJob.cancel()
                 }
             }
     }
@@ -246,7 +299,19 @@ class MultiDeviceSyncCoordinator(
         _presentDevices.update { current ->
             if (isPresent) current + normalizedMac else current - normalizedMac
         }
-        coroutineScope.launch { checkAndConnectEnabledDevices() }
+        coroutineScope.launch {
+            if (isPresent) {
+                // When a device appears (e.g., camera turned on), give it time to start advertising
+                // before attempting to connect. Cameras may need 10-15 seconds after power-on
+                // before they're ready for BLE connections, especially if they were just turned on.
+                val delayMs = 10_000L
+                Log.info(tag = TAG) {
+                    "Device $normalizedMac appeared, waiting ${delayMs}ms before attempting connection to allow camera to start advertising"
+                }
+                delay(delayMs)
+            }
+            checkAndConnectEnabledDevices()
+        }
     }
 
     /**
@@ -290,8 +355,8 @@ class MultiDeviceSyncCoordinator(
             // Set state to searching immediately before launching the job
             updateDeviceState(macAddress, DeviceConnectionState.Searching)
 
-            // Ensure we are observing device presence for better background performance
-            companionDeviceManagerHelper.startObservingDevicePresence(macAddress)
+            // Note: Presence observations are managed by PresenceObservationManager
+            // We don't need to start them here - they're already active for all paired devices.
 
             val job =
                 coroutineScope.launch {

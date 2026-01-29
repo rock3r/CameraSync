@@ -7,6 +7,7 @@ import android.content.ServiceConnection
 import android.os.IBinder
 import androidx.compose.runtime.State
 import androidx.compose.runtime.mutableStateOf
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.juul.khronicle.Log
@@ -60,6 +61,7 @@ class DevicesListViewModel(
 
     private var service: MultiDeviceSyncService? = null
     private var serviceConnection: ServiceConnection? = null
+    private var isServiceBound = false
     private val deviceStatesFromService =
         MutableStateFlow<Map<String, DeviceConnectionState>>(emptyMap())
     private val isScanningFromService = MutableStateFlow(false)
@@ -68,15 +70,12 @@ class DevicesListViewModel(
     private var stateCollectionJob: Job? = null
     private var scanningCollectionJob: Job? = null
     private var serviceRunningJob: Job? = null
-    private var presenceObservationJob: Job? = null
     private var autoStartJob: Job? = null
     private var autoStartTriggered = false
-    private var observedPresenceMacs = emptySet<String>()
 
     init {
         observeDevices()
         observeServiceRunning()
-        observePresenceRequests()
         observeAutoStartSync()
         locationRepository.startLocationUpdates()
         checkBatteryOptimizationStatus()
@@ -156,7 +155,7 @@ class DevicesListViewModel(
 
     private fun bindToRunningService() {
         val intent = Intent(context, MultiDeviceSyncService::class.java)
-        if (serviceConnection != null) return
+        if (serviceConnection != null || isServiceBound) return
 
         val connection =
             object : ServiceConnection {
@@ -183,60 +182,51 @@ class DevicesListViewModel(
 
                 override fun onServiceDisconnected(name: ComponentName?) {
                     Log.info(tag = TAG) { "Disconnected from MultiDeviceSyncService" }
+                    isServiceBound = false
                     unbindFromService()
                 }
             }
 
         serviceConnection = connection
         val bound = context.bindService(intent, connection, 0)
-        if (!bound) {
+        if (bound) {
+            isServiceBound = true
+        } else {
             serviceConnection = null
         }
     }
 
     private fun unbindFromService() {
-        serviceConnection?.let { connection ->
-            try {
-                context.unbindService(connection)
-            } catch (e: Exception) {
-                Log.warn(tag = TAG, throwable = e) { "Error unbinding service" }
-            }
+        if (!isServiceBound || serviceConnection == null) {
+            // Already unbound or never bound, just clean up state
+            serviceConnection = null
+            service = null
+            stateCollectionJob?.cancel()
+            scanningCollectionJob?.cancel()
+            deviceStatesFromService.value = emptyMap()
+            isScanningFromService.value = false
+            return
         }
-        serviceConnection = null
-        service = null
-        stateCollectionJob?.cancel()
-        scanningCollectionJob?.cancel()
-        deviceStatesFromService.value = emptyMap()
-        isScanningFromService.value = false
-    }
 
-    private fun observePresenceRequests() {
-        presenceObservationJob =
-            viewModelScope.launch(ioDispatcher) {
-                combine(
-                        pairedDevicesRepository.enabledDevices,
-                        pairedDevicesRepository.isSyncEnabled,
-                    ) { enabledDevices, isSyncEnabled ->
-                        if (!isSyncEnabled) {
-                            emptySet()
-                        } else {
-                            enabledDevices.map { it.macAddress }.toSet()
-                        }
-                    }
-                    .collect { newMacs ->
-                        val toStart = newMacs - observedPresenceMacs
-                        val toStop = observedPresenceMacs - newMacs
-
-                        toStart.forEach { macAddress ->
-                            companionDeviceManagerHelper.startObservingDevicePresence(macAddress)
-                        }
-                        toStop.forEach { macAddress ->
-                            companionDeviceManagerHelper.stopObservingDevicePresence(macAddress)
-                        }
-
-                        observedPresenceMacs = newMacs
-                    }
-            }
+        val connection = serviceConnection!!
+        try {
+            context.unbindService(connection)
+            isServiceBound = false
+        } catch (e: IllegalArgumentException) {
+            // Service was already unbound or never bound
+            Log.debug(tag = TAG) { "Service already unbound: ${e.message}" }
+            isServiceBound = false
+        } catch (e: Exception) {
+            Log.warn(tag = TAG, throwable = e) { "Error unbinding service" }
+            isServiceBound = false
+        } finally {
+            serviceConnection = null
+            service = null
+            stateCollectionJob?.cancel()
+            scanningCollectionJob?.cancel()
+            deviceStatesFromService.value = emptyMap()
+            isScanningFromService.value = false
+        }
     }
 
     private fun observeAutoStartSync() {
@@ -263,7 +253,7 @@ class DevicesListViewModel(
                             }
                             try {
                                 val intent = MultiDeviceSyncService.createRefreshIntent(context)
-                                context.startService(intent)
+                                ContextCompat.startForegroundService(context, intent)
                                 autoStartTriggered = true
                             } catch (e: Exception) {
                                 Log.warn(tag = TAG, throwable = e) {
@@ -317,7 +307,7 @@ class DevicesListViewModel(
         viewModelScope.launch(ioDispatcher) {
             pairedDevicesRepository.setSyncEnabled(true)
             val intent = MultiDeviceSyncService.createRefreshIntent(context)
-            context.startService(intent)
+            ContextCompat.startForegroundService(context, intent)
         }
     }
 
@@ -388,11 +378,20 @@ class DevicesListViewModel(
         stateCollectionJob?.cancel()
         scanningCollectionJob?.cancel()
         autoStartJob?.cancel()
-        serviceConnection?.let { connection ->
+        if (isServiceBound && serviceConnection != null) {
+            val connection = serviceConnection!!
             try {
                 context.unbindService(connection)
+                isServiceBound = false
+            } catch (e: IllegalArgumentException) {
+                // Service was already unbound
+                Log.debug(tag = TAG) { "Service already unbound in onCleared: ${e.message}" }
+                isServiceBound = false
             } catch (e: Exception) {
-                Log.warn(tag = TAG, throwable = e) { "Error unbinding service" }
+                Log.warn(tag = TAG, throwable = e) { "Error unbinding service in onCleared" }
+                isServiceBound = false
+            } finally {
+                serviceConnection = null
             }
         }
     }

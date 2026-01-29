@@ -233,8 +233,9 @@ private fun RootComposable(
                                 if (backStack.size > 1) backStack.removeAt(backStack.lastIndex)
                                 // Trigger a refresh so the newly paired device connects
                                 // immediately.
-                                context.startService(
-                                    MultiDeviceSyncService.createRefreshIntent(context)
+                                androidx.core.content.ContextCompat.startForegroundService(
+                                    context,
+                                    MultiDeviceSyncService.createRefreshIntent(context),
                                 )
                             },
                         )

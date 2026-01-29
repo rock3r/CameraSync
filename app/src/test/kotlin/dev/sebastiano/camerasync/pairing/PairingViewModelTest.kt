@@ -93,14 +93,15 @@ class PairingViewModelTest {
     }
 
     @Test
-    fun `pairDevice enables sync and observes presence`() = runTest {
+    fun `pairDevice enables sync`() = runTest {
         pairedDevicesRepository.setSyncEnabled(false)
 
         viewModel.pairDevice(testCamera)
         advanceUntilIdle()
 
         assertTrue(pairedDevicesRepository.isSyncEnabled.first())
-        verify { companionDeviceManagerHelper.startObservingDevicePresence(testCamera.macAddress) }
+        // Note: Presence observations are now managed by PresenceObservationManager,
+        // not by PairingViewModel
     }
 
     @Test

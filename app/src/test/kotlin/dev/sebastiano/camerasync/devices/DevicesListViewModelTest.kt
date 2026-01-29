@@ -13,7 +13,6 @@ import dev.sebastiano.camerasync.fakes.FakeVendorRegistry
 import dev.sebastiano.camerasync.pairing.CompanionDeviceManagerHelper
 import io.mockk.every
 import io.mockk.mockk
-import io.mockk.verify
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
@@ -211,40 +210,8 @@ class DevicesListViewModelTest {
         assertEquals("Unknown Camera", displayInfo.model)
     }
 
-    @Test
-    fun `presence observation starts for enabled devices when sync is enabled`() = runTest {
-        val device =
-            PairedDevice(
-                macAddress = "CC:DD:EE:FF:00:11",
-                name = "Test Camera",
-                vendorId = "fake",
-                isEnabled = true,
-            )
-
-        pairedDevicesRepository.addTestDevice(device)
-        advanceUntilIdle()
-
-        verify { companionDeviceManagerHelper.startObservingDevicePresence(device.macAddress) }
-    }
-
-    @Test
-    fun `presence observation stops when sync is disabled`() = runTest {
-        val device =
-            PairedDevice(
-                macAddress = "11:00:FF:EE:DD:CC",
-                name = "Test Camera",
-                vendorId = "fake",
-                isEnabled = true,
-            )
-
-        pairedDevicesRepository.addTestDevice(device)
-        advanceUntilIdle()
-
-        pairedDevicesRepository.setSyncEnabled(false)
-        advanceUntilIdle()
-
-        verify { companionDeviceManagerHelper.stopObservingDevicePresence(device.macAddress) }
-    }
+    // Note: Presence observation tests removed - presence observations are now managed
+    // by PresenceObservationManager in Application.onCreate(), not by DevicesListViewModel
 
     @Test
     fun `computeDeviceDisplayInfo handles null device name`() = runTest {

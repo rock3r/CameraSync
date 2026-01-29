@@ -50,4 +50,12 @@ class FakeBluetoothBondingChecker : BluetoothBondingChecker {
         }
         return true
     }
+
+    override fun getBondState(macAddress: String): Int? {
+        return if (isDeviceBonded(macAddress)) {
+            android.bluetooth.BluetoothDevice.BOND_BONDED
+        } else {
+            android.bluetooth.BluetoothDevice.BOND_NONE
+        }
+    }
 }

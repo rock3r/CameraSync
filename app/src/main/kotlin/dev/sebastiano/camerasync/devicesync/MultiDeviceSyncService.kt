@@ -207,6 +207,10 @@ class MultiDeviceSyncService(
     private fun startDeviceMonitoring() {
         if (deviceMonitorJob != null) return
 
+        // Note: Presence observations are managed by PresenceObservationManager in
+        // Application.onCreate()
+        // We don't need to start them here - they're already active for all paired devices.
+
         // Start background monitoring in the coordinator
         syncCoordinator.startBackgroundMonitoring(pairedDevicesRepository.enabledDevices)
 
@@ -256,7 +260,11 @@ class MultiDeviceSyncService(
                     )
                 }
                 .collect { (connectedCount, enabledCount, presentCount, isScanning, lastSyncTime) ->
-                    if (presentCount == 0 && connectedCount == 0 && !isScanning) {
+                    // Only stop service if there are NO enabled devices
+                    // Don't stop just because devices aren't present/connected - periodic checks
+                    // need the service running to reconnect when cameras turn on
+                    if (enabledCount == 0) {
+                        Log.info(tag = TAG) { "No enabled devices, stopping service" }
                         stopAllAndShutdown()
                         return@collect
                     }

@@ -38,7 +38,7 @@ android {
 
     defaultConfig {
         applicationId = "dev.sebastiano.camerasync"
-        minSdk = 33
+        minSdk = 36
         targetSdk = 36
         versionCode = 1
         versionName = "1.0.0"

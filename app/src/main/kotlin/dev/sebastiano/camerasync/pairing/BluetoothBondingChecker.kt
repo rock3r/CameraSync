@@ -54,6 +54,15 @@ interface BluetoothBondingChecker {
      * @return true if bonding was initiated successfully, false otherwise
      */
     fun createBond(macAddress: String): Boolean
+
+    /**
+     * Gets the current bond state of a device.
+     *
+     * @param macAddress The MAC address of the device
+     * @return The bond state (BOND_NONE, BOND_BONDING, or BOND_BONDED), or null if device cannot be
+     *   accessed
+     */
+    fun getBondState(macAddress: String): Int?
 }
 
 /**
@@ -211,6 +220,33 @@ class AndroidBluetoothBondingChecker(private val context: Context) : BluetoothBo
         } catch (e: Exception) {
             Log.error(tag = TAG, throwable = e) { "Error creating bond for $macAddress" }
             false
+        }
+    }
+
+    override fun getBondState(macAddress: String): Int? {
+        val adapter = bluetoothAdapter ?: return null
+        if (!adapter.isEnabled) return null
+
+        // Check for BLUETOOTH_CONNECT permission
+        if (
+            ContextCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH_CONNECT) !=
+                PackageManager.PERMISSION_GRANTED
+        ) {
+            Log.warn(tag = TAG) { "BLUETOOTH_CONNECT permission not granted" }
+            return null
+        }
+
+        return try {
+            val device = adapter.getRemoteDevice(macAddress)
+            device.bondState
+        } catch (e: SecurityException) {
+            Log.error(tag = TAG, throwable = e) {
+                "SecurityException getting bond state (permission may have been revoked)"
+            }
+            null
+        } catch (e: Exception) {
+            Log.error(tag = TAG, throwable = e) { "Error getting bond state for $macAddress" }
+            null
         }
     }
 }
