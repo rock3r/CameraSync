@@ -350,20 +350,41 @@ class MultiDeviceSyncCoordinator(
                         throw e
                     } catch (e: Exception) {
                         Log.error(tag = TAG, throwable = e) { "Connection error for $macAddress" }
-                        val errorMessage =
-                            when {
-                                e.message?.contains("pairing", ignoreCase = true) == true ->
-                                    context.getString(R.string.error_pairing_rejected_long)
-                                e.message?.contains("timeout", ignoreCase = true) == true ->
-                                    context.getString(R.string.error_pairing_timeout_long)
-                                else ->
-                                    e.message ?: context.getString(R.string.error_connection_failed)
+
+                        // Check if this is an unreachable device scenario (timeout, not found,
+                        // etc.)
+                        val isUnreachable =
+                            e is TimeoutCancellationException ||
+                                (e is IllegalStateException &&
+                                    e.cause is TimeoutCancellationException) ||
+                                e.message?.contains("timeout", ignoreCase = true) == true ||
+                                e.message?.contains("not found", ignoreCase = true) == true ||
+                                e.message?.contains("unreachable", ignoreCase = true) == true ||
+                                e.message?.contains("could not find device", ignoreCase = true) ==
+                                    true
+
+                        if (isUnreachable) {
+                            Log.info(tag = TAG) {
+                                "Device $macAddress is unreachable, setting state to Unreachable"
                             }
-                        updateDeviceState(
-                            macAddress,
-                            DeviceConnectionState.Error(message = errorMessage),
-                        )
-                        cleanup(macAddress, preserveErrorState = true)
+                            updateDeviceState(macAddress, DeviceConnectionState.Unreachable)
+                            cleanup(macAddress, preserveErrorState = true)
+                        } else {
+                            // This is a real error (pairing rejected, etc.)
+                            val errorMessage =
+                                when {
+                                    e.message?.contains("pairing", ignoreCase = true) == true ->
+                                        context.getString(R.string.error_pairing_rejected_long)
+                                    else ->
+                                        e.message
+                                            ?: context.getString(R.string.error_connection_failed)
+                                }
+                            updateDeviceState(
+                                macAddress,
+                                DeviceConnectionState.Error(message = errorMessage),
+                            )
+                            cleanup(macAddress, preserveErrorState = true)
+                        }
                     }
                 }
             deviceJobs[macAddress] = job
