@@ -116,14 +116,38 @@ class SonyGattSpecTest {
     }
 
     @Test
-    fun `firmware uses standard Device Information Service`() {
+    fun `firmware uses Camera Control Service`() {
         assertEquals(
-            Uuid.parse("0000180a-0000-1000-8000-00805f9b34fb"),
+            Uuid.parse("8000CC00-CC00-FFFF-FFFF-FFFFFFFFFFFF"),
             SonyGattSpec.firmwareServiceUuid,
         )
         assertEquals(
-            Uuid.parse("00002a26-0000-1000-8000-00805f9b34fb"),
+            Uuid.parse("0000CC0A-0000-1000-8000-00805f9b34fb"),
             SonyGattSpec.firmwareVersionCharacteristicUuid,
+        )
+    }
+
+    @Test
+    fun `camera control service UUID matches documentation`() {
+        assertEquals(
+            Uuid.parse("8000CC00-CC00-FFFF-FFFF-FFFFFFFFFFFF"),
+            SonyGattSpec.CAMERA_CONTROL_SERVICE_UUID,
+        )
+    }
+
+    @Test
+    fun `firmware version characteristic UUID matches documentation`() {
+        assertEquals(
+            Uuid.parse("0000CC0A-0000-1000-8000-00805f9b34fb"),
+            SonyGattSpec.FIRMWARE_VERSION_CHARACTERISTIC_UUID,
+        )
+    }
+
+    @Test
+    fun `model name characteristic UUID matches documentation`() {
+        assertEquals(
+            Uuid.parse("0000CC0B-0000-1000-8000-00805f9b34fb"),
+            SonyGattSpec.MODEL_NAME_CHARACTERISTIC_UUID,
         )
     }
 
