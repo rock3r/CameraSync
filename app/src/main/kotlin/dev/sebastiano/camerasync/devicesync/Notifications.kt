@@ -26,20 +26,68 @@ internal const val NOTIFICATION_CHANNEL = "SYNC_SERVICE_NOTIFICATION_CHANNEL"
  * - "Yesterday at 13:33" if between 24 and 48 hours ago (roughly "yesterday")
  * - Date and time if further in the past (e.g., "Jan 1, 2026, 13:33")
  */
-internal fun formatElapsedTimeSince(lastSyncTime: ZonedDateTime?): String {
-    if (lastSyncTime == null) return "never"
-    return formatElapsedTimeSince(lastSyncTime.toInstant().toEpochMilli())
+internal fun formatElapsedTimeSince(context: Context, lastSyncTime: ZonedDateTime?): String {
+    if (lastSyncTime == null) return context.getString(R.string.time_never)
+    return formatElapsedTimeSince(context, lastSyncTime.toInstant().toEpochMilli())
 }
 
 /** Formats the elapsed time since the last sync in a human-readable format. */
-internal fun formatElapsedTimeSince(lastSyncTimestamp: Long?): String {
-    if (lastSyncTimestamp == null) return "never"
+internal fun formatElapsedTimeSince(context: Context, lastSyncTimestamp: Long?): String {
+    if (lastSyncTimestamp == null) return context.getString(R.string.time_never)
 
     val now = Instant.now()
     val then = Instant.ofEpochMilli(lastSyncTimestamp)
     val diffSeconds = ChronoUnit.SECONDS.between(then, now)
 
-    if (diffSeconds < 0) return "just now" // Should not happen with real clocks
+    if (diffSeconds < 0)
+        return context.getString(R.string.time_just_now) // Should not happen with real clocks
+
+    return when {
+        diffSeconds < 60 -> context.getString(R.string.time_seconds_ago)
+        diffSeconds < 3600 ->
+            context.resources.getQuantityString(
+                R.plurals.time_minutes_ago,
+                (diffSeconds / 60).toInt(),
+                (diffSeconds / 60).toInt(),
+            )
+        diffSeconds < 24 * 3600 ->
+            context.resources.getQuantityString(
+                R.plurals.time_hours_ago,
+                (diffSeconds / 3600).toInt(),
+                (diffSeconds / 3600).toInt(),
+            )
+        else -> {
+            val thenDateTime = LocalDateTime.ofInstant(then, ZoneId.systemDefault())
+            val nowDateTime = LocalDateTime.ofInstant(now, ZoneId.systemDefault())
+
+            val yesterday = nowDateTime.minusDays(1).toLocalDate()
+            if (thenDateTime.toLocalDate() == yesterday) {
+                val timeFormatter = DateTimeFormatter.ofPattern("HH:mm")
+                context.getString(R.string.time_yesterday_at, thenDateTime.format(timeFormatter))
+            } else {
+                val dateTimeFormatter = DateTimeFormatter.ofPattern("MMM d, yyyy, HH:mm")
+                thenDateTime.format(dateTimeFormatter)
+            }
+        }
+    }
+}
+
+/**
+ * Backwards compatibility for usages that don't have a context. **Note**: This will use hardcoded
+ * strings and should be avoided in favor of the context-aware version.
+ */
+@Deprecated(
+    "Use context-aware version instead",
+    ReplaceWith("formatElapsedTimeSince(context, lastSyncTime)"),
+)
+internal fun formatElapsedTimeSince(lastSyncTime: ZonedDateTime?): String {
+    if (lastSyncTime == null) return "never"
+
+    val now = Instant.now()
+    val then = lastSyncTime.toInstant()
+    val diffSeconds = ChronoUnit.SECONDS.between(then, now)
+
+    if (diffSeconds < 0) return "just now"
 
     return when {
         diffSeconds < 60 -> "seconds ago"
@@ -77,7 +125,7 @@ fun registerNotificationChannel(context: Context) {
     val channel =
         NotificationChannel(
             /* id = */ NOTIFICATION_CHANNEL,
-            /* name = */ "Camera connection",
+            /* name = */ context.getString(R.string.notification_channel_name),
             /* importance = */ NotificationManager.IMPORTANCE_MIN,
         )
 
@@ -102,35 +150,51 @@ internal fun createMultiDeviceNotification(
 ): Notification {
     val title =
         when {
-            totalEnabled == 0 -> "No devices enabled"
+            totalEnabled == 0 -> context.getString(R.string.notification_no_devices)
             connectedCount == 0 ->
-                "Searching for $totalEnabled device${if (totalEnabled > 1) "s" else ""}..."
+                context.resources.getQuantityString(
+                    R.plurals.notification_searching,
+                    totalEnabled,
+                    totalEnabled,
+                )
             connectedCount == totalEnabled -> {
-                if (connectedCount == 1) {
-                    "Syncing with 1 device"
-                } else {
-                    "Syncing with $connectedCount devices"
-                }
+                context.resources.getQuantityString(
+                    R.plurals.notification_syncing,
+                    connectedCount,
+                    connectedCount,
+                )
             }
-            else -> "Syncing with $connectedCount of $totalEnabled devices"
+            else ->
+                context.getString(
+                    R.string.notification_syncing_partial,
+                    connectedCount,
+                    totalEnabled,
+                )
         }
 
     val content =
         when {
-            totalEnabled == 0 -> "Enable devices to start syncing"
-            connectedCount == 0 -> "Will connect when cameras are in range"
+            totalEnabled == 0 -> context.getString(R.string.notification_enable_to_start)
+            connectedCount == 0 -> context.getString(R.string.notification_will_connect)
             connectedCount < totalEnabled -> {
                 val missing = totalEnabled - connectedCount
                 val syncText =
                     if (lastSyncTime != null) {
-                        "Last sync: ${formatElapsedTimeSince(lastSyncTime)}"
+                        context.getString(
+                            R.string.notification_last_sync,
+                            formatElapsedTimeSince(context, lastSyncTime),
+                        )
                     } else {
-                        "Connected and syncing"
+                        context.getString(R.string.notification_connected_syncing)
                     }
-                "$syncText • $missing waiting"
+                context.getString(R.string.notification_sync_waiting, syncText, missing)
             }
-            lastSyncTime != null -> "Last sync: ${formatElapsedTimeSince(lastSyncTime)}"
-            else -> "Connected and syncing"
+            lastSyncTime != null ->
+                context.getString(
+                    R.string.notification_last_sync,
+                    formatElapsedTimeSince(context, lastSyncTime),
+                )
+            else -> context.getString(R.string.notification_connected_syncing)
         }
 
     val icon =
@@ -143,7 +207,7 @@ internal fun createMultiDeviceNotification(
         listOf(
             NotificationAction(
                 icon = 0,
-                title = "Refresh",
+                title = context.getString(R.string.notification_action_refresh),
                 pendingIntent =
                     pendingIntentFactory.createServicePendingIntent(
                         context,
@@ -154,7 +218,7 @@ internal fun createMultiDeviceNotification(
             ),
             NotificationAction(
                 icon = 0,
-                title = "Stop all",
+                title = context.getString(R.string.notification_action_stop),
                 pendingIntent =
                     pendingIntentFactory.createServicePendingIntent(
                         context,

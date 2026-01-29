@@ -3,8 +3,10 @@ package dev.sebastiano.camerasync.devicesync
 import android.app.Notification
 import android.app.NotificationManager
 import android.content.Context
+import android.content.res.Resources
 import androidx.core.app.NotificationCompat
 import dev.sebastiano.camerasync.CameraSyncApp
+import dev.sebastiano.camerasync.R
 import dev.sebastiano.camerasync.di.TestGraphFactory
 import dev.sebastiano.camerasync.fakes.FakeIntentFactory
 import dev.sebastiano.camerasync.fakes.FakeKhronicleLogger
@@ -36,6 +38,7 @@ class NotificationsTest {
     private lateinit var notificationBuilder: FakeNotificationBuilder
     private lateinit var pendingIntentFactory: FakePendingIntentFactory
     private lateinit var intentFactory: FakeIntentFactory
+    private lateinit var resources: Resources
 
     @Before
     fun setUp() {
@@ -57,24 +60,74 @@ class NotificationsTest {
         intentFactory.reset()
 
         // Mock context and notification manager
-        notificationManager = mockk<NotificationManager>(relaxed = true)
-        context =
-            mockk<Context>(relaxed = true) {
-                // Return NotificationManager directly for NOTIFICATION_SERVICE
-                // Use answers to ensure proper type casting
-                every { getSystemService(Context.NOTIFICATION_SERVICE) } answers
-                    {
-                        notificationManager
-                    }
-                every { getSystemService(any()) } returns
-                    mockk(relaxed = true) // Handle any other system service
-                every { packageName } returns "dev.sebastiano.camerasync"
-                every { applicationContext } returns this
-                every { resources } returns mockk(relaxed = true)
-                every { theme } returns mockk(relaxed = true)
-                every { classLoader } returns javaClass.classLoader
-                // Ensure packageManager is available for PendingIntent creation
-                every { packageManager } returns mockk(relaxed = true)
+        notificationManager = mockk(relaxed = true)
+        resources = mockk(relaxed = true)
+        context = mockk(relaxed = true)
+        // Return NotificationManager directly for NOTIFICATION_SERVICE
+        // Use answers to ensure proper type casting
+        every { context.getSystemService(Context.NOTIFICATION_SERVICE) } answers
+            {
+                notificationManager
+            }
+        every { context.getSystemService(any()) } returns
+            mockk(relaxed = true) // Handle any other system service
+        every { context.packageName } returns "dev.sebastiano.camerasync"
+        every { context.applicationContext } returns context
+        every { context.resources } returns resources
+        every { context.theme } returns mockk(relaxed = true)
+        every { context.classLoader } returns javaClass.classLoader
+        // Ensure packageManager is available for PendingIntent creation
+        every { context.packageManager } returns mockk(relaxed = true)
+
+        every {
+            resources.getQuantityString(R.plurals.notification_searching, any(), any())
+        } answers
+            {
+                val count = args[1] as Int
+                if (count == 1) {
+                    "Searching for 1 device…"
+                } else {
+                    "Searching for $count devices…"
+                }
+            }
+        every { resources.getQuantityString(R.plurals.notification_syncing, any(), any()) } answers
+            {
+                val count = args[1] as Int
+                if (count == 1) {
+                    "Syncing with 1 device"
+                } else {
+                    "Syncing with $count devices"
+                }
+            }
+
+        every { context.getString(R.string.notification_no_devices) } returns "No devices enabled"
+        every { context.getString(R.string.notification_enable_to_start) } returns
+            "Enable devices to start syncing"
+        every { context.getString(R.string.notification_will_connect) } returns
+            "Will connect when cameras are in range"
+        every { context.getString(R.string.notification_connected_syncing) } returns
+            "Connected and syncing"
+        every { context.getString(R.string.notification_action_refresh) } returns "Refresh"
+        every { context.getString(R.string.notification_action_stop) } returns "Stop all"
+        every { context.getString(R.string.notification_syncing_partial, any(), any()) } answers
+            {
+                val formatArgs = args[1] as Array<*>
+                val connected = formatArgs[0] as Int
+                val total = formatArgs[1] as Int
+                "Syncing with $connected of $total devices"
+            }
+        every { context.getString(R.string.notification_last_sync, any()) } answers
+            {
+                val formatArgs = args[1] as Array<*>
+                val value = formatArgs[0] as String
+                "Last sync: $value"
+            }
+        every { context.getString(R.string.notification_sync_waiting, any(), any()) } answers
+            {
+                val formatArgs = args[1] as Array<*>
+                val syncText = formatArgs[0] as String
+                val waiting = formatArgs[1] as Int
+                "$syncText • $waiting waiting"
             }
 
         // Skip registerNotificationChannel in tests - it requires a real NotificationManager
@@ -95,8 +148,11 @@ class NotificationsTest {
                 lastSyncTime = null,
             )
 
-        assertEquals("No devices enabled", notification.getTitle())
-        assertEquals("Enable devices to start syncing", notification.getText())
+        assertEquals(context.getString(R.string.notification_no_devices), notification.getTitle())
+        assertEquals(
+            context.getString(R.string.notification_enable_to_start),
+            notification.getText(),
+        )
     }
 
     @Test
@@ -112,8 +168,11 @@ class NotificationsTest {
                 lastSyncTime = null,
             )
 
-        assertEquals("Searching for 2 devices...", notification.getTitle())
-        assertEquals("Will connect when cameras are in range", notification.getText())
+        assertEquals(
+            context.resources.getQuantityString(R.plurals.notification_searching, 2, 2),
+            notification.getTitle(),
+        )
+        assertEquals(context.getString(R.string.notification_will_connect), notification.getText())
     }
 
     @Test
@@ -129,8 +188,14 @@ class NotificationsTest {
                 lastSyncTime = null,
             )
 
-        assertEquals("Syncing with 1 device", notification.getTitle())
-        assertEquals("Connected and syncing", notification.getText())
+        assertEquals(
+            context.resources.getQuantityString(R.plurals.notification_syncing, 1, 1),
+            notification.getTitle(),
+        )
+        assertEquals(
+            context.getString(R.string.notification_connected_syncing),
+            notification.getText(),
+        )
     }
 
     @Test
@@ -146,8 +211,14 @@ class NotificationsTest {
                 lastSyncTime = null,
             )
 
-        assertEquals("Syncing with 3 devices", notification.getTitle())
-        assertEquals("Connected and syncing", notification.getText())
+        assertEquals(
+            context.resources.getQuantityString(R.plurals.notification_syncing, 3, 3),
+            notification.getTitle(),
+        )
+        assertEquals(
+            context.getString(R.string.notification_connected_syncing),
+            notification.getText(),
+        )
     }
 
     @Test
@@ -163,7 +234,10 @@ class NotificationsTest {
                 lastSyncTime = null,
             )
 
-        assertEquals("Syncing with 2 of 3 devices", notification.getTitle())
+        assertEquals(
+            context.getString(R.string.notification_syncing_partial, 2, 3),
+            notification.getTitle(),
+        )
         assertTrue(notification.getText()?.toString()?.contains("waiting") == true)
     }
 
@@ -180,7 +254,10 @@ class NotificationsTest {
                 lastSyncTime = null,
             )
 
-        assertEquals("Syncing with 1 of 3 devices", notification.getTitle())
+        assertEquals(
+            context.getString(R.string.notification_syncing_partial, 1, 3),
+            notification.getTitle(),
+        )
         val content = notification.getText()?.toString() ?: ""
         assertTrue(content.contains("2 waiting") || content.contains("waiting"))
     }
@@ -199,7 +276,10 @@ class NotificationsTest {
                 lastSyncTime = lastSyncTime,
             )
 
-        assertEquals("Syncing with 2 devices", notification.getTitle())
+        assertEquals(
+            context.resources.getQuantityString(R.plurals.notification_syncing, 2, 2),
+            notification.getTitle(),
+        )
         val content = notification.getText()?.toString() ?: ""
         assertTrue(content.contains("Last sync:"))
     }
@@ -218,7 +298,10 @@ class NotificationsTest {
                 lastSyncTime = lastSyncTime,
             )
 
-        assertEquals("Syncing with 1 of 3 devices", notification.getTitle())
+        assertEquals(
+            context.getString(R.string.notification_syncing_partial, 1, 3),
+            notification.getTitle(),
+        )
         val content = notification.getText()?.toString() ?: ""
         assertTrue(content.contains("Last sync:"))
         assertTrue(content.contains("waiting"))
@@ -241,8 +324,14 @@ class NotificationsTest {
         val buildCall = notificationBuilder.lastBuildCall
         assertNotNull(buildCall)
         assertEquals(2, buildCall!!.actions.size)
-        assertEquals("Refresh", buildCall.actions[0].title)
-        assertEquals("Stop all", buildCall.actions[1].title)
+        assertEquals(
+            context.getString(R.string.notification_action_refresh),
+            buildCall.actions[0].title,
+        )
+        assertEquals(
+            context.getString(R.string.notification_action_stop),
+            buildCall.actions[1].title,
+        )
 
         // Verify content intent was set
         assertNotNull(buildCall.contentIntent)

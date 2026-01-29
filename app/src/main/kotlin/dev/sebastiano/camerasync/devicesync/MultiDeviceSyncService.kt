@@ -17,6 +17,7 @@ import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.ProcessLifecycleOwner
 import com.juul.khronicle.Log
+import dev.sebastiano.camerasync.R
 import dev.sebastiano.camerasync.domain.model.DeviceConnectionState
 import dev.sebastiano.camerasync.domain.model.PairedDevice
 import dev.sebastiano.camerasync.domain.repository.CameraRepository
@@ -74,6 +75,7 @@ class MultiDeviceSyncService(
 
     private val syncCoordinator by lazy {
         MultiDeviceSyncCoordinator(
+            context = this,
             cameraRepository = cameraRepository,
             locationCollector = locationCollector,
             vendorRegistry = vendorRegistry,
@@ -195,8 +197,8 @@ class MultiDeviceSyncService(
             if (e is ForegroundServiceStartNotAllowedException) {
                 Log.error(tag = TAG, throwable = e) { "Cannot start foreground service" }
             }
-            _serviceState.value =
-                MultiDeviceSyncServiceState.Error("Failed to start service: ${e.message}")
+            val errorMessage = getString(R.string.error_service_start_failed, e.message ?: "")
+            _serviceState.value = MultiDeviceSyncServiceState.Error(errorMessage)
             vibrator.vibrate()
         }
     }
@@ -326,6 +328,7 @@ class MultiDeviceSyncService(
         val requiredPermissions =
             listOf(
                 Manifest.permission.ACCESS_FINE_LOCATION,
+                Manifest.permission.ACCESS_BACKGROUND_LOCATION,
                 Manifest.permission.BLUETOOTH_SCAN,
                 Manifest.permission.BLUETOOTH_CONNECT,
                 Manifest.permission.POST_NOTIFICATIONS,
@@ -346,8 +349,10 @@ class MultiDeviceSyncService(
 
         val notification =
             createErrorNotificationBuilder(this)
-                .setContentTitle("Missing permission")
-                .setContentText("Cannot sync with cameras: $missingPermission is required")
+                .setContentTitle(getString(R.string.error_missing_permission_title))
+                .setContentText(
+                    getString(R.string.error_missing_permission_message, missingPermission)
+                )
                 .setContentIntent(
                     pendingIntentFactory.createActivityPendingIntent(
                         this,

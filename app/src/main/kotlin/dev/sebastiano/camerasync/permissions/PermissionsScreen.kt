@@ -1,5 +1,8 @@
 package dev.sebastiano.camerasync.permissions
 
+import android.content.Intent
+import android.net.Uri
+import android.provider.Settings
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.animateColorAsState
@@ -24,6 +27,7 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ElevatedButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -42,7 +46,9 @@ import androidx.compose.ui.draw.scale
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import dev.sebastiano.camerasync.PermissionInfo
@@ -51,9 +57,11 @@ import dev.sebastiano.camerasync.R
 
 @Composable
 fun PermissionsScreen(onPermissionsGranted: () -> Unit) {
+    val context = LocalContext.current
     val viewModel = remember { PermissionsViewModel() }
     val showSuccessAnimation = viewModel.showSuccessAnimation.value
     val shouldNavigate by viewModel.shouldNavigate.collectAsState()
+    val backgroundPermissionName = stringResource(R.string.perm_bg_location)
 
     // Trigger navigation when ViewModel signals it
     LaunchedEffect(shouldNavigate) {
@@ -106,13 +114,13 @@ fun PermissionsScreen(onPermissionsGranted: () -> Unit) {
                         verticalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
                         Text(
-                            text = "Welcome to CameraSync",
+                            text = stringResource(R.string.welcome_title),
                             style = MaterialTheme.typography.headlineMedium,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.onSurface,
                         )
                         Text(
-                            text = "We need a few permissions to sync GPS data to your camera",
+                            text = stringResource(R.string.welcome_subtitle),
                             style = MaterialTheme.typography.bodyLarge,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -148,17 +156,41 @@ fun PermissionsScreen(onPermissionsGranted: () -> Unit) {
 
                     // Request button - only show when there are missing permissions
                     val hasMissingPermissions = permissions.any { !it.isGranted }
+                    val backgroundMissing =
+                        permissions.any { it.name == backgroundPermissionName && !it.isGranted }
                     AnimatedVisibility(visible = hasMissingPermissions) {
-                        ElevatedButton(
-                            onClick = { requestAll() },
-                            modifier = Modifier.fillMaxWidth().height(56.dp),
-                            shape = RoundedCornerShape(16.dp),
-                        ) {
-                            Text(
-                                text = "Grant All Permissions",
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.SemiBold,
-                            )
+                        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                            ElevatedButton(
+                                onClick = { requestAll() },
+                                modifier = Modifier.fillMaxWidth().height(56.dp),
+                                shape = RoundedCornerShape(16.dp),
+                            ) {
+                                Text(
+                                    text = stringResource(R.string.action_grant_all),
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.SemiBold,
+                                )
+                            }
+                            if (backgroundMissing) {
+                                OutlinedButton(
+                                    onClick = {
+                                        val intent =
+                                            Intent(
+                                                Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                                                Uri.fromParts("package", context.packageName, null),
+                                            )
+                                        context.startActivity(intent)
+                                    },
+                                    modifier = Modifier.fillMaxWidth().height(56.dp),
+                                    shape = RoundedCornerShape(16.dp),
+                                ) {
+                                    Text(
+                                        text = stringResource(R.string.action_open_settings),
+                                        style = MaterialTheme.typography.titleMedium,
+                                        fontWeight = FontWeight.SemiBold,
+                                    )
+                                }
+                            }
                         }
                     }
                 }
@@ -207,11 +239,16 @@ private fun PermissionChecklistItem(permission: PermissionInfo, modifier: Modifi
             contentAlignment = Alignment.Center,
         ) {
             val icon =
-                when (permission.name) {
-                    "Location" -> R.drawable.ic_location_on_24dp
-                    "Bluetooth Scan",
-                    "Bluetooth Connect" -> R.drawable.ic_bluetooth_24dp
-                    "Notifications" -> R.drawable.ic_notifications_24dp
+                when {
+                    permission.name == stringResource(R.string.perm_location) ->
+                        R.drawable.ic_location_on_24dp
+                    permission.name == stringResource(R.string.perm_bg_location) ->
+                        R.drawable.ic_location_on_24dp
+                    permission.name == stringResource(R.string.perm_bt_scan) ||
+                        permission.name == stringResource(R.string.perm_bt_connect) ->
+                        R.drawable.ic_bluetooth_24dp
+                    permission.name == stringResource(R.string.perm_notifications) ->
+                        R.drawable.ic_notifications_24dp
                     else -> R.drawable.ic_select_check_box_24dp
                 }
             Icon(
@@ -247,7 +284,7 @@ private fun PermissionChecklistItem(permission: PermissionInfo, modifier: Modifi
                 if (isGranted) {
                     Icon(
                         painterResource(R.drawable.ic_check_circle_24dp),
-                        contentDescription = "Granted",
+                        contentDescription = stringResource(R.string.content_desc_granted),
                         tint = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.scale(checkmarkScale),
                     )

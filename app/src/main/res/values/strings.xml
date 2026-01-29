@@ -1,3 +1,144 @@
 <resources>
     <string name="app_name">CameraSync</string>
+
+    <!-- General -->
+    <string name="label_unknown">Unknown</string>
+    <string name="default_device_name">Camera (%1$s)</string>
+    <string name="action_ok">OK</string>
+    <string name="action_cancel">Cancel</string>
+    <string name="action_retry">Retry</string>
+
+    <!-- Devices List Screen -->
+    <string name="content_desc_refresh">Refresh connections</string>
+    <string name="content_desc_settings">More options</string>
+    <string name="menu_view_logs">View Logs</string>
+    <string name="menu_send_feedback">Send Feedback</string>
+    <string name="content_desc_add_device">Add device</string>
+    <string name="loading_devices">Loading devices…</string>
+    <string name="empty_devices_title">No cameras paired</string>
+    <string name="empty_devices_subtitle">Tap the + button to pair a camera</string>
+    <string name="content_desc_collapse">Collapse</string>
+    <string name="content_desc_expand">Expand</string>
+    <string name="label_make">Make</string>
+    <string name="label_model">Model</string>
+    <string name="label_pairing_name">Pairing Name</string>
+    <string name="label_mac_address">MAC Address</string>
+    <string name="label_last_sync">Last sync</string>
+    <string name="label_firmware">Firmware</string>
+    <string name="unreachable_message">Camera not found nearby.</string>
+    <string name="retry_connection">Retry connection</string>
+    <string name="unpair_device">Unpair device</string>
+    <string name="status_disabled">Disabled</string>
+    <string name="status_disconnected">Disconnected</string>
+    <string name="status_searching">Searching…</string>
+    <string name="status_connecting">Connecting…</string>
+    <string name="status_unreachable">Unreachable</string>
+    <string name="status_connected">Connected</string>
+    <string name="status_syncing">Syncing</string>
+    <string name="dialog_unpair_title">Unpair device?</string>
+    <string name="dialog_unpair_message">Are you sure you want to unpair “%1$s”? You’ll need to pair it again to sync data.</string>
+    <string name="action_unpair">Unpair</string>
+    <string name="dialog_settings_error_title">Unable to open settings</string>
+    <string name="dialog_settings_error_message">Could not open battery optimization settings. Please navigate to Settings > Apps > CameraSync > Battery to disable battery optimization manually.</string>
+    <string name="dialog_battery_opt_title">Disable battery optimization</string>
+    <string name="dialog_battery_opt_message">CameraSync needs to run in the background to sync GPS data to your cameras. Battery optimization can interfere with background operation and Bluetooth connections.</string>
+    <string name="dialog_battery_opt_oem_message">Your device has manufacturer-specific battery settings that may also need to be configured.</string>
+    <string name="dialog_battery_opt_instructions">Please select “Unrestricted” on the next screen to ensure reliable syncing. “Optimized” (the default) may cause the app to lose connection in the background.</string>
+    <string name="action_open_settings">Open Settings</string>
+    <string name="action_oem_settings">OEM Settings</string>
+    <string name="action_not_now">Not now</string>
+    <string name="warning_battery_opt_title">App is battery optimized</string>
+    <string name="warning_battery_opt_subtitle">Background sync may be unreliable.</string>
+    <string name="action_disable">Disable</string>
+    <string name="warning_sync_stopped_title">Searching stopped</string>
+    <string name="warning_sync_stopped_subtitle">Tap to resume searching for cameras</string>
+    <string name="content_desc_resume_searching">Resume searching</string>
+    <string name="acquiring_location">Acquiring location…</string>
+    <string name="content_desc_user_location">User location</string>
+
+    <!-- Pairing Screen -->
+    <string name="pairing_title">Add Camera</string>
+    <string name="content_desc_back">Back</string>
+    <string name="pairing_feedback">Having issues? Let us know</string>
+    <string name="ready_to_pair_title">Ready to pair</string>
+    <string name="ready_to_pair_subtitle">Use Android’s pairing flow to select a camera from the system list.</string>
+    <string name="action_pair_system">Pair using Android System</string>
+    <string name="bonded_dialog_title">Camera Already Paired</string>
+    <string name="bonded_dialog_remove_failed">This camera is already paired to your phone at the system level. Please remove the existing pairing from your phone’s Bluetooth settings, then try again.</string>
+    <string name="bonded_dialog_message">This camera is already paired to your phone at the system level. This can interfere with the app’s connection. Would you like to remove the existing pairing?</string>
+    <string name="action_remove_pairing">Remove Pairing</string>
+    <string name="pairing_failed_title">Pairing failed</string>
+    <string name="error_pairing_rejected">The camera rejected the pairing request. Make sure Bluetooth pairing is enabled on your camera.</string>
+    <string name="error_pairing_rejected_long">The camera rejected the pairing request. Make sure Bluetooth pairing is enabled on your camera and try again.</string>
+    <string name="error_pairing_timeout">Connection timed out. Make sure the camera is nearby and Bluetooth is enabled.</string>
+    <string name="error_pairing_timeout_long">Connection timed out. Make sure the camera is nearby, Bluetooth is enabled, and try again.</string>
+    <string name="error_pairing_unknown">An unexpected error occurred. Please try again.</string>
+    <string name="error_connection_failed">Connection failed. Please try again.</string>
+    <string name="error_unknown_vendor">Unknown camera vendor.</string>
+    <string name="pairing_in_progress_title">Pairing with %1$s…</string>
+    <string name="pairing_in_progress_subtitle">Please wait while we connect to your camera.</string>
+
+    <!-- Log Viewer -->
+    <string name="log_viewer_title">Log Viewer</string>
+    <string name="content_desc_close_search">Close search</string>
+    <string name="content_desc_search">Search</string>
+    <string name="content_desc_filter">Filter by level</string>
+    <string name="filter_all_levels">All Levels</string>
+    <string name="placeholder_filter_logs">Filter logs…</string>
+    <string name="content_desc_clear">Clear</string>
+    <string name="label_level_filter">Level: %1$s</string>
+    <string name="content_desc_clear_level_filter">Clear level filter</string>
+
+    <!-- Permissions Screen -->
+    <string name="welcome_title">Welcome to CameraSync</string>
+    <string name="welcome_subtitle">We need a few permissions to sync GPS data to your camera</string>
+    <string name="action_grant_all">Grant All Permissions</string>
+    <string name="content_desc_granted">Granted</string>
+
+    <!-- Notifications and Time Formatting -->
+    <string name="time_never">never</string>
+    <string name="time_just_now">just now</string>
+    <string name="time_seconds_ago">seconds ago</string>
+    <plurals name="time_minutes_ago">
+        <item quantity="one">1 minute ago</item>
+        <item quantity="other">%1$d minutes ago</item>
+    </plurals>
+    <plurals name="time_hours_ago">
+        <item quantity="one">1 hour ago</item>
+        <item quantity="other">%1$d hours ago</item>
+    </plurals>
+    <string name="time_yesterday_at">yesterday at %1$s</string>
+    <string name="notification_channel_name">Camera connection</string>
+    <string name="notification_no_devices">No devices enabled</string>
+    <plurals name="notification_searching">
+        <item quantity="one">Searching for 1 device…</item>
+        <item quantity="other">Searching for %1$d devices…</item>
+    </plurals>
+    <plurals name="notification_syncing">
+        <item quantity="one">Syncing with 1 device</item>
+        <item quantity="other">Syncing with %1$d devices</item>
+    </plurals>
+    <string name="notification_syncing_partial">Syncing with %1$d of %2$d devices</string>
+    <string name="notification_enable_to_start">Enable devices to start syncing</string>
+    <string name="notification_will_connect">Will connect when cameras are in range</string>
+    <string name="notification_last_sync">Last sync: %1$s</string>
+    <string name="notification_connected_syncing">Connected and syncing</string>
+    <string name="notification_sync_waiting">%1$s • %2$d waiting</string>
+    <string name="notification_action_refresh">Refresh</string>
+    <string name="notification_action_stop">Stop all</string>
+    <string name="error_missing_permission_title">Missing permission</string>
+    <string name="error_missing_permission_message">Cannot sync with cameras: %1$s is required</string>
+    <string name="error_service_start_failed">Failed to start service: %1$s</string>
+
+    <!-- Permission Names and Descriptions -->
+    <string name="perm_location">Location</string>
+    <string name="perm_location_desc">Get GPS coordinates for your photos</string>
+    <string name="perm_bg_location">Background Location</string>
+    <string name="perm_bg_location_desc">Sync GPS data even when the app is in the background. Select "Allow all the time" in the system settings.</string>
+    <string name="perm_bt_scan">Bluetooth Scan</string>
+    <string name="perm_bt_scan_desc">Find nearby cameras</string>
+    <string name="perm_bt_connect">Bluetooth Connect</string>
+    <string name="perm_bt_connect_desc">Connect to your camera</string>
+    <string name="perm_notifications">Notifications</string>
+    <string name="perm_notifications_desc">Show sync status updates</string>
 </resources>

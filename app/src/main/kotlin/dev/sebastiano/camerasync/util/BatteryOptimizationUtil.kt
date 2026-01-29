@@ -26,13 +26,14 @@ object BatteryOptimizationUtil {
      * Checks if the app is currently ignoring battery optimizations.
      *
      * @param context The application context
-     * @return true if the app is ignoring battery optimizations, false otherwise
+     * @return true if the app is ignoring battery optimizations (set to "Unrestricted"), false
+     *   otherwise
      */
     fun isIgnoringBatteryOptimizations(context: Context): Boolean {
         val powerManager = context.getSystemService(Context.POWER_SERVICE) as PowerManager
         val isIgnoring = powerManager.isIgnoringBatteryOptimizations(context.packageName)
         Log.debug(logTag) {
-            "Battery optimization status: ${if (isIgnoring) "disabled (good)" else "enabled (may affect background sync)"}"
+            "Battery optimization status: ${if (isIgnoring) "DISABLED (Unrestricted)" else "ENABLED (Optimized or Restricted)"}"
         }
         return isIgnoring
     }

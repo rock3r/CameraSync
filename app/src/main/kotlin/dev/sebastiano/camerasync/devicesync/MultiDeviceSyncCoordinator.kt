@@ -1,7 +1,9 @@
 package dev.sebastiano.camerasync.devicesync
 
+import android.content.Context
 import android.os.Build
 import com.juul.khronicle.Log
+import dev.sebastiano.camerasync.R
 import dev.sebastiano.camerasync.domain.model.Camera
 import dev.sebastiano.camerasync.domain.model.DeviceConnectionState
 import dev.sebastiano.camerasync.domain.model.GpsLocation
@@ -45,6 +47,7 @@ private const val TAG = "MultiDeviceSyncCoordinator"
  * - Per-device connection state
  * - Broadcasting location updates to all connected devices
  *
+ * @param context Application context for resource access.
  * @param cameraRepository Repository for BLE camera operations.
  * @param locationCollector Centralized location collector.
  * @param vendorRegistry Registry for resolving camera vendors.
@@ -53,6 +56,7 @@ private const val TAG = "MultiDeviceSyncCoordinator"
  * @param deviceNameProvider Provider for the device name to set on cameras.
  */
 class MultiDeviceSyncCoordinator(
+    private val context: Context,
     private val cameraRepository: CameraRepository,
     private val locationCollector: LocationCollectionCoordinator,
     private val vendorRegistry: CameraVendorRegistry,
@@ -60,7 +64,9 @@ class MultiDeviceSyncCoordinator(
     private val companionDeviceManagerHelper:
         dev.sebastiano.camerasync.pairing.CompanionDeviceManagerHelper,
     private val coroutineScope: CoroutineScope,
-    private val deviceNameProvider: () -> String = { "${Build.MODEL} CameraSync" },
+    private val deviceNameProvider: () -> String = {
+        context.getString(R.string.default_device_name, Build.MODEL)
+    },
 ) {
     private val _deviceStates = MutableStateFlow<Map<String, DeviceConnectionState>>(emptyMap())
 
@@ -266,7 +272,7 @@ class MultiDeviceSyncCoordinator(
             updateDeviceState(
                 macAddress,
                 DeviceConnectionState.Error(
-                    message = "Unknown camera vendor",
+                    message = context.getString(R.string.error_unknown_vendor),
                     isRecoverable = false,
                 ),
             )
@@ -347,10 +353,11 @@ class MultiDeviceSyncCoordinator(
                         val errorMessage =
                             when {
                                 e.message?.contains("pairing", ignoreCase = true) == true ->
-                                    "Pairing rejected. Enable pairing on your camera."
+                                    context.getString(R.string.error_pairing_rejected_long)
                                 e.message?.contains("timeout", ignoreCase = true) == true ->
-                                    "Connection timed out. Is the camera nearby?"
-                                else -> e.message ?: "Connection failed"
+                                    context.getString(R.string.error_pairing_timeout_long)
+                                else ->
+                                    e.message ?: context.getString(R.string.error_connection_failed)
                             }
                         updateDeviceState(
                             macAddress,
@@ -440,7 +447,7 @@ class MultiDeviceSyncCoordinator(
             }
         }
 
-        return firmwareVersion ?: "Unknown"
+        return firmwareVersion ?: context.getString(R.string.label_unknown)
     }
 
     /**

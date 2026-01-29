@@ -77,6 +77,7 @@ import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
@@ -151,7 +152,7 @@ fun DevicesListScreen(
             TopAppBar(
                 title = {
                     Text(
-                        "CameraSync",
+                        stringResource(R.string.app_name),
                         style = MaterialTheme.typography.headlineMedium,
                         fontWeight = FontWeight.Bold,
                     )
@@ -166,7 +167,7 @@ fun DevicesListScreen(
                         ) {
                             Icon(
                                 painterResource(R.drawable.ic_refresh_24dp),
-                                contentDescription = "Refresh connections",
+                                contentDescription = stringResource(R.string.content_desc_refresh),
                             )
                         }
                     }
@@ -175,19 +176,19 @@ fun DevicesListScreen(
                         IconButton(onClick = { showMenu = true }) {
                             Icon(
                                 painterResource(R.drawable.ic_settings_24dp),
-                                contentDescription = "More options",
+                                contentDescription = stringResource(R.string.content_desc_settings),
                             )
                         }
                         DropdownMenu(expanded = showMenu, onDismissRequest = { showMenu = false }) {
                             DropdownMenuItem(
-                                text = { Text("View Logs") },
+                                text = { Text(stringResource(R.string.menu_view_logs)) },
                                 onClick = {
                                     showMenu = false
                                     onViewLogsClick()
                                 },
                             )
                             DropdownMenuItem(
-                                text = { Text("Send Feedback") },
+                                text = { Text(stringResource(R.string.menu_send_feedback)) },
                                 onClick = {
                                     showMenu = false
                                     viewModel.sendFeedback()
@@ -202,7 +203,7 @@ fun DevicesListScreen(
             FloatingActionButton(onClick = onAddDeviceClick) {
                 Icon(
                     painterResource(R.drawable.ic_add_camera_24dp),
-                    contentDescription = "Add device",
+                    contentDescription = stringResource(R.string.content_desc_add_device),
                 )
             }
         },
@@ -293,7 +294,7 @@ fun DevicesListScreen(
 @Composable
 private fun LoadingContent(modifier: Modifier = Modifier) {
     Box(modifier = modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        Text("Loading devices...", style = MaterialTheme.typography.bodyLarge)
+        Text(stringResource(R.string.loading_devices), style = MaterialTheme.typography.bodyLarge)
     }
 }
 
@@ -314,7 +315,7 @@ private fun EmptyContent(modifier: Modifier = Modifier) {
             Spacer(Modifier.height(16.dp))
 
             Text(
-                "No cameras paired",
+                stringResource(R.string.empty_devices_title),
                 style = MaterialTheme.typography.headlineSmall,
                 color = MaterialTheme.colorScheme.onSurface,
                 fontWeight = FontWeight.Bold,
@@ -323,7 +324,7 @@ private fun EmptyContent(modifier: Modifier = Modifier) {
             Spacer(Modifier.height(8.dp))
 
             Text(
-                "Tap the + button to pair a camera",
+                stringResource(R.string.empty_devices_subtitle),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -375,7 +376,8 @@ private fun DeviceCard(
     var isExpanded by remember { mutableStateOf(false) }
     val device = deviceWithState.device
     val connectionState = deviceWithState.connectionState
-    val info = displayInfo ?: DeviceDisplayInfo("Unknown", "Unknown", device.name, false)
+    val unknownString = stringResource(R.string.label_unknown)
+    val info = displayInfo ?: DeviceDisplayInfo(unknownString, unknownString, device.name, false)
 
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -423,8 +425,9 @@ private fun DeviceCard(
                             device.lastSyncedAt != null &&
                                 connectionState is DeviceConnectionState.Syncing
                         ) {
+                            val context = LocalContext.current
                             Text(
-                                text = " • ${formatElapsedTimeSince(device.lastSyncedAt)}",
+                                text = " • ${formatElapsedTimeSince(context, device.lastSyncedAt)}",
                                 style = MaterialTheme.typography.bodySmall,
                                 color =
                                     MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
@@ -445,7 +448,9 @@ private fun DeviceCard(
                     painterResource(
                         if (isExpanded) R.drawable.ic_collapse_24dp else R.drawable.ic_expand_24dp
                     ),
-                    contentDescription = if (isExpanded) "Collapse" else "Expand",
+                    contentDescription =
+                        if (isExpanded) stringResource(R.string.content_desc_collapse)
+                        else stringResource(R.string.content_desc_expand),
                     modifier = Modifier.alpha(0.6f),
                 )
             }
@@ -461,32 +466,41 @@ private fun DeviceCard(
                         Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, bottom = 8.dp)
                 ) {
                     // Device details
-                    DeviceDetailRow("Make", info.make)
-                    DeviceDetailRow("Model", info.model)
+                    DeviceDetailRow(stringResource(R.string.label_make), info.make)
+                    DeviceDetailRow(stringResource(R.string.label_model), info.model)
                     if (info.pairingName != null) {
-                        DeviceDetailRow("Pairing Name", info.pairingName)
+                        DeviceDetailRow(
+                            stringResource(R.string.label_pairing_name),
+                            info.pairingName,
+                        )
                     }
-                    DeviceDetailRow("MAC Address", device.macAddress)
+                    DeviceDetailRow(stringResource(R.string.label_mac_address), device.macAddress)
 
                     if (device.lastSyncedAt != null) {
-                        DeviceDetailRow("Last sync", formatElapsedTimeSince(device.lastSyncedAt))
+                        val context = LocalContext.current
+                        DeviceDetailRow(
+                            stringResource(R.string.label_last_sync),
+                            formatElapsedTimeSince(context, device.lastSyncedAt),
+                        )
                     }
 
                     if (connectionState is DeviceConnectionState.Syncing) {
                         connectionState.firmwareVersion?.let { version ->
-                            DeviceDetailRow("Firmware", version)
+                            DeviceDetailRow(stringResource(R.string.label_firmware), version)
                         }
                     }
 
                     if (connectionState is DeviceConnectionState.Unreachable) {
                         Spacer(Modifier.height(8.dp))
                         Text(
-                            text = "Camera not found nearby.",
+                            text = stringResource(R.string.unreachable_message),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                         Spacer(Modifier.height(8.dp))
-                        TextButton(onClick = onRetryClick) { Text("Retry connection") }
+                        TextButton(onClick = onRetryClick) {
+                            Text(stringResource(R.string.retry_connection))
+                        }
                     }
 
                     if (connectionState is DeviceConnectionState.Error) {
@@ -499,7 +513,9 @@ private fun DeviceCard(
 
                         if (connectionState.isRecoverable) {
                             Spacer(Modifier.height(8.dp))
-                            TextButton(onClick = onRetryClick) { Text("Retry connection") }
+                            TextButton(onClick = onRetryClick) {
+                                Text(stringResource(R.string.retry_connection))
+                            }
                         }
                     }
 
@@ -507,7 +523,10 @@ private fun DeviceCard(
 
                     // Unpair action
                     TextButton(onClick = onUnpairClick, modifier = Modifier.align(Alignment.End)) {
-                        Text("Unpair device", color = MaterialTheme.colorScheme.error)
+                        Text(
+                            stringResource(R.string.unpair_device),
+                            color = MaterialTheme.colorScheme.error,
+                        )
                     }
                 }
             }
@@ -675,22 +694,27 @@ private fun ConnectionStatusText(state: DeviceConnectionState) {
     val (text, color) =
         when (state) {
             is DeviceConnectionState.Disabled ->
-                "Disabled" to MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                stringResource(R.string.status_disabled) to
+                    MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
 
             is DeviceConnectionState.Disconnected ->
-                "Disconnected" to MaterialTheme.colorScheme.onSurfaceVariant
+                stringResource(R.string.status_disconnected) to
+                    MaterialTheme.colorScheme.onSurfaceVariant
 
             is DeviceConnectionState.Searching ->
-                "Searching..." to MaterialTheme.colorScheme.primary
+                stringResource(R.string.status_searching) to MaterialTheme.colorScheme.primary
             is DeviceConnectionState.Connecting ->
-                "Connecting..." to MaterialTheme.colorScheme.primary
+                stringResource(R.string.status_connecting) to MaterialTheme.colorScheme.primary
 
             is DeviceConnectionState.Unreachable ->
-                "Unreachable" to MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                stringResource(R.string.status_unreachable) to
+                    MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
 
-            is DeviceConnectionState.Connected -> "Connected" to MaterialTheme.colorScheme.primary
+            is DeviceConnectionState.Connected ->
+                stringResource(R.string.status_connected) to MaterialTheme.colorScheme.primary
             is DeviceConnectionState.Error -> state.message to MaterialTheme.colorScheme.error
-            is DeviceConnectionState.Syncing -> "Syncing" to MaterialTheme.colorScheme.primary
+            is DeviceConnectionState.Syncing ->
+                stringResource(R.string.status_syncing) to MaterialTheme.colorScheme.primary
         }
 
     Text(text = text, style = MaterialTheme.typography.bodySmall, color = color)
@@ -722,18 +746,19 @@ private fun UnpairConfirmationDialog(
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Unpair device?") },
-        text = {
-            Text(
-                "Are you sure you want to unpair \"$deviceName\"? You'll need to pair it again to sync data."
-            )
-        },
+        title = { Text(stringResource(R.string.dialog_unpair_title)) },
+        text = { Text(stringResource(R.string.dialog_unpair_message, deviceName)) },
         confirmButton = {
             TextButton(onClick = onConfirm) {
-                Text("Unpair", color = MaterialTheme.colorScheme.error)
+                Text(
+                    stringResource(R.string.action_unpair),
+                    color = MaterialTheme.colorScheme.error,
+                )
             }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) }
+        },
     )
 }
 
@@ -751,13 +776,8 @@ private fun BatteryOptimizationDialog(onConfirm: () -> Unit, onDismiss: () -> Un
                 showError = false
                 onDismiss()
             },
-            title = { Text("Unable to open settings") },
-            text = {
-                Text(
-                    "Could not open battery optimization settings. Please navigate to " +
-                        "Settings > Apps > CameraSync > Battery to disable battery optimization manually."
-                )
-            },
+            title = { Text(stringResource(R.string.dialog_settings_error_title)) },
+            text = { Text(stringResource(R.string.dialog_settings_error_message)) },
             confirmButton = {
                 TextButton(
                     onClick = {
@@ -765,34 +785,29 @@ private fun BatteryOptimizationDialog(onConfirm: () -> Unit, onDismiss: () -> Un
                         onDismiss()
                     }
                 ) {
-                    Text("OK")
+                    Text(stringResource(R.string.action_ok))
                 }
             },
         )
     } else {
         AlertDialog(
             onDismissRequest = onDismiss,
-            title = { Text("Disable battery optimization") },
+            title = { Text(stringResource(R.string.dialog_battery_opt_title)) },
             text = {
                 Column {
-                    Text(
-                        "CameraSync needs to run in the background to sync GPS data to your cameras. " +
-                            "Battery optimization can interfere with background operation and Bluetooth connections."
-                    )
+                    Text(stringResource(R.string.dialog_battery_opt_message))
 
                     if (hasOemSettings) {
                         Spacer(Modifier.height(12.dp))
                         Text(
-                            "Your device has manufacturer-specific battery settings that may also need to be configured.",
+                            stringResource(R.string.dialog_battery_opt_oem_message),
                             style = MaterialTheme.typography.bodyMedium,
                             fontWeight = FontWeight.SemiBold,
                         )
                     }
 
                     Spacer(Modifier.height(12.dp))
-                    Text(
-                        "Please select \"Don't optimize\" or \"Allow\" on the next screen to ensure reliable syncing."
-                    )
+                    Text(stringResource(R.string.dialog_battery_opt_instructions))
                 }
             },
             confirmButton = {
@@ -812,7 +827,7 @@ private fun BatteryOptimizationDialog(onConfirm: () -> Unit, onDismiss: () -> Un
                         }
                     }
                 ) {
-                    Text("Open Settings")
+                    Text(stringResource(R.string.action_open_settings))
                 }
             },
             dismissButton = {
@@ -833,10 +848,12 @@ private fun BatteryOptimizationDialog(onConfirm: () -> Unit, onDismiss: () -> Un
                             }
                         }
                     ) {
-                        Text("OEM Settings")
+                        Text(stringResource(R.string.action_oem_settings))
                     }
                 } else {
-                    TextButton(onClick = onDismiss) { Text("Not now") }
+                    TextButton(onClick = onDismiss) {
+                        Text(stringResource(R.string.action_not_now))
+                    }
                 }
             },
         )
@@ -865,16 +882,16 @@ private fun BatteryOptimizationWarning(onEnableClick: () -> Unit, modifier: Modi
 
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = "Battery optimization active",
+                    text = stringResource(R.string.warning_battery_opt_title),
                     style = MaterialTheme.typography.titleSmall,
                 )
                 Text(
-                    text = "Background sync may be unreliable.",
+                    text = stringResource(R.string.warning_battery_opt_subtitle),
                     style = MaterialTheme.typography.bodySmall,
                 )
             }
 
-            TextButton(onClick = onEnableClick) { Text("Disable") }
+            TextButton(onClick = onEnableClick) { Text(stringResource(R.string.action_disable)) }
         }
     }
 }
@@ -904,9 +921,12 @@ private fun SyncStoppedWarning(
             Spacer(Modifier.width(16.dp))
 
             Column(modifier = Modifier.weight(1f)) {
-                Text(text = "Searching stopped", style = MaterialTheme.typography.titleSmall)
                 Text(
-                    text = "Tap to resume searching for cameras",
+                    text = stringResource(R.string.warning_sync_stopped_title),
+                    style = MaterialTheme.typography.titleSmall,
+                )
+                Text(
+                    text = stringResource(R.string.warning_sync_stopped_subtitle),
                     style = MaterialTheme.typography.bodySmall,
                 )
             }
@@ -914,7 +934,7 @@ private fun SyncStoppedWarning(
             IconButton(onClick = onRefreshClick, enabled = enabled) {
                 Icon(
                     painterResource(R.drawable.ic_refresh_24dp),
-                    contentDescription = "Resume searching",
+                    contentDescription = stringResource(R.string.content_desc_resume_searching),
                 )
             }
         }
@@ -934,7 +954,7 @@ private fun LocationCard(location: GpsLocation?, modifier: Modifier = Modifier) 
                     CircularProgressIndicator(modifier = Modifier.size(32.dp))
                     Spacer(Modifier.height(8.dp))
                     Text(
-                        "Acquiring location...",
+                        stringResource(R.string.acquiring_location),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -1044,7 +1064,7 @@ private fun UserLocationButton(
     colors: ButtonColors = ButtonDefaults.elevatedButtonColors(),
     puckColors: LocationPuckColors = LocationPuckDefaults.colors(),
     puckSizes: LocationPuckSizes = LocationPuckSizes(),
-    contentDescription: String = "User location",
+    contentDescription: String = stringResource(R.string.content_desc_user_location),
     size: Dp = 48.dp,
     contentPadding: PaddingValues = PaddingValues(size / 6),
     shape: Shape = CircleShape,

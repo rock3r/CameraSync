@@ -43,6 +43,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -65,12 +66,12 @@ fun LogViewerScreen(viewModel: LogViewerViewModel, onNavigateBack: () -> Unit) {
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Log Viewer") },
+                title = { Text(stringResource(R.string.log_viewer_title)) },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
                         Icon(
                             painterResource(R.drawable.ic_arrow_back_24dp),
-                            contentDescription = "Back",
+                            contentDescription = stringResource(R.string.content_desc_back),
                         )
                     }
                 },
@@ -81,14 +82,17 @@ fun LogViewerScreen(viewModel: LogViewerViewModel, onNavigateBack: () -> Unit) {
                                 if (showSearchField) R.drawable.ic_close_24dp
                                 else R.drawable.ic_search_24dp
                             ),
-                            contentDescription = if (showSearchField) "Close search" else "Search",
+                            contentDescription =
+                                if (showSearchField)
+                                    stringResource(R.string.content_desc_close_search)
+                                else stringResource(R.string.content_desc_search),
                         )
                     }
                     Box {
                         IconButton(onClick = { showFilterMenu = true }) {
                             Icon(
                                 painterResource(R.drawable.ic_filter_list_24dp),
-                                contentDescription = "Filter by level",
+                                contentDescription = stringResource(R.string.content_desc_filter),
                             )
                         }
                         DropdownMenu(
@@ -96,7 +100,7 @@ fun LogViewerScreen(viewModel: LogViewerViewModel, onNavigateBack: () -> Unit) {
                             onDismissRequest = { showFilterMenu = false },
                         ) {
                             DropdownMenuItem(
-                                text = { Text("All Levels") },
+                                text = { Text(stringResource(R.string.filter_all_levels)) },
                                 onClick = {
                                     viewModel.setFilterLevel(null)
                                     showFilterMenu = false
@@ -124,7 +128,7 @@ fun LogViewerScreen(viewModel: LogViewerViewModel, onNavigateBack: () -> Unit) {
                         } else {
                             Icon(
                                 painterResource(R.drawable.ic_refresh_24dp),
-                                contentDescription = "Refresh",
+                                contentDescription = stringResource(R.string.content_desc_refresh),
                             )
                         }
                     }
@@ -138,7 +142,7 @@ fun LogViewerScreen(viewModel: LogViewerViewModel, onNavigateBack: () -> Unit) {
                     value = filterText,
                     onValueChange = { viewModel.setFilterText(it) },
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
-                    placeholder = { Text("Filter logs...") },
+                    placeholder = { Text(stringResource(R.string.placeholder_filter_logs)) },
                     leadingIcon = {
                         Icon(painterResource(R.drawable.ic_search_24dp), contentDescription = null)
                     },
@@ -147,7 +151,7 @@ fun LogViewerScreen(viewModel: LogViewerViewModel, onNavigateBack: () -> Unit) {
                             IconButton(onClick = { viewModel.setFilterText("") }) {
                                 Icon(
                                     painterResource(R.drawable.ic_close_24dp),
-                                    contentDescription = "Clear",
+                                    contentDescription = stringResource(R.string.content_desc_clear),
                                 )
                             }
                         }
@@ -167,7 +171,7 @@ fun LogViewerScreen(viewModel: LogViewerViewModel, onNavigateBack: () -> Unit) {
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Text(
-                        "Level: ${filterLevel!!.name}",
+                        stringResource(R.string.label_level_filter, filterLevel!!.name),
                         style = MaterialTheme.typography.labelMedium,
                         color = getLogLevelColor(filterLevel!!),
                     )
@@ -178,7 +182,8 @@ fun LogViewerScreen(viewModel: LogViewerViewModel, onNavigateBack: () -> Unit) {
                     ) {
                         Icon(
                             painterResource(R.drawable.ic_close_24dp),
-                            contentDescription = "Clear level filter",
+                            contentDescription =
+                                stringResource(R.string.content_desc_clear_level_filter),
                         )
                     }
                 }

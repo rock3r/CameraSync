@@ -10,6 +10,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.juul.khronicle.Log
+import dev.sebastiano.camerasync.R
 import dev.sebastiano.camerasync.devicesync.MultiDeviceSyncService
 import dev.sebastiano.camerasync.domain.model.DeviceConnectionState
 import dev.sebastiano.camerasync.domain.model.GpsLocation
@@ -62,7 +63,8 @@ class DevicesListViewModel(
     private val deviceStatesFromService =
         MutableStateFlow<Map<String, DeviceConnectionState>>(emptyMap())
     private val isScanningFromService = MutableStateFlow(false)
-    private val batteryOptimizationStatus = MutableStateFlow(false)
+    // Initialize to true to avoid "flash" of warning on startup before check completes
+    private val batteryOptimizationStatus = MutableStateFlow(true)
     private var stateCollectionJob: Job? = null
     private var scanningCollectionJob: Job? = null
     private var serviceRunningJob: Job? = null
@@ -350,20 +352,23 @@ class DevicesListViewModel(
     private fun computeDeviceDisplayInfo(
         devices: List<PairedDevice>
     ): Map<String, DeviceDisplayInfo> {
+        val unknownString = context.getString(R.string.label_unknown)
+
         // Group devices by make/model to determine if we need to show pairing names
         val makeModelGroups =
             devices.groupBy { device ->
                 val vendor = vendorRegistry.getVendorById(device.vendorId)
                 val make = vendor?.vendorName ?: device.vendorId.replaceFirstChar { it.uppercase() }
                 val model =
-                    vendor?.extractModelFromPairingName(device.name) ?: device.name ?: "Unknown"
+                    vendor?.extractModelFromPairingName(device.name) ?: device.name ?: unknownString
                 MakeModel(make, model)
             }
 
         return devices.associate { device ->
             val vendor = vendorRegistry.getVendorById(device.vendorId)
             val make = vendor?.vendorName ?: device.vendorId.replaceFirstChar { it.uppercase() }
-            val model = vendor?.extractModelFromPairingName(device.name) ?: device.name ?: "Unknown"
+            val model =
+                vendor?.extractModelFromPairingName(device.name) ?: device.name ?: unknownString
             val makeModel = MakeModel(make, model)
             val showPairingName = (makeModelGroups[makeModel]?.size ?: 0) > 1
 

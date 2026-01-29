@@ -1,6 +1,8 @@
 package dev.sebastiano.camerasync.devicesync
 
+import android.content.Context
 import dev.sebastiano.camerasync.CameraSyncApp
+import dev.sebastiano.camerasync.R
 import dev.sebastiano.camerasync.domain.model.DeviceConnectionState
 import dev.sebastiano.camerasync.domain.model.GpsLocation
 import dev.sebastiano.camerasync.domain.model.PairedDevice
@@ -12,6 +14,7 @@ import dev.sebastiano.camerasync.fakes.FakeLocationCollector
 import dev.sebastiano.camerasync.fakes.FakePairedDevicesRepository
 import dev.sebastiano.camerasync.fakes.FakeVendorRegistry
 import dev.sebastiano.camerasync.pairing.CompanionDeviceManagerHelper
+import io.mockk.every
 import io.mockk.mockk
 import java.time.ZoneId
 import java.time.ZonedDateTime
@@ -39,6 +42,7 @@ class MultiDeviceSyncCoordinatorTest {
     private lateinit var vendorRegistry: FakeVendorRegistry
     private lateinit var pairedDevicesRepository: FakePairedDevicesRepository
     private lateinit var companionDeviceManagerHelper: CompanionDeviceManagerHelper
+    private lateinit var context: Context
     private lateinit var testScope: TestScope
     private lateinit var coordinator: MultiDeviceSyncCoordinator
 
@@ -78,11 +82,14 @@ class MultiDeviceSyncCoordinatorTest {
         vendorRegistry = FakeVendorRegistry()
         pairedDevicesRepository = FakePairedDevicesRepository()
         companionDeviceManagerHelper = mockk(relaxed = true)
+        context = mockk(relaxed = true)
+        every { context.getString(R.string.error_unknown_vendor) } returns "Unknown camera vendor"
 
         testScope = TestScope(UnconfinedTestDispatcher())
 
         coordinator =
             MultiDeviceSyncCoordinator(
+                context = context,
                 cameraRepository = cameraRepository,
                 locationCollector = locationCollector,
                 vendorRegistry = vendorRegistry,
@@ -305,6 +312,7 @@ class MultiDeviceSyncCoordinatorTest {
         val timeoutTestScope = TestScope(testDispatcher)
         val timeoutCoordinator =
             MultiDeviceSyncCoordinator(
+                context = context,
                 cameraRepository = cameraRepository,
                 locationCollector = locationCollector,
                 vendorRegistry = vendorRegistry,

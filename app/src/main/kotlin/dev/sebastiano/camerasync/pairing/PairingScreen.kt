@@ -45,6 +45,7 @@ import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
@@ -96,14 +97,17 @@ fun PairingScreen(
             TopAppBar(
                 title = {
                     Text(
-                        "Add Camera",
+                        stringResource(R.string.pairing_title),
                         style = MaterialTheme.typography.headlineMedium,
                         fontWeight = FontWeight.Bold,
                     )
                 },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
-                        Icon(painterResource(R.drawable.ic_arrow_back_24dp), "Back")
+                        Icon(
+                            painterResource(R.drawable.ic_arrow_back_24dp),
+                            stringResource(R.string.content_desc_back),
+                        )
                     }
                 },
             )
@@ -114,7 +118,7 @@ fun PairingScreen(
                 contentAlignment = Alignment.Center,
             ) {
                 Text(
-                    text = "Having issues? Let us know",
+                    text = stringResource(R.string.pairing_feedback),
                     color = MaterialTheme.colorScheme.primary,
                     style = MaterialTheme.typography.bodyMedium,
                     modifier = Modifier.clickable { viewModel.sendFeedback() },
@@ -168,7 +172,7 @@ private fun IdleContent(modifier: Modifier = Modifier, onStartPairing: () -> Uni
             Spacer(Modifier.height(24.dp))
 
             Text(
-                "Ready to pair",
+                stringResource(R.string.ready_to_pair_title),
                 style = MaterialTheme.typography.headlineMedium,
                 fontWeight = FontWeight.Bold,
             )
@@ -176,7 +180,7 @@ private fun IdleContent(modifier: Modifier = Modifier, onStartPairing: () -> Uni
             Spacer(Modifier.height(12.dp))
 
             Text(
-                "Use Android's pairing flow to select a camera from the system list.",
+                stringResource(R.string.ready_to_pair_subtitle),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center,
@@ -191,7 +195,7 @@ private fun IdleContent(modifier: Modifier = Modifier, onStartPairing: () -> Uni
                     modifier = Modifier.size(18.dp),
                 )
                 Spacer(Modifier.width(8.dp))
-                Text("Pair using Android System")
+                Text(stringResource(R.string.action_pair_system))
             }
         }
     }
@@ -219,7 +223,7 @@ private fun AlreadyBondedContent(
             Spacer(Modifier.height(24.dp))
 
             Text(
-                "Camera Already Paired",
+                stringResource(R.string.bonded_dialog_title),
                 style = MaterialTheme.typography.headlineMedium,
                 fontWeight = FontWeight.Bold,
             )
@@ -229,13 +233,9 @@ private fun AlreadyBondedContent(
             Text(
                 text =
                     if (removeFailed) {
-                        "This camera is already paired to your phone at the system level. " +
-                            "Please remove the existing pairing from your phone's Bluetooth settings, " +
-                            "then try again."
+                        stringResource(R.string.bonded_dialog_remove_failed)
                     } else {
-                        "This camera is already paired to your phone at the system level. " +
-                            "This can interfere with the app's connection. " +
-                            "Would you like to remove the existing pairing?"
+                        stringResource(R.string.bonded_dialog_message)
                     },
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -245,16 +245,21 @@ private fun AlreadyBondedContent(
             Spacer(Modifier.height(32.dp))
 
             Row {
-                TextButton(onClick = onCancel) { Text("Cancel") }
+                TextButton(onClick = onCancel) { Text(stringResource(R.string.action_cancel)) }
 
                 Spacer(Modifier.width(16.dp))
 
                 if (!removeFailed) {
                     Button(onClick = onRemoveBond) {
-                        Text("Remove Pairing", fontWeight = FontWeight.SemiBold)
+                        Text(
+                            stringResource(R.string.action_remove_pairing),
+                            fontWeight = FontWeight.SemiBold,
+                        )
                     }
                 } else {
-                    TextButton(onClick = onCancel) { Text("OK", fontWeight = FontWeight.SemiBold) }
+                    TextButton(onClick = onCancel) {
+                        Text(stringResource(R.string.action_ok), fontWeight = FontWeight.SemiBold)
+                    }
                 }
             }
         }
@@ -314,7 +319,7 @@ private fun PairingFailed(error: PairingError, onCancel: () -> Unit, onRetry: ()
         Spacer(Modifier.height(24.dp))
 
         Text(
-            "Pairing failed",
+            stringResource(R.string.pairing_failed_title),
             style = MaterialTheme.typography.headlineMedium,
             fontWeight = FontWeight.Bold,
             color = MaterialTheme.colorScheme.error,
@@ -325,13 +330,11 @@ private fun PairingFailed(error: PairingError, onCancel: () -> Unit, onRetry: ()
         Text(
             text =
                 when (error) {
-                    PairingError.REJECTED ->
-                        "The camera rejected the pairing request. Make sure Bluetooth pairing is enabled on your camera."
+                    PairingError.REJECTED -> stringResource(R.string.error_pairing_rejected)
 
-                    PairingError.TIMEOUT ->
-                        "Connection timed out. Make sure the camera is nearby and Bluetooth is enabled."
+                    PairingError.TIMEOUT -> stringResource(R.string.error_pairing_timeout)
 
-                    PairingError.UNKNOWN -> "An unexpected error occurred. Please try again."
+                    PairingError.UNKNOWN -> stringResource(R.string.error_pairing_unknown)
                 },
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -341,11 +344,13 @@ private fun PairingFailed(error: PairingError, onCancel: () -> Unit, onRetry: ()
         Spacer(Modifier.height(32.dp))
 
         Row {
-            TextButton(onClick = onCancel) { Text("Cancel") }
+            TextButton(onClick = onCancel) { Text(stringResource(R.string.action_cancel)) }
 
             Spacer(Modifier.width(16.dp))
 
-            TextButton(onClick = onRetry) { Text("Retry", fontWeight = FontWeight.SemiBold) }
+            TextButton(onClick = onRetry) {
+                Text(stringResource(R.string.action_retry), fontWeight = FontWeight.SemiBold)
+            }
         }
     }
 }
@@ -409,7 +414,7 @@ private fun PairingInProgress(deviceName: String, onCancel: () -> Unit) {
         Spacer(Modifier.height(32.dp))
 
         Text(
-            "Pairing with $deviceName...",
+            stringResource(R.string.pairing_in_progress_title, deviceName),
             style = MaterialTheme.typography.headlineSmall,
             fontWeight = FontWeight.SemiBold,
         )
@@ -417,7 +422,7 @@ private fun PairingInProgress(deviceName: String, onCancel: () -> Unit) {
         Spacer(Modifier.height(12.dp))
 
         Text(
-            "Please wait while we connect to your camera.",
+            stringResource(R.string.pairing_in_progress_subtitle),
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center,
@@ -425,7 +430,7 @@ private fun PairingInProgress(deviceName: String, onCancel: () -> Unit) {
 
         Spacer(Modifier.height(32.dp))
 
-        TextButton(onClick = onCancel) { Text("Cancel") }
+        TextButton(onClick = onCancel) { Text(stringResource(R.string.action_cancel)) }
     }
 }
 
