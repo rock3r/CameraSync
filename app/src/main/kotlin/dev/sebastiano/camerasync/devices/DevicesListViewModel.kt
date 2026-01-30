@@ -53,6 +53,7 @@ class DevicesListViewModel(
     private val companionDeviceManagerHelper: CompanionDeviceManagerHelper,
     private val issueReporter: IssueReporter,
     private val batteryOptimizationChecker: BatteryOptimizationChecker,
+    private val intentFactory: dev.sebastiano.camerasync.devicesync.IntentFactory,
     private val ioDispatcher: CoroutineDispatcher,
 ) : ViewModel() {
 
@@ -154,7 +155,7 @@ class DevicesListViewModel(
     }
 
     private fun bindToRunningService() {
-        val intent = Intent(context, MultiDeviceSyncService::class.java)
+        val intent = intentFactory.createStartIntent(context)
         if (serviceConnection != null || isServiceBound) return
 
         val connection =
@@ -252,7 +253,7 @@ class DevicesListViewModel(
                                 return@collect
                             }
                             try {
-                                val intent = MultiDeviceSyncService.createRefreshIntent(context)
+                                val intent = intentFactory.createRefreshIntent(context)
                                 ContextCompat.startForegroundService(context, intent)
                                 autoStartTriggered = true
                             } catch (e: Exception) {
@@ -263,6 +264,25 @@ class DevicesListViewModel(
                         }
                     }
             }
+    }
+
+    /** Sets whether sync is globally enabled. */
+    fun setSyncEnabled(enabled: Boolean) {
+        viewModelScope.launch(ioDispatcher) {
+            pairedDevicesRepository.setSyncEnabled(enabled)
+            if (enabled) {
+                // If enabling, explicitly start/refresh the service
+                try {
+                    val intent = intentFactory.createRefreshIntent(context)
+                    ContextCompat.startForegroundService(context, intent)
+                } catch (e: Exception) {
+                    // Ignore service start errors (e.g. background restrictions)
+                    // The user will see a warning or it will retry later
+                    Log.warn(tag = TAG, throwable = e) { "Failed to start service when enabling sync" }
+                }
+            }
+            // If disabling, the service will observe the repository change and stop itself
+        }
     }
 
     /** Sets whether a device is enabled for sync. */
@@ -303,7 +323,7 @@ class DevicesListViewModel(
     fun refreshConnections() {
         viewModelScope.launch(ioDispatcher) {
             pairedDevicesRepository.setSyncEnabled(true)
-            val intent = MultiDeviceSyncService.createRefreshIntent(context)
+            val intent = intentFactory.createRefreshIntent(context)
             ContextCompat.startForegroundService(context, intent)
         }
     }

@@ -60,6 +60,10 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.TooltipBox
+import androidx.compose.material3.TooltipDefaults
+import androidx.compose.material3.PlainTooltip
+import androidx.compose.material3.rememberTooltipState
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -159,11 +163,21 @@ fun DevicesListScreen(
                 },
                 actions = {
                     val currentState = state
+                    val isSyncEnabled =
+                        currentState is DevicesListState.HasDevices && currentState.isSyncEnabled
+
+                    // Sync toggle switch
+                    Switch(
+                        checked = isSyncEnabled,
+                        onCheckedChange = { viewModel.setSyncEnabled(it) },
+                        modifier = Modifier.padding(end = 8.dp),
+                    )
+
                     if (currentState is DevicesListState.HasDevices) {
                         val hasEnabledCameras = currentState.devices.any { it.device.isEnabled }
                         IconButton(
                             onClick = { viewModel.refreshConnections() },
-                            enabled = hasEnabledCameras,
+                            enabled = hasEnabledCameras && isSyncEnabled,
                         ) {
                             Icon(
                                 painterResource(R.drawable.ic_refresh_24dp),
@@ -200,11 +214,39 @@ fun DevicesListScreen(
             )
         },
         floatingActionButton = {
-            FloatingActionButton(onClick = onAddDeviceClick) {
-                Icon(
-                    painterResource(R.drawable.ic_add_camera_24dp),
-                    contentDescription = stringResource(R.string.content_desc_add_device),
-                )
+            val currentState = state
+            val isSyncEnabled =
+                currentState is DevicesListState.HasDevices && currentState.isSyncEnabled
+
+            if (isSyncEnabled) {
+                FloatingActionButton(onClick = onAddDeviceClick) {
+                    Icon(
+                        painterResource(R.drawable.ic_add_camera_24dp),
+                        contentDescription = stringResource(R.string.content_desc_add_device),
+                    )
+                }
+            } else {
+                // Wrap in tooltip when disabled
+                TooltipBox(
+                    positionProvider = TooltipDefaults.rememberPlainTooltipPositionProvider(),
+                    tooltip = {
+                        PlainTooltip {
+                            Text(stringResource(R.string.tooltip_sync_disabled_pairing))
+                        }
+                    },
+                    state = rememberTooltipState(),
+                ) {
+                    FloatingActionButton(
+                        onClick = {}, // No-op when disabled
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                        contentColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f),
+                    ) {
+                        Icon(
+                            painterResource(R.drawable.ic_add_camera_24dp),
+                            contentDescription = stringResource(R.string.content_desc_add_device_disabled),
+                        )
+                    }
+                }
             }
         },
     ) { innerPadding ->
@@ -237,8 +279,7 @@ fun DevicesListScreen(
 
                         if (!currentState.isSyncEnabled) {
                             SyncStoppedWarning(
-                                onRefreshClick = { viewModel.refreshConnections() },
-                                enabled = currentState.devices.any { it.device.isEnabled },
+                                onRefreshClick = { viewModel.setSyncEnabled(true) },
                                 modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
                             )
                         }
@@ -900,7 +941,6 @@ private fun BatteryOptimizationWarning(onEnableClick: () -> Unit, modifier: Modi
 private fun SyncStoppedWarning(
     onRefreshClick: () -> Unit,
     modifier: Modifier = Modifier,
-    enabled: Boolean = true,
 ) {
     Card(
         modifier = modifier.fillMaxWidth(),
@@ -931,11 +971,8 @@ private fun SyncStoppedWarning(
                 )
             }
 
-            IconButton(onClick = onRefreshClick, enabled = enabled) {
-                Icon(
-                    painterResource(R.drawable.ic_refresh_24dp),
-                    contentDescription = stringResource(R.string.content_desc_resume_searching),
-                )
+            TextButton(onClick = onRefreshClick) {
+                Text(stringResource(R.string.action_enable_sync))
             }
         }
     }

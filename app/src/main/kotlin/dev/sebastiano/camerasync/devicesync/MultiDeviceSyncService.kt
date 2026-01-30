@@ -228,7 +228,8 @@ class MultiDeviceSyncService(
                     pairedDevicesRepository.enabledDevices,
                     syncCoordinator.presentDevices,
                     syncCoordinator.isScanning,
-                ) { deviceStates, enabledDevices, presentDevices, isScanning ->
+                    pairedDevicesRepository.isSyncEnabled,
+                ) { deviceStates, enabledDevices, presentDevices, isScanning, isSyncEnabled ->
                     val connectedCount =
                         deviceStates.count { (_, state) ->
                             state is DeviceConnectionState.Connected ||
@@ -248,18 +249,19 @@ class MultiDeviceSyncService(
                         vibrator.vibrate()
                     }
 
-                    Quintuple(
+                    Sextuple(
                         connectedCount,
                         enabledDevices.size,
                         presentCount,
                         isScanning,
                         lastSyncTime,
+                        isSyncEnabled,
                     )
                 }
-                .collect { (connectedCount, enabledCount, presentCount, isScanning, lastSyncTime) ->
-                    // Only stop service if there are NO enabled devices
-                    if (enabledCount == 0) {
-                        Log.info(tag = TAG) { "No enabled devices, stopping service" }
+                .collect { (connectedCount, enabledCount, presentCount, isScanning, lastSyncTime, isSyncEnabled) ->
+                    // Only stop service if there are NO enabled devices OR sync is disabled
+                    if (enabledCount == 0 || !isSyncEnabled) {
+                        Log.info(tag = TAG) { "Stopping service (enabledCount=$enabledCount, isSyncEnabled=$isSyncEnabled)" }
                         stopAllAndShutdown()
                         return@collect
                     }
@@ -474,12 +476,13 @@ class MultiDeviceSyncService(
     }
 }
 
-private data class Quintuple<A, B, C, D, E>(
+private data class Sextuple<A, B, C, D, E, F>(
     val first: A,
     val second: B,
     val third: C,
     val fourth: D,
     val fifth: E,
+    val sixth: F,
 )
 
 /** Represents the state of the multi-device sync service. */

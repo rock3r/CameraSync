@@ -50,11 +50,14 @@
     <string name="warning_battery_opt_title">App is battery optimized</string>
     <string name="warning_battery_opt_subtitle">Background sync may be unreliable.</string>
     <string name="action_disable">Disable</string>
-    <string name="warning_sync_stopped_title">Searching stopped</string>
-    <string name="warning_sync_stopped_subtitle">Tap to resume searching for cameras</string>
+    <string name="action_enable_sync">Turn On</string>
+    <string name="warning_sync_stopped_title">Sync is off</string>
+    <string name="warning_sync_stopped_subtitle">Turn on sync to find and connect to cameras.</string>
     <string name="content_desc_resume_searching">Resume searching</string>
     <string name="acquiring_location">Acquiring location…</string>
     <string name="content_desc_user_location">User location</string>
+    <string name="tooltip_sync_disabled_pairing">Turn on sync to pair new cameras</string>
+    <string name="content_desc_add_device_disabled">Add device (disabled)</string>
 
     <!-- Pairing Screen -->
     <string name="pairing_title">Add Camera</string>
