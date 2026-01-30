@@ -23,6 +23,7 @@ navigation3 = "1.0.0"
 protobufPlugin = "0.9.6"
 protobuf = "4.33.2"
 playServicesLocation = "21.3.0"
+workRuntimeKtx = "2.10.0"
 
 [libraries]
 androidx-navigation3-runtime = { group = "androidx.navigation3", name = "navigation3-runtime", version.ref = "navigation3" }
@@ -47,6 +48,7 @@ androidx-ui-test-junit4 = { group = "androidx.compose.ui", name = "ui-test-junit
 androidx-ui-test-manifest = { group = "androidx.compose.ui", name = "ui-test-manifest" }
 androidx-ui-tooling = { group = "androidx.compose.ui", name = "ui-tooling" }
 androidx-ui-tooling-preview = { group = "androidx.compose.ui", name = "ui-tooling-preview" }
+androidx-work-runtime-ktx = { group = "androidx.work", name = "work-runtime-ktx", version.ref = "workRuntimeKtx" }
 junit = { group = "junit", name = "junit", version.ref = "junit" }
 kable = { module = "com.juul.kable:kable-core", version.ref = "kable" }
 khronicle-core = { group = "com.juul.khronicle", name = "khronicle-core", version.ref = "khronicle" }

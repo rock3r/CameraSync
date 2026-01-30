@@ -97,6 +97,13 @@
             </intent-filter>
         </receiver>
 
+        <receiver
+            android:name=".ble.ScanReceiver"
+            android:exported="true">
+            <!-- No intent filter needed as it's targeted by PendingIntent class name, 
+                 but we export it so the system can call it. -->
+        </receiver>
+
         <activity
             android:name=".MainActivity"
             android:exported="true"

@@ -45,6 +45,19 @@ class FakeCameraRepository : CameraRepository {
         stopScanningCalled = true
     }
 
+    var startPassiveScanCalled = false
+        private set
+    var stopPassiveScanCalled = false
+        private set
+
+    override fun startPassiveScan(pendingIntent: android.app.PendingIntent) {
+        startPassiveScanCalled = true
+    }
+
+    override fun stopPassiveScan(pendingIntent: android.app.PendingIntent) {
+        stopPassiveScanCalled = true
+    }
+
     override fun findCameraByMacAddress(macAddress: String): Flow<Camera> = flow {
         cameraToReturn?.let { emit(it) }
     }

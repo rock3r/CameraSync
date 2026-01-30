@@ -1,9 +1,12 @@
 package dev.sebastiano.camerasync.devicesync
 
+import android.app.PendingIntent
 import android.content.Context
+import android.content.Intent
 import android.os.Build
 import com.juul.khronicle.Log
 import dev.sebastiano.camerasync.R
+import dev.sebastiano.camerasync.ble.ScanReceiver
 import dev.sebastiano.camerasync.domain.model.Camera
 import dev.sebastiano.camerasync.domain.model.DeviceConnectionState
 import dev.sebastiano.camerasync.domain.model.GpsLocation
@@ -63,6 +66,7 @@ class MultiDeviceSyncCoordinator(
     private val pairedDevicesRepository: PairedDevicesRepository,
     private val companionDeviceManagerHelper:
         dev.sebastiano.camerasync.pairing.CompanionDeviceManagerHelper,
+    private val pendingIntentFactory: PendingIntentFactory,
     private val coroutineScope: CoroutineScope,
     private val deviceNameProvider: () -> String = {
         context.getString(R.string.default_device_name, Build.MODEL)
@@ -745,7 +749,37 @@ class MultiDeviceSyncCoordinator(
         }
     }
 
+    /** Starts the passive scan using PendingIntent. */
+    fun startPassiveScan() {
+        Log.info(tag = TAG) { "Starting passive scan" }
+        val scanReceiverIntent = Intent(context, ScanReceiver::class.java)
+        val pendingIntent =
+            pendingIntentFactory.createBroadcastPendingIntent(
+                context,
+                PASSIVE_SCAN_REQUEST_CODE,
+                scanReceiverIntent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_MUTABLE,
+            )
+        cameraRepository.startPassiveScan(pendingIntent)
+    }
+
+    /** Stops the passive scan. */
+    fun stopPassiveScan() {
+        Log.info(tag = TAG) { "Stopping passive scan" }
+        val scanReceiverIntent = Intent(context, ScanReceiver::class.java)
+        val pendingIntent =
+            pendingIntentFactory.createBroadcastPendingIntent(
+                context,
+                PASSIVE_SCAN_REQUEST_CODE,
+                scanReceiverIntent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_MUTABLE,
+            )
+        cameraRepository.stopPassiveScan(pendingIntent)
+    }
+
     companion object {
+        private const val PASSIVE_SCAN_REQUEST_CODE = 999
+
         /** Suspends until cancellation. Used to keep a coroutine alive. */
         private suspend fun awaitCancellation(): Nothing {
             while (true) {

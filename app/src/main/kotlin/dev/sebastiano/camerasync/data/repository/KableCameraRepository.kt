@@ -98,6 +98,58 @@ class KableCameraRepository(
         return scanner.advertisements.mapNotNull { it.toCamera() }
     }
 
+    override fun startPassiveScan(pendingIntent: android.app.PendingIntent) {
+        val adapter = BluetoothAdapter.getDefaultAdapter()
+        if (adapter == null || !adapter.isEnabled) {
+            Log.warn(tag = TAG) { "Bluetooth adapter not available or disabled, cannot start passive scan" }
+            return
+        }
+
+        try {
+            val scanner = adapter.bluetoothLeScanner
+            if (scanner == null) {
+                Log.warn(tag = TAG) { "Bluetooth LE scanner not available" }
+                return
+            }
+
+            val settings = ScanSettings.Builder()
+                .setScanMode(ScanSettings.SCAN_MODE_BALANCED)
+                .setCallbackType(ScanSettings.CALLBACK_TYPE_ALL_MATCHES)
+                .setMatchMode(ScanSettings.MATCH_MODE_STICKY)
+                .build()
+
+            // We need to filter by Service UUIDs to avoid waking up for every BLE device
+            val filters = vendorRegistry.getAllScanFilterUuids().map { uuid ->
+                 android.bluetooth.le.ScanFilter.Builder()
+                    .setServiceUuid(android.os.ParcelUuid(java.util.UUID.fromString(uuid.toString())))
+                    .build()
+            }
+            
+            Log.info(tag = TAG) { "Starting passive PendingIntent scan with ${filters.size} filters" }
+            scanner.startScan(filters, settings, pendingIntent)
+            
+        } catch (e: SecurityException) {
+            Log.error(tag = TAG, throwable = e) { "SecurityException starting passive scan" }
+        } catch (e: Exception) {
+            Log.error(tag = TAG, throwable = e) { "Error starting passive scan" }
+        }
+    }
+
+    override fun stopPassiveScan(pendingIntent: android.app.PendingIntent) {
+        val adapter = BluetoothAdapter.getDefaultAdapter() ?: return
+        if (!adapter.isEnabled) return
+
+        try {
+            val scanner = adapter.bluetoothLeScanner
+            Log.info(tag = TAG) { "Stopping passive PendingIntent scan" }
+            scanner?.stopScan(pendingIntent)
+        } catch (e: SecurityException) {
+             Log.error(tag = TAG, throwable = e) { "SecurityException stopping passive scan" }
+        } catch (e: Exception) {
+            Log.error(tag = TAG, throwable = e) { "Error stopping passive scan" }
+        }
+    }
+
     override suspend fun connect(camera: Camera, onFound: (() -> Unit)?): CameraConnection {
         Log.info(tag = TAG) {
             "Looking for ${camera.name ?: camera.macAddress} (${camera.macAddress})"

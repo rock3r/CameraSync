@@ -19,4 +19,11 @@ class AndroidPendingIntentFactory : PendingIntentFactory {
         intent: Intent,
         flags: Int,
     ): PendingIntent = PendingIntent.getActivity(context, requestCode, intent, flags)
+
+    override fun createBroadcastPendingIntent(
+        context: Context,
+        requestCode: Int,
+        intent: Intent,
+        flags: Int,
+    ): PendingIntent = PendingIntent.getBroadcast(context, requestCode, intent, flags)
 }

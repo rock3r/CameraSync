@@ -19,4 +19,11 @@ interface PendingIntentFactory {
         intent: Intent,
         flags: Int,
     ): PendingIntent
+
+    fun createBroadcastPendingIntent(
+        context: Context,
+        requestCode: Int,
+        intent: Intent,
+        flags: Int,
+    ): PendingIntent
 }

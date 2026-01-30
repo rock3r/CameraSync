@@ -12,6 +12,7 @@ import dev.sebastiano.camerasync.fakes.FakeCameraVendor
 import dev.sebastiano.camerasync.fakes.FakeKhronicleLogger
 import dev.sebastiano.camerasync.fakes.FakeLocationCollector
 import dev.sebastiano.camerasync.fakes.FakePairedDevicesRepository
+import dev.sebastiano.camerasync.fakes.FakePendingIntentFactory
 import dev.sebastiano.camerasync.fakes.FakeVendorRegistry
 import dev.sebastiano.camerasync.pairing.CompanionDeviceManagerHelper
 import io.mockk.every
@@ -41,6 +42,7 @@ class MultiDeviceSyncCoordinatorTest {
     private lateinit var locationCollector: FakeLocationCollector
     private lateinit var vendorRegistry: FakeVendorRegistry
     private lateinit var pairedDevicesRepository: FakePairedDevicesRepository
+    private lateinit var pendingIntentFactory: FakePendingIntentFactory
     private lateinit var companionDeviceManagerHelper: CompanionDeviceManagerHelper
     private lateinit var context: Context
     private lateinit var testScope: TestScope
@@ -81,6 +83,7 @@ class MultiDeviceSyncCoordinatorTest {
         locationCollector = FakeLocationCollector()
         vendorRegistry = FakeVendorRegistry()
         pairedDevicesRepository = FakePairedDevicesRepository()
+        pendingIntentFactory = FakePendingIntentFactory()
         companionDeviceManagerHelper = mockk(relaxed = true)
         context = mockk(relaxed = true)
         every { context.getString(R.string.error_unknown_vendor) } returns "Unknown camera vendor"
@@ -95,6 +98,7 @@ class MultiDeviceSyncCoordinatorTest {
                 vendorRegistry = vendorRegistry,
                 pairedDevicesRepository = pairedDevicesRepository,
                 companionDeviceManagerHelper = companionDeviceManagerHelper,
+                pendingIntentFactory = pendingIntentFactory,
                 coroutineScope = testScope.backgroundScope,
                 deviceNameProvider = { "Test Device CameraSync" },
             )
@@ -318,6 +322,7 @@ class MultiDeviceSyncCoordinatorTest {
                 vendorRegistry = vendorRegistry,
                 pairedDevicesRepository = pairedDevicesRepository,
                 companionDeviceManagerHelper = companionDeviceManagerHelper,
+                pendingIntentFactory = pendingIntentFactory,
                 coroutineScope = timeoutTestScope,
             )
 
@@ -769,6 +774,31 @@ class MultiDeviceSyncCoordinatorTest {
             // Should still have 1 connected, but now only 1 enabled
             assertEquals(1, coordinator.getConnectedDeviceCount())
             assertTrue(coordinator.isDeviceConnected(testDevice1.macAddress))
+        }
+
+    @Test
+    fun `startPassiveScan creates PendingIntent and calls repository`() =
+        testScope.runTest {
+            coordinator.startPassiveScan()
+
+            assertEquals(1, pendingIntentFactory.calls.size)
+            // Can't check intent extras easily as we mock intent creation but can check request code/flags
+            val call = pendingIntentFactory.calls.first()
+            assertEquals(999, call.requestCode) // PASSIVE_SCAN_REQUEST_CODE
+
+            assertTrue(cameraRepository.startPassiveScanCalled)
+        }
+
+    @Test
+    fun `stopPassiveScan creates PendingIntent and calls repository`() =
+        testScope.runTest {
+            coordinator.stopPassiveScan()
+
+            assertEquals(1, pendingIntentFactory.calls.size)
+            val call = pendingIntentFactory.calls.first()
+            assertEquals(999, call.requestCode)
+
+            assertTrue(cameraRepository.stopPassiveScanCalled)
         }
 
     private fun PairedDevice.toTestCamera() =

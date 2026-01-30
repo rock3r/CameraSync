@@ -38,6 +38,12 @@ interface CameraRepository {
      * @return A [CameraConnection] for interacting with the connected camera.
      */
     suspend fun connect(camera: Camera, onFound: (() -> Unit)? = null): CameraConnection
+
+    /** Starts a passive scan using a PendingIntent. */
+    fun startPassiveScan(pendingIntent: android.app.PendingIntent)
+
+    /** Stops a passive scan. */
+    fun stopPassiveScan(pendingIntent: android.app.PendingIntent)
 }
 
 /**

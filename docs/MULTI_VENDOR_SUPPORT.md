@@ -158,6 +158,8 @@ object CanonCameraVendor : CameraVendor {
 
 Update `CameraSyncApp.kt` to register the new vendor:
 
+> **Important**: Registering a new vendor automatically updates the global BLE scan filters. The `KableCameraRepository` queries the registry for all vendor UUIDs at startup. Ensure your vendor's `scanFilterServiceUuids` are correct, or the scanner will filter out your devices.
+
 ```kotlin
 fun createVendorRegistry(): CameraVendorRegistry {
     return DefaultCameraVendorRegistry(

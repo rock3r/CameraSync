@@ -33,7 +33,7 @@ This document describes the architecture that enables CameraSync to manage multi
 │  LocationCollectionCoordinator                                  │
 │  - Centralized location collection                              │
 │  - Device registration for automatic start/stop                 │
-│  - 60-second update interval                                    │
+│  - 30-second update interval                                    │
 └─────────────────────────────────────────────────────────────────┘
                               │
                               ▼
@@ -114,7 +114,7 @@ interface LocationCollectionCoordinator : LocationCollector {
 - Automatically starts collecting when first device registers
 - Automatically stops when last device unregisters
 - Exposes `StateFlow<GpsLocation?>` for consumers
-- 60-second update interval
+- 30-second update interval
 
 ### 3. MultiDeviceSyncCoordinator
 
@@ -149,7 +149,7 @@ fun refreshConnections()
 - `startBackgroundMonitoring()` observes the enabled devices flow
 - Periodically checks for enabled but disconnected devices and connects them
 - **Automatically disconnects devices that are no longer enabled**
-- Runs every 60 seconds and on enabled devices flow changes
+- Runs every 30 seconds and on enabled devices flow changes
 
 **Connection States:**
 ```kotlin
@@ -381,6 +381,23 @@ The foreground service shows:
 - **Actions**: 
   - "Refresh" - Retry failed connections
   - "Stop all" - Disconnect all devices and stop service
+
+## Scanning Strategy
+
+The app currently uses a **Foreground Service** with periodic checks to maintain connections.
+
+### Current Implementation (Active Check)
+- The `MultiDeviceSyncService` runs continuously when "Sync Enabled" is true.
+- `MultiDeviceSyncCoordinator` runs a coroutine loop every 30 seconds.
+- It checks if any enabled devices are disconnected.
+- If disconnected, it triggers an active BLE scan/connect attempt.
+
+### Future Architecture (PendingIntent)
+To improve energy efficiency, the architecture is being migrated to:
+1. **Passive Scanning**: When no devices are connected, the Foreground Service stops.
+2. **PendingIntent**: The app registers a system-level BLE scan via `PendingIntent`.
+3. **Wake-up**: When a device is found, the system wakes the app, and the service restarts to handle the connection.
+4. **Safety Net**: A `WorkManager` job runs periodically (e.g., every 15m) to ensure the scan is still active if the system kills the app.
 
 ## Future Enhancements
 

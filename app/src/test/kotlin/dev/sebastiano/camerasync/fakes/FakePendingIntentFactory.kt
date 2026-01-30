@@ -62,4 +62,17 @@ class FakePendingIntentFactory : PendingIntentFactory {
         lastIntent = intent
         return mockk<PendingIntent>(relaxed = true)
     }
+
+    override fun createBroadcastPendingIntent(
+        context: Context,
+        requestCode: Int,
+        intent: Intent,
+        flags: Int,
+    ): PendingIntent {
+        val call = PendingIntentCall(requestCode, intent, flags)
+        _calls.add(call)
+        lastRequestCode = requestCode
+        lastIntent = intent
+        return mockk<PendingIntent>(relaxed = true)
+    }
 }
