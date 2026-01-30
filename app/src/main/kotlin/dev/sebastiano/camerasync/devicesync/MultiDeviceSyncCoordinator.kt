@@ -64,8 +64,6 @@ class MultiDeviceSyncCoordinator(
     private val locationCollector: LocationCollectionCoordinator,
     private val vendorRegistry: CameraVendorRegistry,
     private val pairedDevicesRepository: PairedDevicesRepository,
-    private val companionDeviceManagerHelper:
-        dev.sebastiano.camerasync.pairing.CompanionDeviceManagerHelper,
     private val pendingIntentFactory: PendingIntentFactory,
     private val coroutineScope: CoroutineScope,
     private val deviceNameProvider: () -> String = {
@@ -91,7 +89,7 @@ class MultiDeviceSyncCoordinator(
             }
             .stateIn(coroutineScope, SharingStarted.Eagerly, false)
 
-    /** Flow of devices reported as present by Companion Device Manager. */
+    /** Flow of devices currently present (inferred from connection state). */
     val presentDevices: StateFlow<Set<String>> = _presentDevices.asStateFlow()
 
     private val deviceJobs = mutableMapOf<String, Job>()
@@ -119,13 +117,12 @@ class MultiDeviceSyncCoordinator(
 
                 enabledDevices.collect { devices ->
                     enabledDevicesFlow.value = devices
-                    // Note: Presence observations are managed by PresenceObservationManager
-                    // We don't need to start them here - they're already active for all paired
-                    // devices.
 
                     // We perform an initial refresh (ignoring presence) the first time we see
-                    // enabled devices to ensure we try to connect to them even if Companion
-                    // Device Manager hasn't reported them as present yet.
+                    // enabled devices to ensure we try to connect to them proactively.
+                    // Presence is inferred from connection state, so we don't need external
+                    // presence
+                    // updates.
                     val shouldIgnorePresence = !initialRefreshDone && devices.isNotEmpty()
                     if (shouldIgnorePresence) {
                         Log.info(tag = TAG) {
@@ -182,7 +179,9 @@ class MultiDeviceSyncCoordinator(
                         Log.info(tag = TAG) {
                             "Periodic check: Found ${disconnectedDevices.size} disconnected devices (${disconnectedDevices.map { it.macAddress }}), attempting reconnect"
                         }
-                        // Use ignorePresence=true to force connection attempt even if CDM hasn't reported presence
+                        // Use ignorePresence=true to force connection attempt
+                        // Presence is inferred from connection state, so we proactively try to
+                        // reconnect
                         checkAndConnectEnabledDevices(ignorePresence = true)
                     }
                 }
@@ -299,28 +298,6 @@ class MultiDeviceSyncCoordinator(
         }
     }
 
-    /** Updates whether a device is currently present (in range). */
-    fun setDevicePresence(macAddress: String, isPresent: Boolean) {
-        val normalizedMac = macAddress.uppercase()
-        Log.info(tag = TAG) { "Presence update for $normalizedMac: isPresent=$isPresent" }
-        _presentDevices.update { current ->
-            if (isPresent) current + normalizedMac else current - normalizedMac
-        }
-        coroutineScope.launch {
-            if (isPresent) {
-                // When a device appears (e.g., camera turned on), give it time to start advertising
-                // before attempting to connect. Cameras may need 10-15 seconds after power-on
-                // before they're ready for BLE connections, especially if they were just turned on.
-                val delayMs = 10_000L
-                Log.info(tag = TAG) {
-                    "Device $normalizedMac appeared, waiting ${delayMs}ms before attempting connection to allow camera to start advertising"
-                }
-                delay(delayMs)
-            }
-            checkAndConnectEnabledDevices()
-        }
-    }
-
     /**
      * Starts syncing with a paired device.
      *
@@ -362,9 +339,6 @@ class MultiDeviceSyncCoordinator(
             // Set state to searching immediately before launching the job
             updateDeviceState(macAddress, DeviceConnectionState.Searching)
 
-            // Note: Presence observations are managed by PresenceObservationManager
-            // We don't need to start them here - they're already active for all paired devices.
-
             val job =
                 coroutineScope.launch {
                     try {
@@ -397,7 +371,7 @@ class MultiDeviceSyncCoordinator(
                         }
 
                         // Update presence state - device is clearly present since we connected
-                        // This is important because CDM callbacks may not fire reliably
+                        // Presence is inferred from connection state
                         _presentDevices.update { current -> current + macAddress.uppercase() }
                         Log.debug(tag = TAG) {
                             "Marked device $macAddress as present (successfully connected)"

@@ -14,13 +14,13 @@ import dev.sebastiano.camerasync.fakes.FakeLocationCollector
 import dev.sebastiano.camerasync.fakes.FakePairedDevicesRepository
 import dev.sebastiano.camerasync.fakes.FakePendingIntentFactory
 import dev.sebastiano.camerasync.fakes.FakeVendorRegistry
-import dev.sebastiano.camerasync.pairing.CompanionDeviceManagerHelper
 import io.mockk.every
 import io.mockk.mockk
 import java.time.ZoneId
 import java.time.ZonedDateTime
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
@@ -43,7 +43,6 @@ class MultiDeviceSyncCoordinatorTest {
     private lateinit var vendorRegistry: FakeVendorRegistry
     private lateinit var pairedDevicesRepository: FakePairedDevicesRepository
     private lateinit var pendingIntentFactory: FakePendingIntentFactory
-    private lateinit var companionDeviceManagerHelper: CompanionDeviceManagerHelper
     private lateinit var context: Context
     private lateinit var testScope: TestScope
     private lateinit var coordinator: MultiDeviceSyncCoordinator
@@ -84,7 +83,6 @@ class MultiDeviceSyncCoordinatorTest {
         vendorRegistry = FakeVendorRegistry()
         pairedDevicesRepository = FakePairedDevicesRepository()
         pendingIntentFactory = FakePendingIntentFactory()
-        companionDeviceManagerHelper = mockk(relaxed = true)
         context = mockk(relaxed = true)
         every { context.getString(R.string.error_unknown_vendor) } returns "Unknown camera vendor"
 
@@ -97,7 +95,6 @@ class MultiDeviceSyncCoordinatorTest {
                 locationCollector = locationCollector,
                 vendorRegistry = vendorRegistry,
                 pairedDevicesRepository = pairedDevicesRepository,
-                companionDeviceManagerHelper = companionDeviceManagerHelper,
                 pendingIntentFactory = pendingIntentFactory,
                 coroutineScope = testScope.backgroundScope,
                 deviceNameProvider = { "Test Device CameraSync" },
@@ -160,7 +157,7 @@ class MultiDeviceSyncCoordinatorTest {
         }
 
     @Test
-    fun `background monitoring connects only when device is present`() =
+    fun `background monitoring proactively connects enabled devices`() =
         testScope.runTest {
             pairedDevicesRepository.setTestDevices(listOf(testDevice1))
             cameraRepository.connectionToReturn = FakeCameraConnection(testDevice1.toTestCamera())
@@ -168,14 +165,8 @@ class MultiDeviceSyncCoordinatorTest {
             coordinator.startBackgroundMonitoring(pairedDevicesRepository.enabledDevices)
             advanceUntilIdle()
 
-            // We now expect 1 connection attempt even without presence because of the
-            // proactive startup connect logic.
-            assertEquals(1, cameraRepository.connectCallCount)
-
-            coordinator.setDevicePresence(testDevice1.macAddress, true)
-            advanceUntilIdle()
-
-            // Still 1, as it was already connected
+            // We expect 1 connection attempt because of the proactive startup connect logic
+            // which connects to enabled devices even without external presence updates
             assertEquals(1, cameraRepository.connectCallCount)
         }
 
@@ -321,27 +312,25 @@ class MultiDeviceSyncCoordinatorTest {
                 locationCollector = locationCollector,
                 vendorRegistry = vendorRegistry,
                 pairedDevicesRepository = pairedDevicesRepository,
-                companionDeviceManagerHelper = companionDeviceManagerHelper,
                 pendingIntentFactory = pendingIntentFactory,
                 coroutineScope = timeoutTestScope,
             )
 
         runTest(testDispatcher) {
-            // Set up a connection that will take longer than the 30s timeout
+            // Set up a connection that will take longer than the 90s timeout
             // The connectDelay will cause delay() to be called, which with StandardTestDispatcher
-            // requires time advancement. The withTimeout(30_000L) should trigger before the delay
+            // requires time advancement. The withTimeout(90_000L) should trigger before the delay
             // completes.
-            cameraRepository.connectDelay = 60_000L // Longer than 30s timeout
-            val connection = FakeCameraConnection(testDevice1.toTestCamera())
-            cameraRepository.connectionToReturn = connection
+            cameraRepository.connectDelay = 100_000L // Longer than 90s timeout
+            // Don't set connectionToReturn - this ensures the connection never completes
+            // and the timeout will trigger
+            cameraRepository.connectionToReturn = null
 
             timeoutCoordinator.startDeviceSync(testDevice1)
             // Run only immediately scheduled work, don't advance virtual time
             runCurrent()
 
             // Verify we're in Searching or Connecting state initially
-            // Note: With StandardTestDispatcher, if we don't advance time, the delay won't start
-            // and the timeout won't trigger yet, so we should be in Searching or Connecting
             val initialState = timeoutCoordinator.getDeviceState(testDevice1.macAddress)
             assertTrue(
                 "Expected Searching or Connecting state initially, but got: $initialState",
@@ -349,36 +338,22 @@ class MultiDeviceSyncCoordinatorTest {
                     initialState is DeviceConnectionState.Connecting,
             )
 
-            // Advance time to just before the timeout (29s) - should still be connecting
-            advanceTimeBy(29_000L)
+            // Advance time to just before the timeout (89s) - should still be connecting
+            advanceTimeBy(89_000L)
             advanceUntilIdle()
 
-            // Now advance past the 30s timeout threshold to trigger the
+            // Now advance past the 90s timeout threshold to trigger the
             // TimeoutCancellationException
-            // The withTimeout(30_000L) will timeout after 30 seconds total
-            advanceTimeBy(2_000L)
+            // The withTimeout(90_000L) will timeout after 90 seconds total
+            advanceTimeBy(5_000L) // Advance past the 90s timeout
             advanceUntilIdle()
 
-            // Verify the state is Unreachable after timeout
-            // Note: The timeout should have triggered by now, setting the state to Unreachable
+            // The timeout should have triggered by now, setting the state to Unreachable
             val state = timeoutCoordinator.getDeviceState(testDevice1.macAddress)
-
-            // If the state is not Unreachable, it might still be Connecting if the timeout hasn't
-            // triggered yet
-            // This can happen if the delay hasn't started when we advance time, or if withTimeout
-            // doesn't work as expected with StandardTestDispatcher. Let's check what we actually
-            // got.
-            if (state !is DeviceConnectionState.Unreachable) {
-                // The timeout might not have triggered yet - let's advance a bit more and check
-                // again
-                advanceTimeBy(5_000L)
-                advanceUntilIdle()
-                val finalState = timeoutCoordinator.getDeviceState(testDevice1.macAddress)
-                assertTrue(
-                    "Expected Unreachable state after timeout, but got: $finalState (initial: $initialState, after first advance: $state)",
-                    finalState is DeviceConnectionState.Unreachable,
-                )
-            }
+            assertTrue(
+                "Expected Unreachable state after timeout, but got: $state",
+                state is DeviceConnectionState.Unreachable,
+            )
         }
     }
 
@@ -549,9 +524,6 @@ class MultiDeviceSyncCoordinatorTest {
 
             assertTrue(coordinator.isDeviceConnected(testDevice1.macAddress))
 
-            coordinator.setDevicePresence(testDevice1.macAddress, true)
-            advanceUntilIdle()
-
             // Start background monitoring
             coordinator.startBackgroundMonitoring(pairedDevicesRepository.enabledDevices)
             advanceUntilIdle()
@@ -563,16 +535,18 @@ class MultiDeviceSyncCoordinatorTest {
             pairedDevicesRepository.setDeviceEnabled(testDevice1.macAddress, false)
             advanceUntilIdle()
 
-            // The collector should have processed the update and called
             // checkAndConnectEnabledDevices(), which calls stopDeviceSync
             // stopDeviceSync calls job.join() which waits for cleanup to complete
             // Give it time to complete the cleanup
+            // Since we're using UnconfinedTestDispatcher, advanceUntilIdle should be enough,
+            // but let's be explicit about ensuring coroutines complete
             advanceUntilIdle()
 
             // Wait a bit more to ensure cleanup has updated the state
             advanceUntilIdle()
 
             // Device should be disconnected
+            // Note: Since stopDeviceSync is called, it should cancel the job and update state
             val state = coordinator.getDeviceState(testDevice1.macAddress)
             assertFalse(
                 "Device should be disconnected, but isDeviceConnected returned true. State: $state",
@@ -588,40 +562,89 @@ class MultiDeviceSyncCoordinatorTest {
             val connection1 = FakeCameraConnection(testDevice1.toTestCamera())
             val connection2 = FakeCameraConnection(testDevice2.toTestCamera())
 
-            // Start with NO devices to avoid proactive connect at startup
-            pairedDevicesRepository.setTestDevices(emptyList())
-            coordinator.startBackgroundMonitoring(pairedDevicesRepository.enabledDevices)
-            advanceUntilIdle()
-
             // Setup connections in the repository BEFORE adding devices
             cameraRepository.setConnectionForMac(testDevice1.macAddress, connection1)
             cameraRepository.setConnectionForMac(testDevice2.macAddress, connection2)
 
-            // Now add both devices as enabled
+            // Add both devices as enabled
             pairedDevicesRepository.addTestDevice(testDevice1)
             pairedDevicesRepository.addTestDevice(testDevice2)
+
+            // Connect device1 directly via startDeviceSync (like the working test)
+            coordinator.startDeviceSync(testDevice1)
             advanceUntilIdle()
 
-            // Connect device1 via presence
-            coordinator.setDevicePresence(testDevice1.macAddress, true)
+            // Connect device2 directly via startDeviceSync
+            coordinator.startDeviceSync(testDevice2)
             advanceUntilIdle()
 
-            // Connect device2 via presence
-            coordinator.setDevicePresence(testDevice2.macAddress, true)
+            // Verify both devices are connected
+            assertTrue(
+                "Device1 should be connected",
+                coordinator.isDeviceConnected(testDevice1.macAddress),
+            )
+            assertTrue(
+                "Device2 should be connected",
+                coordinator.isDeviceConnected(testDevice2.macAddress),
+            )
+
+            // Start background monitoring AFTER devices are connected
+            // This matches the pattern from the working test
+            coordinator.startBackgroundMonitoring(pairedDevicesRepository.enabledDevices)
             advanceUntilIdle()
 
-            assertTrue(coordinator.isDeviceConnected(testDevice1.macAddress))
-            assertTrue(coordinator.isDeviceConnected(testDevice2.macAddress))
+            // Verify device1 is enabled before disabling
+            val enabledBefore = pairedDevicesRepository.enabledDevices.first()
+            assertTrue(
+                "Device1 should be enabled before disabling",
+                enabledBefore.any { it.macAddress == testDevice1.macAddress },
+            )
 
-            // Disable device1
+            // Disable device1 - this will trigger the enabledDevices flow to emit
+            // The background monitoring collector should automatically call
+            // checkAndConnectEnabledDevices() when the flow emits
             pairedDevicesRepository.setDeviceEnabled(testDevice1.macAddress, false)
             advanceUntilIdle()
 
-            // Device1 should be disconnected, device2 should remain connected
-            assertFalse(coordinator.isDeviceConnected(testDevice1.macAddress))
-            assertTrue(coordinator.isDeviceConnected(testDevice2.macAddress))
-            assertTrue(connection1.disconnectCalled)
-            assertFalse(connection2.disconnectCalled)
+            // checkAndConnectEnabledDevices() calls stopDeviceSync
+            // stopDeviceSync calls job.join() which waits for cleanup to complete
+            // Give it time to complete the cleanup
+            // Since we're using UnconfinedTestDispatcher, advanceUntilIdle should be enough,
+            // but let's be explicit about ensuring coroutines complete
+            advanceUntilIdle()
+
+            // Wait a bit more to ensure cleanup has updated the state
+            advanceUntilIdle()
+
+            // Verify disconnect was called on connection1
+            assertTrue(
+                "Connection1 should have been disconnected after device1 was disabled",
+                connection1.disconnectCalled,
+            )
+
+            // Now verify device1 is disconnected
+            val device1State = coordinator.getDeviceState(testDevice1.macAddress)
+            assertFalse(
+                "Device1 should be disconnected, but isDeviceConnected returned true. State: $device1State",
+                coordinator.isDeviceConnected(testDevice1.macAddress),
+            )
+            assertEquals(
+                "Device1 state should be Disconnected after being disabled",
+                DeviceConnectionState.Disconnected,
+                device1State,
+            )
+
+            // Verify device2 is still connected
+            assertTrue(
+                "Device2 should still be connected",
+                coordinator.isDeviceConnected(testDevice2.macAddress),
+            )
+
+            // Verify disconnect was NOT called on connection2
+            assertFalse(
+                "Connection2 should not have been disconnected",
+                connection2.disconnectCalled,
+            )
         }
 
     @Test
@@ -688,22 +711,23 @@ class MultiDeviceSyncCoordinatorTest {
             pairedDevicesRepository.addTestDevice(testDevice1)
             pairedDevicesRepository.addTestDevice(testDevice2)
 
-            // Start background monitoring
-            coordinator.startBackgroundMonitoring(pairedDevicesRepository.enabledDevices)
-            advanceUntilIdle()
-
+            // Connect devices directly via startDeviceSync
             cameraRepository.connectionToReturn = connection1
-            coordinator.setDevicePresence(testDevice1.macAddress, true)
+            coordinator.startDeviceSync(testDevice1)
             advanceUntilIdle()
 
             cameraRepository.connectionToReturn = connection2
-            coordinator.setDevicePresence(testDevice2.macAddress, true)
+            coordinator.startDeviceSync(testDevice2)
             advanceUntilIdle()
 
             // Both should be connected
             assertEquals(2, coordinator.getConnectedDeviceCount())
             assertTrue(coordinator.isDeviceConnected(testDevice1.macAddress))
             assertTrue(coordinator.isDeviceConnected(testDevice2.macAddress))
+
+            // Start background monitoring after devices are connected
+            coordinator.startBackgroundMonitoring(pairedDevicesRepository.enabledDevices)
+            advanceUntilIdle()
 
             // Disable device1 - this will trigger the enabledDevices flow to emit
             // The background monitoring collector should automatically call
@@ -738,19 +762,17 @@ class MultiDeviceSyncCoordinatorTest {
             pairedDevicesRepository.addTestDevice(testDevice1)
             pairedDevicesRepository.addTestDevice(testDevice2)
 
-            // Make connection fail when no connection is set
+            // Make connection fail when no connection is set (before starting background
+            // monitoring)
             cameraRepository.failIfConnectionNull = true
             cameraRepository.connectionToReturn = null
 
-            coordinator.setDevicePresence(testDevice1.macAddress, true)
-            coordinator.setDevicePresence(testDevice2.macAddress, true)
-            advanceUntilIdle()
-
             // Start background monitoring to track enabled devices
+            // The proactive connection logic will attempt to connect, but it will fail
+            // and devices will end up in Error state
             coordinator.startBackgroundMonitoring(pairedDevicesRepository.enabledDevices)
             advanceUntilIdle()
 
-            // Initially both enabled, but connection fails so they end up in Error state
             // So the count should be 0 (only Connected or Syncing states are counted).
             assertEquals(0, coordinator.getConnectedDeviceCount())
 
@@ -782,7 +804,8 @@ class MultiDeviceSyncCoordinatorTest {
             coordinator.startPassiveScan()
 
             assertEquals(1, pendingIntentFactory.calls.size)
-            // Can't check intent extras easily as we mock intent creation but can check request code/flags
+            // Can't check intent extras easily as we mock intent creation but can check request
+            // code/flags
             val call = pendingIntentFactory.calls.first()
             assertEquals(999, call.requestCode) // PASSIVE_SCAN_REQUEST_CODE
 

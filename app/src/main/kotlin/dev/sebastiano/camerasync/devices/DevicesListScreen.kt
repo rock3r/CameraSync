@@ -56,15 +56,15 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.PlainTooltip
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TooltipBox
 import androidx.compose.material3.TooltipDefaults
-import androidx.compose.material3.PlainTooltip
-import androidx.compose.material3.rememberTooltipState
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.rememberTooltipState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -239,11 +239,13 @@ fun DevicesListScreen(
                     FloatingActionButton(
                         onClick = {}, // No-op when disabled
                         containerColor = MaterialTheme.colorScheme.surfaceVariant,
-                        contentColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f),
+                        contentColor =
+                            MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f),
                     ) {
                         Icon(
                             painterResource(R.drawable.ic_add_camera_24dp),
-                            contentDescription = stringResource(R.string.content_desc_add_device_disabled),
+                            contentDescription =
+                                stringResource(R.string.content_desc_add_device_disabled),
                         )
                     }
                 }
@@ -938,10 +940,7 @@ private fun BatteryOptimizationWarning(onEnableClick: () -> Unit, modifier: Modi
 }
 
 @Composable
-private fun SyncStoppedWarning(
-    onRefreshClick: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
+private fun SyncStoppedWarning(onRefreshClick: () -> Unit, modifier: Modifier = Modifier) {
     Card(
         modifier = modifier.fillMaxWidth(),
         shape = MaterialTheme.shapes.medium,

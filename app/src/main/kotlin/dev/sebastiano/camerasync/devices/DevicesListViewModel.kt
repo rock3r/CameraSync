@@ -2,7 +2,6 @@ package dev.sebastiano.camerasync.devices
 
 import android.content.ComponentName
 import android.content.Context
-import android.content.Intent
 import android.content.ServiceConnection
 import android.os.IBinder
 import androidx.compose.runtime.State
@@ -22,7 +21,6 @@ import dev.sebastiano.camerasync.domain.repository.PairedDevicesRepository
 import dev.sebastiano.camerasync.domain.vendor.CameraVendorRegistry
 import dev.sebastiano.camerasync.feedback.IssueReporter
 import dev.sebastiano.camerasync.pairing.BluetoothBondingChecker
-import dev.sebastiano.camerasync.pairing.CompanionDeviceManagerHelper
 import dev.sebastiano.camerasync.util.BatteryOptimizationChecker
 import dev.zacsweers.metro.Inject
 import kotlinx.coroutines.CoroutineDispatcher
@@ -50,7 +48,6 @@ class DevicesListViewModel(
     private val context: Context,
     private val vendorRegistry: CameraVendorRegistry,
     private val bluetoothBondingChecker: BluetoothBondingChecker,
-    private val companionDeviceManagerHelper: CompanionDeviceManagerHelper,
     private val issueReporter: IssueReporter,
     private val batteryOptimizationChecker: BatteryOptimizationChecker,
     private val intentFactory: dev.sebastiano.camerasync.devicesync.IntentFactory,
@@ -278,7 +275,9 @@ class DevicesListViewModel(
                 } catch (e: Exception) {
                     // Ignore service start errors (e.g. background restrictions)
                     // The user will see a warning or it will retry later
-                    Log.warn(tag = TAG, throwable = e) { "Failed to start service when enabling sync" }
+                    Log.warn(tag = TAG, throwable = e) {
+                        "Failed to start service when enabling sync"
+                    }
                 }
             }
             // If disabling, the service will observe the repository change and stop itself

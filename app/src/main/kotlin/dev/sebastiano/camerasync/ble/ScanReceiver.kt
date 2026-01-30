@@ -20,8 +20,10 @@ class ScanReceiver : BroadcastReceiver() {
         }
 
         if (callbackType != -1) {
-            Log.info(tag = TAG) { "Device found via PendingIntent scan (callback type: $callbackType)" }
-            
+            Log.info(tag = TAG) {
+                "Device found via PendingIntent scan (callback type: $callbackType)"
+            }
+
             // Start the service to handle the connection
             // We need to use startForegroundService because we might be in the background
             val serviceIntent = MultiDeviceSyncService.createDeviceFoundIntent(context)

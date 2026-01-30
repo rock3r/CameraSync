@@ -47,6 +47,7 @@ class FakeCameraRepository : CameraRepository {
 
     var startPassiveScanCalled = false
         private set
+
     var stopPassiveScanCalled = false
         private set
 

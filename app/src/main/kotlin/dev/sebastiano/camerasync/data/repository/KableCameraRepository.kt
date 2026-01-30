@@ -101,7 +101,9 @@ class KableCameraRepository(
     override fun startPassiveScan(pendingIntent: android.app.PendingIntent) {
         val adapter = BluetoothAdapter.getDefaultAdapter()
         if (adapter == null || !adapter.isEnabled) {
-            Log.warn(tag = TAG) { "Bluetooth adapter not available or disabled, cannot start passive scan" }
+            Log.warn(tag = TAG) {
+                "Bluetooth adapter not available or disabled, cannot start passive scan"
+            }
             return
         }
 
@@ -112,22 +114,27 @@ class KableCameraRepository(
                 return
             }
 
-            val settings = ScanSettings.Builder()
-                .setScanMode(ScanSettings.SCAN_MODE_BALANCED)
-                .setCallbackType(ScanSettings.CALLBACK_TYPE_ALL_MATCHES)
-                .setMatchMode(ScanSettings.MATCH_MODE_STICKY)
-                .build()
+            val settings =
+                ScanSettings.Builder()
+                    .setScanMode(ScanSettings.SCAN_MODE_BALANCED)
+                    .setCallbackType(ScanSettings.CALLBACK_TYPE_ALL_MATCHES)
+                    .setMatchMode(ScanSettings.MATCH_MODE_STICKY)
+                    .build()
 
             // We need to filter by Service UUIDs to avoid waking up for every BLE device
-            val filters = vendorRegistry.getAllScanFilterUuids().map { uuid ->
-                 android.bluetooth.le.ScanFilter.Builder()
-                    .setServiceUuid(android.os.ParcelUuid(java.util.UUID.fromString(uuid.toString())))
-                    .build()
+            val filters =
+                vendorRegistry.getAllScanFilterUuids().map { uuid ->
+                    android.bluetooth.le.ScanFilter.Builder()
+                        .setServiceUuid(
+                            android.os.ParcelUuid(java.util.UUID.fromString(uuid.toString()))
+                        )
+                        .build()
+                }
+
+            Log.info(tag = TAG) {
+                "Starting passive PendingIntent scan with ${filters.size} filters"
             }
-            
-            Log.info(tag = TAG) { "Starting passive PendingIntent scan with ${filters.size} filters" }
             scanner.startScan(filters, settings, pendingIntent)
-            
         } catch (e: SecurityException) {
             Log.error(tag = TAG, throwable = e) { "SecurityException starting passive scan" }
         } catch (e: Exception) {
@@ -144,7 +151,7 @@ class KableCameraRepository(
             Log.info(tag = TAG) { "Stopping passive PendingIntent scan" }
             scanner?.stopScan(pendingIntent)
         } catch (e: SecurityException) {
-             Log.error(tag = TAG, throwable = e) { "SecurityException stopping passive scan" }
+            Log.error(tag = TAG, throwable = e) { "SecurityException stopping passive scan" }
         } catch (e: Exception) {
             Log.error(tag = TAG, throwable = e) { "Error stopping passive scan" }
         }

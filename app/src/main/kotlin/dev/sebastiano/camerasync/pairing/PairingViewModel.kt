@@ -183,8 +183,8 @@ class PairingViewModel(
                 if (pairedDevicesRepository.isDevicePaired(camera.macAddress)) {
                     Log.info(tag = TAG) { "Device ${camera.macAddress} already paired" }
                     pairedDevicesRepository.setSyncEnabled(true)
-                    // Note: Presence observations are managed by PresenceObservationManager
-                    // It will automatically pick up this device since it watches pairedDevices flow
+                    // Presence is inferred from connection state, so the device will be connected
+                    // when background monitoring runs
                     _state.value = PairingScreenState.Idle
                     _navigationEvents.send(PairingNavigationEvent.DevicePaired)
                     return@launch
@@ -312,8 +312,8 @@ class PairingViewModel(
                     // Now add the device to the paired devices repository
                     pairedDevicesRepository.addDevice(camera, enabled = true)
                     pairedDevicesRepository.setSyncEnabled(true)
-                    // Note: Presence observations are managed by PresenceObservationManager
-                    // It will automatically pick up this device since it watches pairedDevices flow
+                    // Presence is inferred from connection state, so the device will be connected
+                    // when background monitoring runs
 
                     Log.info(tag = TAG) {
                         "Device paired successfully: ${camera.name ?: camera.macAddress}"

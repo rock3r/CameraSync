@@ -46,7 +46,6 @@ import dev.sebastiano.camerasync.feedback.IssueReporter
 import dev.sebastiano.camerasync.logging.LogViewerScreen
 import dev.sebastiano.camerasync.logging.LogViewerViewModel
 import dev.sebastiano.camerasync.pairing.BluetoothBondingChecker
-import dev.sebastiano.camerasync.pairing.CompanionDeviceManagerHelper
 import dev.sebastiano.camerasync.pairing.PairingScreen
 import dev.sebastiano.camerasync.pairing.PairingViewModel
 import dev.sebastiano.camerasync.permissions.PermissionsScreen
@@ -60,7 +59,6 @@ class MainActivity(
     private val vendorRegistry: CameraVendorRegistry,
     private val bluetoothBondingChecker: BluetoothBondingChecker,
     private val cameraRepository: CameraRepository,
-    private val companionDeviceManagerHelper: CompanionDeviceManagerHelper,
     private val issueReporter: IssueReporter,
 ) : ComponentActivity() {
 

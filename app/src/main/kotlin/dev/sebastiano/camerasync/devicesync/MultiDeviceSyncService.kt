@@ -25,7 +25,6 @@ import dev.sebastiano.camerasync.domain.repository.CameraRepository
 import dev.sebastiano.camerasync.domain.repository.LocationRepository
 import dev.sebastiano.camerasync.domain.repository.PairedDevicesRepository
 import dev.sebastiano.camerasync.domain.vendor.CameraVendorRegistry
-import dev.sebastiano.camerasync.pairing.CompanionDeviceManagerHelper
 import dev.zacsweers.metro.Inject
 import kotlin.coroutines.CoroutineContext
 import kotlinx.coroutines.CoroutineName
@@ -63,7 +62,6 @@ class MultiDeviceSyncService(
     private val notificationBuilder: NotificationBuilder,
     private val intentFactory: IntentFactory,
     private val pendingIntentFactory: PendingIntentFactory,
-    private val companionDeviceManagerHelper: CompanionDeviceManagerHelper,
     private val locationCollectorFactory: DefaultLocationCollector.Factory,
 ) : Service(), CoroutineScope {
 
@@ -81,7 +79,6 @@ class MultiDeviceSyncService(
             locationCollector = locationCollector,
             vendorRegistry = vendorRegistry,
             pairedDevicesRepository = pairedDevicesRepository,
-            companionDeviceManagerHelper = companionDeviceManagerHelper,
             pendingIntentFactory = pendingIntentFactory,
             coroutineScope = this,
         )
@@ -146,7 +143,9 @@ class MultiDeviceSyncService(
                 launch { refreshConnections() }
             }
             ACTION_DEVICE_FOUND -> {
-                Log.info(tag = TAG) { "Received device found intent, starting service and connecting..." }
+                Log.info(tag = TAG) {
+                    "Received device found intent, starting service and connecting..."
+                }
                 if (!checkPermissions()) return START_NOT_STICKY
                 startForegroundService()
                 startDeviceMonitoring()
@@ -200,9 +199,7 @@ class MultiDeviceSyncService(
         // Stop any existing passive scan when we become active
         syncCoordinator.stopPassiveScan()
 
-        // Note: Presence observations are managed by PresenceObservationManager in
-        // Application.onCreate()
-        // We don't need to start them here - they're already active for all paired devices.
+        // Presence is inferred from connection state, not from external observations.
 
         // Start background monitoring in the coordinator
         syncCoordinator.startBackgroundMonitoring(pairedDevicesRepository.enabledDevices)
@@ -219,7 +216,8 @@ class MultiDeviceSyncService(
 
         // Start state collection for notification updates
         stateCollectionJob = launch {
-            // Wait a bit to allow initial scan to start and avoid race condition where we think we are idle
+            // Wait a bit to allow initial scan to start and avoid race condition where we think we
+            // are idle
             // before the coordinator has a chance to set isScanning = true.
             kotlinx.coroutines.delay(2000)
 
@@ -258,20 +256,32 @@ class MultiDeviceSyncService(
                         isSyncEnabled,
                     )
                 }
-                .collect { (connectedCount, enabledCount, presentCount, isScanning, lastSyncTime, isSyncEnabled) ->
+                .collect {
+                    (
+                        connectedCount,
+                        enabledCount,
+                        presentCount,
+                        isScanning,
+                        lastSyncTime,
+                        isSyncEnabled) ->
                     // Only stop service if there are NO enabled devices OR sync is disabled
                     if (enabledCount == 0 || !isSyncEnabled) {
-                        Log.info(tag = TAG) { "Stopping service (enabledCount=$enabledCount, isSyncEnabled=$isSyncEnabled)" }
+                        Log.info(tag = TAG) {
+                            "Stopping service (enabledCount=$enabledCount, isSyncEnabled=$isSyncEnabled)"
+                        }
                         stopAllAndShutdown()
                         return@collect
                     }
 
-                    // Check for idle state: enabled devices exist, but none connected and not scanning.
-                    // We check for isScanning to ensure we don't stop while a connection attempt is in progress.
+                    // Check for idle state: enabled devices exist, but none connected and not
+                    // scanning.
+                    // We check for isScanning to ensure we don't stop while a connection attempt is
+                    // in progress.
                     val isActive =
                         connectedCount > 0 ||
                             isScanning ||
-                            // Also check if any device is in a transitional state that isScanning might miss
+                            // Also check if any device is in a transitional state that isScanning
+                            // might miss
                             // (though isScanning covers Connecting/Searching)
                             syncCoordinator.getConnectedDeviceCount() > 0
 
@@ -297,14 +307,14 @@ class MultiDeviceSyncService(
         Log.info(tag = TAG) { "Switching to passive scan and stopping foreground service" }
         // Start passive scan to wake us up when a device is found
         syncCoordinator.startPassiveScan()
-        
+
         // Stop the active parts of the service
         syncCoordinator.stopAllDevices()
         deviceMonitorJob?.cancel()
         deviceMonitorJob = null
         stateCollectionJob?.cancel()
         stateCollectionJob = null
-        
+
         _serviceState.value = MultiDeviceSyncServiceState.Stopped
         ServiceCompat.stopForeground(this, ServiceCompat.STOP_FOREGROUND_REMOVE)
         NotificationManagerCompat.from(this).cancel(NOTIFICATION_ID)
@@ -469,7 +479,9 @@ class MultiDeviceSyncService(
             Intent(context, MultiDeviceSyncService::class.java).apply { action = ACTION_REFRESH }
 
         fun createDeviceFoundIntent(context: Context): Intent =
-            Intent(context, MultiDeviceSyncService::class.java).apply { action = ACTION_DEVICE_FOUND }
+            Intent(context, MultiDeviceSyncService::class.java).apply {
+                action = ACTION_DEVICE_FOUND
+            }
 
         fun createStartIntent(context: Context): Intent =
             Intent(context, MultiDeviceSyncService::class.java)
