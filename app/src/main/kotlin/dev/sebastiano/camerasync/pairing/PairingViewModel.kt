@@ -328,6 +328,8 @@ class PairingViewModel(
                     Log.info(tag = TAG) {
                         "Device paired successfully: ${camera.name ?: camera.macAddress}"
                     }
+                    // Reset state to Idle before emitting navigation event
+                    _state.value = PairingScreenState.Idle
                     // Emit navigation event instead of setting success flag in state
                     _navigationEvents.send(PairingNavigationEvent.DevicePaired)
                 } catch (e: TimeoutCancellationException) {

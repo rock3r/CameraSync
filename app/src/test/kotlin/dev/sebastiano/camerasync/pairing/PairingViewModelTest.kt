@@ -125,6 +125,14 @@ class PairingViewModelTest {
     }
 
     @Test
+    fun `pairDevice resets state to Idle on success`() = runTest {
+        viewModel.pairDevice(testCamera)
+        advanceUntilIdle()
+
+        assertEquals(PairingScreenState.Idle, viewModel.state.value)
+    }
+
+    @Test
     fun `pairDevice establishes BLE connection before adding device to repository`() = runTest {
         val fakeConnection = FakeCameraConnection(testCamera)
         cameraRepository.connectionToReturn = fakeConnection
