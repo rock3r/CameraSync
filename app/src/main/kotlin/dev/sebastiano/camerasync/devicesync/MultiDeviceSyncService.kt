@@ -24,6 +24,7 @@ import dev.sebastiano.camerasync.domain.model.PairedDevice
 import dev.sebastiano.camerasync.domain.repository.CameraRepository
 import dev.sebastiano.camerasync.domain.repository.LocationRepository
 import dev.sebastiano.camerasync.domain.repository.PairedDevicesRepository
+import dev.sebastiano.camerasync.domain.repository.SyncStatusRepository
 import dev.sebastiano.camerasync.domain.vendor.CameraVendorRegistry
 import dev.zacsweers.metro.Inject
 import kotlin.coroutines.CoroutineContext
@@ -59,6 +60,7 @@ class MultiDeviceSyncService(
     private val locationRepository: LocationRepository,
     private val cameraRepository: CameraRepository,
     private val pairedDevicesRepository: PairedDevicesRepository,
+    private val syncStatusRepository: SyncStatusRepository,
     private val notificationBuilder: NotificationBuilder,
     private val intentFactory: IntentFactory,
     private val pendingIntentFactory: PendingIntentFactory,
@@ -264,6 +266,10 @@ class MultiDeviceSyncService(
                         isScanning,
                         lastSyncTime,
                         isSyncEnabled) ->
+
+                    // Update the shared sync status repository
+                    syncStatusRepository.updateConnectedDevicesCount(connectedCount)
+
                     // Only stop service if there are NO enabled devices OR sync is disabled
                     if (enabledCount == 0 || !isSyncEnabled) {
                         Log.info(tag = TAG) {
@@ -314,6 +320,9 @@ class MultiDeviceSyncService(
         deviceMonitorJob = null
         stateCollectionJob?.cancel()
         stateCollectionJob = null
+
+        // Reset connected count when service stops
+        syncStatusRepository.updateConnectedDevicesCount(0)
 
         _serviceState.value = MultiDeviceSyncServiceState.Stopped
         ServiceCompat.stopForeground(this, ServiceCompat.STOP_FOREGROUND_REMOVE)
@@ -370,6 +379,10 @@ class MultiDeviceSyncService(
         deviceMonitorJob = null
         stateCollectionJob?.cancel()
         stateCollectionJob = null
+
+        // Reset connected count when service stops
+        syncStatusRepository.updateConnectedDevicesCount(0)
+
         _serviceState.value = MultiDeviceSyncServiceState.Stopped
         ServiceCompat.stopForeground(this, ServiceCompat.STOP_FOREGROUND_REMOVE)
         NotificationManagerCompat.from(this).cancel(NOTIFICATION_ID)

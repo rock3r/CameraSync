@@ -89,6 +89,8 @@ dependencies {
     implementation(libs.androidx.compose.animation.graphics)
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.dataStore)
+    implementation(libs.androidx.glance.appwidget)
+    implementation(libs.androidx.glance.material3)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.lifecycle.viewmodel.compose)
     implementation(libs.androidx.lifecycle.process)

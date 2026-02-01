@@ -5,6 +5,7 @@ import android.content.Context
 import dev.sebastiano.camerasync.MainActivity
 import dev.sebastiano.camerasync.data.repository.DataStorePairedDevicesRepository
 import dev.sebastiano.camerasync.data.repository.FusedLocationRepository
+import dev.sebastiano.camerasync.data.repository.InMemorySyncStatusRepository
 import dev.sebastiano.camerasync.data.repository.KableCameraRepository
 import dev.sebastiano.camerasync.data.repository.pairedDevicesDataStoreV2
 import dev.sebastiano.camerasync.devices.DevicesListViewModel
@@ -19,6 +20,7 @@ import dev.sebastiano.camerasync.devicesync.PendingIntentFactory
 import dev.sebastiano.camerasync.domain.repository.CameraRepository
 import dev.sebastiano.camerasync.domain.repository.LocationRepository
 import dev.sebastiano.camerasync.domain.repository.PairedDevicesRepository
+import dev.sebastiano.camerasync.domain.repository.SyncStatusRepository
 import dev.sebastiano.camerasync.domain.vendor.CameraVendorRegistry
 import dev.sebastiano.camerasync.domain.vendor.DefaultCameraVendorRegistry
 import dev.sebastiano.camerasync.feedback.AndroidIssueReporter
@@ -59,6 +61,10 @@ interface AppGraph {
     fun pairingViewModel(): PairingViewModel
 
     fun logViewerViewModel(): LogViewerViewModel
+
+    fun pairedDevicesRepository(): PairedDevicesRepository
+
+    fun syncStatusRepository(): SyncStatusRepository
 
     fun viewModelFactory(): MetroViewModelFactory = MetroViewModelFactory(this)
 
@@ -107,6 +113,10 @@ interface AppGraph {
     @SingleIn(AppGraph::class)
     fun providePairedDevicesRepository(context: Context): PairedDevicesRepository =
         DataStorePairedDevicesRepository(context.pairedDevicesDataStoreV2)
+
+    @Provides
+    @SingleIn(AppGraph::class)
+    fun provideSyncStatusRepository(): SyncStatusRepository = InMemorySyncStatusRepository()
 
     @Provides
     @SingleIn(AppGraph::class)

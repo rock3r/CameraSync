@@ -144,4 +144,11 @@
     <string name="perm_bt_connect_desc">Connect to your camera</string>
     <string name="perm_notifications">Notifications</string>
     <string name="perm_notifications_desc">Show sync status updates</string>
+
+    <!-- Widget -->
+    <plurals name="cameras_syncing">
+        <item quantity="one">1 camera syncing…</item>
+        <item quantity="other">%1$d cameras syncing…</item>
+    </plurals>
+    <string name="syncing_disabled">Syncing disabled</string>
 </resources>

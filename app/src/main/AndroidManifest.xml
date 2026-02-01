@@ -104,6 +104,18 @@
                  but we export it so the system can call it. -->
         </receiver>
 
+        <receiver
+            android:name=".widget.SyncWidgetReceiver"
+            android:exported="true"
+            android:label="Sync Status">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/sync_widget_info" />
+        </receiver>
+
         <activity
             android:name=".MainActivity"
             android:exported="true"
