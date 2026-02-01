@@ -10,6 +10,7 @@ import dev.sebastiano.camerasync.fakes.FakeKhronicleLogger
 import dev.sebastiano.camerasync.fakes.FakeLocationRepository
 import dev.sebastiano.camerasync.fakes.FakePairedDevicesRepository
 import dev.sebastiano.camerasync.fakes.FakeVendorRegistry
+import dev.sebastiano.camerasync.fakes.FakeWidgetUpdateHelper
 import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.Dispatchers
@@ -39,6 +40,7 @@ class DevicesListViewModelTest {
     private lateinit var batteryOptimizationChecker: FakeBatteryOptimizationChecker
     private lateinit var issueReporter: FakeIssueReporter
     private lateinit var intentFactory: dev.sebastiano.camerasync.fakes.FakeIntentFactory
+    private lateinit var widgetUpdateHelper: FakeWidgetUpdateHelper
     private lateinit var viewModel: DevicesListViewModel
     private val testDispatcher = UnconfinedTestDispatcher()
 
@@ -57,6 +59,7 @@ class DevicesListViewModelTest {
         batteryOptimizationChecker = FakeBatteryOptimizationChecker()
         issueReporter = FakeIssueReporter()
         intentFactory = dev.sebastiano.camerasync.fakes.FakeIntentFactory()
+        widgetUpdateHelper = FakeWidgetUpdateHelper()
 
         viewModel =
             DevicesListViewModel(
@@ -68,6 +71,7 @@ class DevicesListViewModelTest {
                 issueReporter = issueReporter,
                 batteryOptimizationChecker = batteryOptimizationChecker,
                 intentFactory = intentFactory,
+                widgetUpdateHelper = widgetUpdateHelper,
                 ioDispatcher = testDispatcher, // Inject test dispatcher for IO operations
             )
     }
@@ -327,6 +331,7 @@ class DevicesListViewModelTest {
                     issueReporter = issueReporter,
                     batteryOptimizationChecker = batteryOptimizationChecker,
                     intentFactory = intentFactory,
+                    widgetUpdateHelper = widgetUpdateHelper,
                     ioDispatcher = testDispatcher,
                 )
 

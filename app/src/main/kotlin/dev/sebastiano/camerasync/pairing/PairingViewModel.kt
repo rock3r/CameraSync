@@ -16,6 +16,7 @@ import dev.sebastiano.camerasync.domain.repository.CameraRepository
 import dev.sebastiano.camerasync.domain.repository.PairedDevicesRepository
 import dev.sebastiano.camerasync.domain.vendor.CameraVendorRegistry
 import dev.sebastiano.camerasync.feedback.IssueReporter
+import dev.sebastiano.camerasync.widget.WidgetUpdateHelper
 import dev.zacsweers.metro.Inject
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
@@ -49,6 +50,7 @@ class PairingViewModel(
     private val bluetoothBondingChecker: BluetoothBondingChecker,
     private val companionDeviceManagerHelper: CompanionDeviceManagerHelper,
     private val issueReporter: IssueReporter,
+    private val widgetUpdateHelper: WidgetUpdateHelper,
     private val ioDispatcher: CoroutineDispatcher,
 ) : ViewModel() {
 
@@ -183,6 +185,10 @@ class PairingViewModel(
                 if (pairedDevicesRepository.isDevicePaired(camera.macAddress)) {
                     Log.info(tag = TAG) { "Device ${camera.macAddress} already paired" }
                     pairedDevicesRepository.setSyncEnabled(true)
+                    
+                    // Notify widget of sync state change
+                    widgetUpdateHelper.updateWidgets()
+
                     // Presence is inferred from connection state, so the device will be connected
                     // when background monitoring runs
                     _state.value = PairingScreenState.Idle
@@ -312,6 +318,10 @@ class PairingViewModel(
                     // Now add the device to the paired devices repository
                     pairedDevicesRepository.addDevice(camera, enabled = true)
                     pairedDevicesRepository.setSyncEnabled(true)
+                    
+                    // Notify widget of sync state change
+                    widgetUpdateHelper.updateWidgets()
+
                     // Presence is inferred from connection state, so the device will be connected
                     // when background monitoring runs
 

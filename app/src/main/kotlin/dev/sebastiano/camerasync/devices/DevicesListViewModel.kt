@@ -22,6 +22,7 @@ import dev.sebastiano.camerasync.domain.vendor.CameraVendorRegistry
 import dev.sebastiano.camerasync.feedback.IssueReporter
 import dev.sebastiano.camerasync.pairing.BluetoothBondingChecker
 import dev.sebastiano.camerasync.util.BatteryOptimizationChecker
+import dev.sebastiano.camerasync.widget.WidgetUpdateHelper
 import dev.zacsweers.metro.Inject
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
@@ -51,6 +52,7 @@ class DevicesListViewModel(
     private val issueReporter: IssueReporter,
     private val batteryOptimizationChecker: BatteryOptimizationChecker,
     private val intentFactory: dev.sebastiano.camerasync.devicesync.IntentFactory,
+    private val widgetUpdateHelper: WidgetUpdateHelper,
     private val ioDispatcher: CoroutineDispatcher,
 ) : ViewModel() {
 
@@ -267,6 +269,10 @@ class DevicesListViewModel(
     fun setSyncEnabled(enabled: Boolean) {
         viewModelScope.launch(ioDispatcher) {
             pairedDevicesRepository.setSyncEnabled(enabled)
+            
+            // Notify widget of sync state change
+            widgetUpdateHelper.updateWidgets()
+
             if (enabled) {
                 // If enabling, explicitly start/refresh the service
                 try {
@@ -322,6 +328,10 @@ class DevicesListViewModel(
     fun refreshConnections() {
         viewModelScope.launch(ioDispatcher) {
             pairedDevicesRepository.setSyncEnabled(true)
+            
+            // Notify widget of sync state change
+            widgetUpdateHelper.updateWidgets()
+
             val intent = intentFactory.createRefreshIntent(context)
             ContextCompat.startForegroundService(context, intent)
         }

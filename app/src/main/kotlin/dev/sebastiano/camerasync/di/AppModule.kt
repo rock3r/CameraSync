@@ -36,6 +36,8 @@ import dev.sebastiano.camerasync.util.AndroidBatteryOptimizationChecker
 import dev.sebastiano.camerasync.util.BatteryOptimizationChecker
 import dev.sebastiano.camerasync.vendors.ricoh.RicohCameraVendor
 import dev.sebastiano.camerasync.vendors.sony.SonyCameraVendor
+import dev.sebastiano.camerasync.widget.GlanceWidgetUpdateHelper
+import dev.sebastiano.camerasync.widget.WidgetUpdateHelper
 import dev.zacsweers.metro.DependencyGraph
 import dev.zacsweers.metro.Provides
 import dev.zacsweers.metro.SingleIn
@@ -169,6 +171,11 @@ interface AppGraph {
         logRepository: LogRepository,
         ioDispatcher: CoroutineDispatcher,
     ): LogViewerViewModel = LogViewerViewModel(logRepository, ioDispatcher)
+
+    @Provides
+    @SingleIn(AppGraph::class)
+    fun provideWidgetUpdateHelper(context: Context): WidgetUpdateHelper =
+        GlanceWidgetUpdateHelper(context)
 
     @DependencyGraph.Factory
     interface Factory {
