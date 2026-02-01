@@ -53,14 +53,7 @@ import dev.sebastiano.camerasync.ui.theme.CameraSyncTheme
 import dev.zacsweers.metro.Inject
 
 @Inject
-class MainActivity(
-    private val pairedDevicesRepository: PairedDevicesRepository,
-    private val locationRepository: LocationRepository,
-    private val vendorRegistry: CameraVendorRegistry,
-    private val bluetoothBondingChecker: BluetoothBondingChecker,
-    private val cameraRepository: CameraRepository,
-    private val issueReporter: IssueReporter,
-) : ComponentActivity() {
+class MainActivity : ComponentActivity() {
 
     private val appGraph: AppGraph by lazy { (application as CameraSyncApp).appGraph }
     private var shouldShowPermissionsState by mutableStateOf(false)

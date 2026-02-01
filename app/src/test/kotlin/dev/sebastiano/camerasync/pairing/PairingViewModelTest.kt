@@ -10,7 +10,6 @@ import dev.sebastiano.camerasync.fakes.FakeIssueReporter
 import dev.sebastiano.camerasync.fakes.FakeKhronicleLogger
 import dev.sebastiano.camerasync.fakes.FakePairedDevicesRepository
 import dev.sebastiano.camerasync.fakes.FakeVendorRegistry
-import dev.sebastiano.camerasync.fakes.FakeWidgetUpdateHelper
 import io.mockk.mockk
 import io.mockk.verify
 import kotlinx.coroutines.Dispatchers
@@ -38,7 +37,6 @@ class PairingViewModelTest {
     private lateinit var bluetoothBondingChecker: FakeBluetoothBondingChecker
     private lateinit var issueReporter: FakeIssueReporter
     private lateinit var companionDeviceManagerHelper: CompanionDeviceManagerHelper
-    private lateinit var widgetUpdateHelper: FakeWidgetUpdateHelper
     private lateinit var viewModel: PairingViewModel
     private val testDispatcher = UnconfinedTestDispatcher()
 
@@ -64,7 +62,6 @@ class PairingViewModelTest {
         issueReporter = FakeIssueReporter()
         val vendorRegistry = FakeVendorRegistry()
         companionDeviceManagerHelper = mockk(relaxed = true)
-        widgetUpdateHelper = FakeWidgetUpdateHelper()
         viewModel =
             PairingViewModel(
                 pairedDevicesRepository = pairedDevicesRepository,
@@ -73,7 +70,6 @@ class PairingViewModelTest {
                 bluetoothBondingChecker = bluetoothBondingChecker,
                 companionDeviceManagerHelper = companionDeviceManagerHelper,
                 issueReporter = issueReporter,
-                widgetUpdateHelper = widgetUpdateHelper,
                 ioDispatcher = testDispatcher, // Inject test dispatcher
             )
     }

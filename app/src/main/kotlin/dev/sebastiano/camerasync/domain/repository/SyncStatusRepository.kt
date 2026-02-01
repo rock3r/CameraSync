@@ -12,10 +12,20 @@ interface SyncStatusRepository {
     /** The number of devices currently connected and syncing. */
     val connectedDevicesCount: StateFlow<Int>
 
+    /** Whether the app is actively searching for devices to connect to. */
+    val isSearching: StateFlow<Boolean>
+
     /**
      * Updates the count of connected devices.
      *
      * @param count The new count of connected devices.
      */
     fun updateConnectedDevicesCount(count: Int)
+
+    /**
+     * Updates the searching state.
+     *
+     * @param searching Whether the app is actively searching.
+     */
+    fun updateIsSearching(searching: Boolean)
 }

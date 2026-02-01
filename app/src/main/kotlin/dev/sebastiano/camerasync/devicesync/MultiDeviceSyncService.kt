@@ -22,11 +22,9 @@ import dev.sebastiano.camerasync.R
 import dev.sebastiano.camerasync.domain.model.DeviceConnectionState
 import dev.sebastiano.camerasync.domain.model.PairedDevice
 import dev.sebastiano.camerasync.domain.repository.CameraRepository
-import dev.sebastiano.camerasync.domain.repository.LocationRepository
 import dev.sebastiano.camerasync.domain.repository.PairedDevicesRepository
 import dev.sebastiano.camerasync.domain.repository.SyncStatusRepository
 import dev.sebastiano.camerasync.domain.vendor.CameraVendorRegistry
-import dev.sebastiano.camerasync.widget.WidgetUpdateHelper
 import dev.zacsweers.metro.Inject
 import kotlin.coroutines.CoroutineContext
 import kotlinx.coroutines.CoroutineName
@@ -58,7 +56,6 @@ private const val TAG = "MultiDeviceSyncService"
 @Inject
 class MultiDeviceSyncService(
     private val vendorRegistry: CameraVendorRegistry,
-    private val locationRepository: LocationRepository,
     private val cameraRepository: CameraRepository,
     private val pairedDevicesRepository: PairedDevicesRepository,
     private val syncStatusRepository: SyncStatusRepository,
@@ -66,7 +63,6 @@ class MultiDeviceSyncService(
     private val intentFactory: IntentFactory,
     private val pendingIntentFactory: PendingIntentFactory,
     private val locationCollectorFactory: DefaultLocationCollector.Factory,
-    private val widgetUpdateHelper: WidgetUpdateHelper,
 ) : Service(), CoroutineScope {
 
     override val coroutineContext: CoroutineContext =
@@ -271,9 +267,7 @@ class MultiDeviceSyncService(
 
                     // Update the shared sync status repository
                     syncStatusRepository.updateConnectedDevicesCount(connectedCount)
-
-                    // Notify widget of changes
-                    widgetUpdateHelper.updateWidgets()
+                    syncStatusRepository.updateIsSearching(isScanning)
 
                     // Only stop service if there are NO enabled devices OR sync is disabled
                     if (enabledCount == 0 || !isSyncEnabled) {
@@ -328,9 +322,7 @@ class MultiDeviceSyncService(
 
         // Reset connected count when service stops
         syncStatusRepository.updateConnectedDevicesCount(0)
-
-        // Notify widget of changes
-        widgetUpdateHelper.updateWidgets()
+        syncStatusRepository.updateIsSearching(false)
 
         _serviceState.value = MultiDeviceSyncServiceState.Stopped
         ServiceCompat.stopForeground(this, ServiceCompat.STOP_FOREGROUND_REMOVE)
@@ -390,9 +382,7 @@ class MultiDeviceSyncService(
 
         // Reset connected count when service stops
         syncStatusRepository.updateConnectedDevicesCount(0)
-
-        // Notify widget of changes
-        widgetUpdateHelper.updateWidgets()
+        syncStatusRepository.updateIsSearching(false)
 
         _serviceState.value = MultiDeviceSyncServiceState.Stopped
         ServiceCompat.stopForeground(this, ServiceCompat.STOP_FOREGROUND_REMOVE)

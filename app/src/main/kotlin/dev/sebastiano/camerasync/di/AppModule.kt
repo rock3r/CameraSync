@@ -38,6 +38,7 @@ import dev.sebastiano.camerasync.vendors.ricoh.RicohCameraVendor
 import dev.sebastiano.camerasync.vendors.sony.SonyCameraVendor
 import dev.sebastiano.camerasync.widget.GlanceWidgetUpdateHelper
 import dev.sebastiano.camerasync.widget.WidgetUpdateHelper
+import dev.sebastiano.camerasync.widget.WidgetUpdateManager
 import dev.zacsweers.metro.DependencyGraph
 import dev.zacsweers.metro.Provides
 import dev.zacsweers.metro.SingleIn
@@ -67,6 +68,10 @@ interface AppGraph {
     fun pairedDevicesRepository(): PairedDevicesRepository
 
     fun syncStatusRepository(): SyncStatusRepository
+
+    fun widgetUpdateManager(): WidgetUpdateManager
+
+    fun widgetUpdateHelper(): WidgetUpdateHelper
 
     fun viewModelFactory(): MetroViewModelFactory = MetroViewModelFactory(this)
 

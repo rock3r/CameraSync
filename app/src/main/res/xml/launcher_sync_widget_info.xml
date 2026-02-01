@@ -6,4 +6,4 @@
     android:targetCellHeight="1"
     android:resizeMode="horizontal"
     android:updatePeriodMillis="0"
-    android:widgetCategory="home_screen|keyguard" />
+    android:widgetCategory="home_screen" />

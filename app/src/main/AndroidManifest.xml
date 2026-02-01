@@ -24,7 +24,9 @@
          allows background starts. All service starts are from foreground user actions anyway. -->
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
 
-    <uses-feature android:name="android.software.companion_device_setup" android:required="true"/>
+    <uses-feature
+        android:name="android.software.companion_device_setup"
+        android:required="true" />
 
     <queries>
         <!-- Battery optimization settings intents -->
@@ -105,7 +107,7 @@
         </receiver>
 
         <receiver
-            android:name=".widget.SyncWidgetReceiver"
+            android:name=".widget.LauncherSyncWidgetReceiver"
             android:exported="true"
             android:label="Sync Status">
             <intent-filter>
@@ -113,7 +115,19 @@
             </intent-filter>
             <meta-data
                 android:name="android.appwidget.provider"
-                android:resource="@xml/sync_widget_info" />
+                android:resource="@xml/launcher_sync_widget_info" />
+        </receiver>
+
+        <receiver
+            android:name=".widget.LockScreenSyncWidgetReceiver"
+            android:exported="true"
+            android:label="Sync Status (Lock Screen)">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/lockscreen_sync_widget_info" />
         </receiver>
 
         <activity

@@ -35,6 +35,7 @@
     <string name="status_unreachable">Unreachable</string>
     <string name="status_connected">Connected</string>
     <string name="status_syncing">Syncing</string>
+    <string name="status_idle">Idle</string>
     <string name="dialog_unpair_title">Unpair device?</string>
     <string name="dialog_unpair_message">Are you sure you want to unpair “%1$s”? You’ll need to pair it again to sync data.</string>
     <string name="action_unpair">Unpair</string>
