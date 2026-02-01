@@ -163,8 +163,7 @@ fun DevicesListScreen(
                 },
                 actions = {
                     val currentState = state
-                    val isSyncEnabled =
-                        currentState is DevicesListState.HasDevices && currentState.isSyncEnabled
+                    val isSyncEnabled = currentState.isSyncEnabled
 
                     // Sync toggle switch
                     Switch(
@@ -214,9 +213,7 @@ fun DevicesListScreen(
             )
         },
         floatingActionButton = {
-            val currentState = state
-            val isSyncEnabled =
-                currentState is DevicesListState.HasDevices && currentState.isSyncEnabled
+            val isSyncEnabled = state.isSyncEnabled
 
             if (isSyncEnabled) {
                 FloatingActionButton(onClick = onAddDeviceClick) {

@@ -98,7 +98,7 @@ class DevicesListViewModel(
                     val isIgnoringBatteryOptimizations = flows[5] as Boolean
 
                     if (pairedDevices.isEmpty()) {
-                        DevicesListState.Empty
+                        DevicesListState.Empty(isSyncEnabled = isSyncEnabled)
                     } else {
                         val devicesWithState =
                             pairedDevices.map { device ->
@@ -426,18 +426,24 @@ private data class MakeModel(val make: String, val model: String)
 
 /** UI state for the devices list screen. */
 sealed interface DevicesListState {
+
+    /** Whether global synchronization is enabled. */
+    val isSyncEnabled: Boolean
+
     /** Loading devices from storage. */
-    data object Loading : DevicesListState
+    data object Loading : DevicesListState {
+        override val isSyncEnabled: Boolean = true
+    }
 
     /** No paired devices. */
-    data object Empty : DevicesListState
+    data class Empty(override val isSyncEnabled: Boolean = true) : DevicesListState
 
     /** Has one or more paired devices. */
     data class HasDevices(
         val devices: List<PairedDeviceWithState>,
         val displayInfoMap: Map<String, DeviceDisplayInfo>,
         val isScanning: Boolean = false,
-        val isSyncEnabled: Boolean = true,
+        override val isSyncEnabled: Boolean = true,
         val currentLocation: GpsLocation? = null,
         val isIgnoringBatteryOptimizations: Boolean = true,
     ) : DevicesListState
