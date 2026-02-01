@@ -6,7 +6,7 @@ import com.juul.khronicle.Log
 
 /** Interface for triggering updates for the sync widget. */
 interface WidgetUpdateHelper {
-    /** Updates all instances of [LauncherSyncWidget] and [LockScreenSyncWidget]. */
+    /** Updates all instances of [SyncWidget]. */
     suspend fun updateWidgets()
 }
 
@@ -16,8 +16,7 @@ class GlanceWidgetUpdateHelper(private val context: Context) : WidgetUpdateHelpe
     override suspend fun updateWidgets() {
         Log.debug(tag = TAG) { "Updating all sync widgets" }
         try {
-            LauncherSyncWidget().updateAll(context)
-            LockScreenSyncWidget().updateAll(context)
+            SyncWidget().updateAll(context)
         } catch (e: Exception) {
             Log.warn(tag = TAG, throwable = e) { "Failed to update widgets" }
         }

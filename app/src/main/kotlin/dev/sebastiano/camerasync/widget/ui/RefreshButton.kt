@@ -13,8 +13,6 @@ import androidx.glance.action.ActionParameters
 import androidx.glance.action.clickable
 import androidx.glance.appwidget.action.ActionCallback
 import androidx.glance.appwidget.action.actionRunCallback
-import androidx.glance.appwidget.cornerRadius
-import androidx.glance.background
 import androidx.glance.layout.Alignment
 import androidx.glance.layout.Box
 import androidx.glance.layout.size
@@ -23,13 +21,9 @@ import dev.sebastiano.camerasync.R
 import dev.sebastiano.camerasync.devicesync.MultiDeviceSyncService
 
 @Composable
-internal fun RefreshButton() {
+internal fun RefreshButton(modifier: GlanceModifier = GlanceModifier) {
     Box(
-        modifier =
-            GlanceModifier.size(48.dp)
-                .background(GlanceTheme.colors.tertiary)
-                .cornerRadius(24.dp)
-                .clickable(actionRunCallback<RefreshAction>()),
+        modifier = modifier.clickable(actionRunCallback<RefreshAction>()),
         contentAlignment = Alignment.Center,
     ) {
         Image(
@@ -47,7 +41,7 @@ internal class RefreshAction : ActionCallback {
         glanceId: GlanceId,
         parameters: ActionParameters,
     ) {
-        Log.info(javaClass.name) { "Forcing refresh" }
+        Log.info(javaClass.simpleName) { "Forcing refresh" }
         context.startForegroundService(MultiDeviceSyncService.createRefreshIntent(context))
     }
 }

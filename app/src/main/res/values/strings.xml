@@ -152,4 +152,8 @@
         <item quantity="other">%1$d cameras syncing…</item>
     </plurals>
     <string name="syncing_disabled">Syncing disabled</string>
+    <string name="widget_launcher_label">CameraSync: Home</string>
+    <string name="widget_launcher_description">Quick view and toggle for camera sync.</string>
+    <string name="widget_lockscreen_label">CameraSync: Lock</string>
+    <string name="widget_lockscreen_description">Detailed sync status for your lock screen.</string>
 </resources>

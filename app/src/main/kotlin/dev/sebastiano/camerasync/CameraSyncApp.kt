@@ -7,8 +7,7 @@ import com.juul.khronicle.ConsoleLogger
 import com.juul.khronicle.Log
 import com.juul.khronicle.Logger
 import dev.sebastiano.camerasync.di.AppGraph
-import dev.sebastiano.camerasync.widget.LockScreenSyncWidgetReceiver
-import dev.sebastiano.camerasync.widget.LauncherSyncWidgetReceiver
+import dev.sebastiano.camerasync.widget.SyncWidgetReceiver
 import dev.zacsweers.metro.createGraphFactory
 import kotlin.getValue
 import kotlinx.coroutines.CoroutineScope
@@ -42,15 +41,12 @@ class CameraSyncApp : Application() {
             GlobalScope.launch {
                 Log.info("CameraSyncApp") { "Generating widget preview" }
                 val glanceManager = GlanceAppWidgetManager(this@CameraSyncApp)
-                glanceManager.setWidgetPreviews(LauncherSyncWidgetReceiver::class)
-                glanceManager.setWidgetPreviews(LockScreenSyncWidgetReceiver::class)
+                glanceManager.setWidgetPreviews(SyncWidgetReceiver::class)
             }
         }
     }
 
     companion object {
-        private const val TAG = "CameraSyncApp"
-
         /**
          * Initializes Khronicle logging with the provided logger.
          *

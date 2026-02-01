@@ -107,27 +107,15 @@
         </receiver>
 
         <receiver
-            android:name=".widget.LauncherSyncWidgetReceiver"
+            android:name=".widget.SyncWidgetReceiver"
             android:exported="true"
-            android:label="Sync Status">
+            android:label="@string/widget_lockscreen_label">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
             </intent-filter>
             <meta-data
                 android:name="android.appwidget.provider"
-                android:resource="@xml/launcher_sync_widget_info" />
-        </receiver>
-
-        <receiver
-            android:name=".widget.LockScreenSyncWidgetReceiver"
-            android:exported="true"
-            android:label="Sync Status (Lock Screen)">
-            <intent-filter>
-                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
-            </intent-filter>
-            <meta-data
-                android:name="android.appwidget.provider"
-                android:resource="@xml/lockscreen_sync_widget_info" />
+                android:resource="@xml/sync_widget_info" />
         </receiver>
 
         <activity

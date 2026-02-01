@@ -21,7 +21,7 @@ class SyncStartupReceiver : BroadcastReceiver() {
             return
         }
 
-        Log.info(javaClass.name) { "Received ${intent.action} intent" }
+        Log.info(javaClass.simpleName) { "Received ${intent.action} intent" }
 
         val appGraph = (context.applicationContext as CameraSyncApp).appGraph
         val pairedDevicesRepository = appGraph.pairedDevicesRepository()
@@ -32,23 +32,23 @@ class SyncStartupReceiver : BroadcastReceiver() {
         receiverScope.launch {
             try {
                 val isSyncEnabled = pairedDevicesRepository.isSyncEnabled.first()
-                Log.debug(javaClass.name) { "Checking if sync is enabled: $isSyncEnabled" }
+                Log.debug(javaClass.simpleName) { "Checking if sync is enabled: $isSyncEnabled" }
 
                 if (isSyncEnabled) {
                     val hasEnabledDevices = pairedDevicesRepository.hasEnabledDevices()
                     if (hasEnabledDevices) {
-                        Log.info(javaClass.name) { "Starting MultiDeviceSyncService..." }
+                        Log.info(javaClass.simpleName) { "Starting MultiDeviceSyncService..." }
                         val serviceIntent = MultiDeviceSyncService.createStartIntent(context)
                         context.startForegroundService(serviceIntent)
                     } else {
-                        Log.info(javaClass.name) { "Sync enabled but no devices enabled, not starting service." }
+                        Log.info(javaClass.simpleName) { "Sync enabled but no devices enabled, not starting service." }
                     }
                 }
 
-                Log.info(javaClass.name) { "Updating widgets..." }
+                Log.info(javaClass.simpleName) { "Updating widgets..." }
                 widgetUpdateHelper.updateWidgets()
             } catch (e: Exception) {
-                Log.error(javaClass.name, throwable = e) { "Error during startup sync initialization" }
+                Log.error(javaClass.simpleName, throwable = e) { "Error during startup sync initialization" }
             } finally {
                 pendingResult.finish()
             }
