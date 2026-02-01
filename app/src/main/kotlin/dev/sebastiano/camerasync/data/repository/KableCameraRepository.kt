@@ -1,9 +1,11 @@
 package dev.sebastiano.camerasync.data.repository
 
-import android.bluetooth.BluetoothAdapter
+import android.app.PendingIntent
+import android.bluetooth.BluetoothManager
 import android.bluetooth.le.ScanSettings
 import android.content.Context
 import androidx.core.content.ContextCompat
+import androidx.core.content.getSystemService
 import com.juul.kable.Advertisement
 import com.juul.kable.ExperimentalApi
 import com.juul.kable.ObsoleteKableApi
@@ -98,8 +100,9 @@ class KableCameraRepository(
         return scanner.advertisements.mapNotNull { it.toCamera() }
     }
 
-    override fun startPassiveScan(pendingIntent: android.app.PendingIntent) {
-        val adapter = BluetoothAdapter.getDefaultAdapter()
+    override fun startPassiveScan(pendingIntent: PendingIntent) {
+        val bluetoothManager = context.getSystemService<BluetoothManager>()
+        val adapter = bluetoothManager?.adapter
         if (adapter == null || !adapter.isEnabled) {
             Log.warn(tag = TAG) {
                 "Bluetooth adapter not available or disabled, cannot start passive scan"
@@ -142,8 +145,9 @@ class KableCameraRepository(
         }
     }
 
-    override fun stopPassiveScan(pendingIntent: android.app.PendingIntent) {
-        val adapter = BluetoothAdapter.getDefaultAdapter() ?: return
+    override fun stopPassiveScan(pendingIntent: PendingIntent) {
+        val bluetoothManager = context.getSystemService<BluetoothManager>()
+        val adapter = bluetoothManager?.adapter ?: return
         if (!adapter.isEnabled) return
 
         try {
@@ -255,7 +259,8 @@ class KableCameraRepository(
     }
 
     private fun isDeviceBonded(macAddress: String): Boolean {
-        val adapter = BluetoothAdapter.getDefaultAdapter() ?: return false
+        val bluetoothManager = context.getSystemService<BluetoothManager>()
+        val adapter = bluetoothManager?.adapter ?: return false
         if (!adapter.isEnabled) return false
 
         // Check for BLUETOOTH_CONNECT permission

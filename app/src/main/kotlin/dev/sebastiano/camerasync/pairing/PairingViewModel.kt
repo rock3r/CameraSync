@@ -1,12 +1,15 @@
 package dev.sebastiano.camerasync.pairing
 
+import android.Manifest
 import android.bluetooth.BluetoothDevice
 import android.bluetooth.le.ScanResult
 import android.companion.CompanionDeviceManager
 import android.content.Intent
 import android.content.IntentSender
+import androidx.annotation.RequiresPermission
 import androidx.compose.runtime.State
 import androidx.compose.runtime.mutableStateOf
+import androidx.core.util.size
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.juul.khronicle.Log
@@ -80,6 +83,7 @@ class PairingViewModel(
         )
     }
 
+    @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
     @Suppress("DEPRECATION")
     fun onCompanionAssociationResult(data: Intent?) {
         if (data == null) {
@@ -128,13 +132,14 @@ class PairingViewModel(
         }
     }
 
+    @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
     @OptIn(ExperimentalUuidApi::class)
     private fun ScanResult.toCamera(): Camera? {
         val record = scanRecord ?: return null
         val mfrData = record.manufacturerSpecificData
 
         val mfrMap = mutableMapOf<Int, ByteArray>()
-        for (i in 0 until mfrData.size()) {
+        for (i in 0 until mfrData.size) {
             mfrMap[mfrData.keyAt(i)] = mfrData.valueAt(i)
         }
 
@@ -160,6 +165,7 @@ class PairingViewModel(
         )
     }
 
+    @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
     @OptIn(ExperimentalUuidApi::class)
     private fun BluetoothDevice.toCamera(): Camera? {
         val name = name

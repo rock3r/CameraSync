@@ -1,11 +1,13 @@
 package dev.sebastiano.camerasync.feedback
 
+import android.Manifest
 import android.bluetooth.BluetoothAdapter
 import android.bluetooth.BluetoothDevice
 import android.bluetooth.BluetoothManager
 import android.content.Context
 import android.content.Intent
 import android.os.Build
+import androidx.annotation.RequiresPermission
 import androidx.core.content.FileProvider
 import dev.sebastiano.camerasync.domain.repository.CameraConnection
 import java.io.File
@@ -14,7 +16,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 class AndroidIssueReporter(private val context: Context) : IssueReporter {
-
+    @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
     override suspend fun sendIssueReport(connection: CameraConnection?, extraInfo: String?) =
         withContext(Dispatchers.IO) {
             val report = buildString {

@@ -1,9 +1,11 @@
 package dev.sebastiano.camerasync.pairing
 
+import android.Manifest
 import android.app.Activity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.IntentSenderRequest
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.annotation.RequiresPermission
 import androidx.compose.animation.core.EaseInOut
 import androidx.compose.animation.core.InfiniteRepeatableSpec
 import androidx.compose.animation.core.RepeatMode
@@ -57,6 +59,7 @@ import dev.sebastiano.camerasync.ui.theme.DarkElectricBlue
 import dev.sebastiano.camerasync.ui.theme.ElectricBlue
 
 /** Screen for pairing new camera devices using the system flow. */
+@RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PairingScreen(

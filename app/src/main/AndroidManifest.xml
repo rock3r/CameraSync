@@ -85,10 +85,12 @@
         tools:replace="android:appComponentFactory"
         tools:targetApi="34">
 
+        <!-- False lint positive, it's ctor-injected by Metro -->
         <service
             android:name=".devicesync.MultiDeviceSyncService"
             android:exported="false"
-            android:foregroundServiceType="connectedDevice|location" />
+            android:foregroundServiceType="connectedDevice|location"
+            tools:ignore="Instantiatable" />
 
         <receiver
             android:name=".devicesync.SyncStartupReceiver"

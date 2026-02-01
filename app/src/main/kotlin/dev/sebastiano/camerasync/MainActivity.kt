@@ -5,6 +5,7 @@ import android.Manifest.permission.ACCESS_FINE_LOCATION
 import android.Manifest.permission.BLUETOOTH_CONNECT
 import android.Manifest.permission.BLUETOOTH_SCAN
 import android.Manifest.permission.POST_NOTIFICATIONS
+import android.annotation.SuppressLint
 import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -203,6 +204,7 @@ private fun RootComposable(
                             viewModel(factory = viewModelFactory)
                         val context = LocalContext.current
 
+                        @SuppressLint("MissingPermission")
                         PairingScreen(
                             viewModel = pairingViewModel,
                             onNavigateBack = {
