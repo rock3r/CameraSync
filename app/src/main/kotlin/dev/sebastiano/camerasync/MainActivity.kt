@@ -38,14 +38,8 @@ import dev.sebastiano.camerasync.devices.DevicesListViewModel
 import dev.sebastiano.camerasync.devicesync.MultiDeviceSyncService
 import dev.sebastiano.camerasync.devicesync.registerNotificationChannel
 import dev.sebastiano.camerasync.di.AppGraph
-import dev.sebastiano.camerasync.domain.repository.CameraRepository
-import dev.sebastiano.camerasync.domain.repository.LocationRepository
-import dev.sebastiano.camerasync.domain.repository.PairedDevicesRepository
-import dev.sebastiano.camerasync.domain.vendor.CameraVendorRegistry
-import dev.sebastiano.camerasync.feedback.IssueReporter
 import dev.sebastiano.camerasync.logging.LogViewerScreen
 import dev.sebastiano.camerasync.logging.LogViewerViewModel
-import dev.sebastiano.camerasync.pairing.BluetoothBondingChecker
 import dev.sebastiano.camerasync.pairing.PairingScreen
 import dev.sebastiano.camerasync.pairing.PairingViewModel
 import dev.sebastiano.camerasync.permissions.PermissionsScreen

@@ -11,9 +11,9 @@ import kotlinx.coroutines.launch
 private const val TAG = "WidgetUpdateManager"
 
 /**
- * Manager that observes sync-related state and triggers widget updates reactively.
- * This ensures that widgets always reflect the latest state without needing
- * manual update calls everywhere state is modified.
+ * Manager that observes sync-related state and triggers widget updates reactively. This ensures
+ * that widgets always reflect the latest state without needing manual update calls everywhere state
+ * is modified.
  */
 @Inject
 class WidgetUpdateManager(
@@ -30,12 +30,12 @@ class WidgetUpdateManager(
         scope.launch {
             Log.info(tag = TAG) { "Starting widget update observation" }
             combine(
-                pairedDevicesRepository.isSyncEnabled,
-                syncStatusRepository.connectedDevicesCount,
-                syncStatusRepository.isSearching
-            ) { isSyncEnabled, connectedCount, isSearching ->
-                Triple(isSyncEnabled, connectedCount, isSearching)
-            }
+                    pairedDevicesRepository.isSyncEnabled,
+                    syncStatusRepository.connectedDevicesCount,
+                    syncStatusRepository.isSearching,
+                ) { isSyncEnabled, connectedCount, isSearching ->
+                    Triple(isSyncEnabled, connectedCount, isSearching)
+                }
                 .collect { (isSyncEnabled, connectedCount, isSearching) ->
                     Log.debug(tag = TAG) {
                         "State changed: enabled=$isSyncEnabled, connected=$connectedCount, searching=$isSearching. Triggering widget update."

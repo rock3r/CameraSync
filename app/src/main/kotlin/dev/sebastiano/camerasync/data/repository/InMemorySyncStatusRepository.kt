@@ -5,9 +5,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
-/**
- * In-memory implementation of [SyncStatusRepository].
- */
+/** In-memory implementation of [SyncStatusRepository]. */
 class InMemorySyncStatusRepository : SyncStatusRepository {
 
     private val _connectedDevicesCount = MutableStateFlow(0)

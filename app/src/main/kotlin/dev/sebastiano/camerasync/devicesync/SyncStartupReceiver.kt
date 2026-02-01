@@ -41,14 +41,18 @@ class SyncStartupReceiver : BroadcastReceiver() {
                         val serviceIntent = MultiDeviceSyncService.createStartIntent(context)
                         context.startForegroundService(serviceIntent)
                     } else {
-                        Log.info(javaClass.simpleName) { "Sync enabled but no devices enabled, not starting service." }
+                        Log.info(javaClass.simpleName) {
+                            "Sync enabled but no devices enabled, not starting service."
+                        }
                     }
                 }
 
                 Log.info(javaClass.simpleName) { "Updating widgets..." }
                 widgetUpdateHelper.updateWidgets()
             } catch (e: Exception) {
-                Log.error(javaClass.simpleName, throwable = e) { "Error during startup sync initialization" }
+                Log.error(javaClass.simpleName, throwable = e) {
+                    "Error during startup sync initialization"
+                }
             } finally {
                 pendingResult.finish()
             }

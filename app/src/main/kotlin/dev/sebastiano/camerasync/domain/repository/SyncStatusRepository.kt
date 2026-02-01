@@ -3,9 +3,9 @@ package dev.sebastiano.camerasync.domain.repository
 import kotlinx.coroutines.flow.StateFlow
 
 /**
- * Repository for tracking the runtime status of the synchronization process.
- * Unlike [PairedDevicesRepository], this repository holds transient state that
- * is only relevant while the app or service is running.
+ * Repository for tracking the runtime status of the synchronization process. Unlike
+ * [PairedDevicesRepository], this repository holds transient state that is only relevant while the
+ * app or service is running.
  */
 interface SyncStatusRepository {
 
