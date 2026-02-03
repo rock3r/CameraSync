@@ -17,6 +17,7 @@ import dev.sebastiano.camerasync.devicesync.IntentFactory
 import dev.sebastiano.camerasync.devicesync.MultiDeviceSyncService
 import dev.sebastiano.camerasync.devicesync.NotificationBuilder
 import dev.sebastiano.camerasync.devicesync.PendingIntentFactory
+import dev.sebastiano.camerasync.devicesync.SyncTileService
 import dev.sebastiano.camerasync.domain.repository.CameraRepository
 import dev.sebastiano.camerasync.domain.repository.LocationRepository
 import dev.sebastiano.camerasync.domain.repository.PairedDevicesRepository
@@ -58,6 +59,8 @@ interface AppGraph {
     fun mainActivity(): MainActivity
 
     fun multiDeviceSyncService(): MultiDeviceSyncService
+
+    fun syncTileService(): SyncTileService
 
     fun devicesListViewModel(): DevicesListViewModel
 

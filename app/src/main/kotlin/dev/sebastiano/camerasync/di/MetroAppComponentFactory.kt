@@ -9,6 +9,7 @@ import androidx.annotation.Keep
 import dev.sebastiano.camerasync.CameraSyncApp
 import dev.sebastiano.camerasync.MainActivity
 import dev.sebastiano.camerasync.devicesync.MultiDeviceSyncService
+import dev.sebastiano.camerasync.devicesync.SyncTileService
 
 /** An [AppComponentFactory] that uses Metro for dependency injection. */
 @Keep
@@ -39,6 +40,7 @@ class MetroAppComponentFactory : AppComponentFactory() {
     override fun instantiateService(cl: ClassLoader, className: String, intent: Intent?): Service {
         return when (className) {
             MultiDeviceSyncService::class.java.name -> appGraph.multiDeviceSyncService()
+            SyncTileService::class.java.name -> appGraph.syncTileService()
             else -> super.instantiateService(cl, className, intent)
         }
     }

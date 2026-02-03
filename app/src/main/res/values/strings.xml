@@ -8,6 +8,9 @@
     <string name="action_cancel">Cancel</string>
     <string name="action_retry">Retry</string>
 
+    <!-- Quick Settings Tile -->
+    <string name="tile_sync_label">Camera Sync</string>
+
     <!-- Devices List Screen -->
     <string name="content_desc_refresh">Refresh connections</string>
     <string name="content_desc_settings">More options</string>

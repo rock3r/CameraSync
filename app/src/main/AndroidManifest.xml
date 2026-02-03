@@ -92,6 +92,18 @@
             android:foregroundServiceType="connectedDevice|location"
             tools:ignore="Instantiatable" />
 
+        <service
+            android:name=".devicesync.SyncTileService"
+            android:exported="true"
+            android:icon="@drawable/ic_sync"
+            android:label="@string/tile_sync_label"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE"
+            tools:ignore="Instantiatable">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE" />
+            </intent-filter>
+        </service>
+
         <receiver
             android:name=".devicesync.SyncStartupReceiver"
             android:exported="true">
