@@ -1,9 +1,12 @@
 package dev.sebastiano.camerasync.devicesync
 
+import android.Manifest
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.os.Build
+import androidx.annotation.RequiresPermission
+import androidx.core.app.NotificationManagerCompat
 import com.juul.khronicle.Log
 import dev.sebastiano.camerasync.R
 import dev.sebastiano.camerasync.ble.ScanReceiver
@@ -34,6 +37,7 @@ import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.joinAll
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -108,6 +112,7 @@ class MultiDeviceSyncCoordinator(
      *
      * @param enabledDevices Flow of enabled devices from the repository.
      */
+    @RequiresPermission(Manifest.permission.POST_NOTIFICATIONS)
     fun startBackgroundMonitoring(enabledDevices: Flow<List<PairedDevice>>) {
         if (backgroundMonitoringJob != null) return
 
@@ -143,6 +148,7 @@ class MultiDeviceSyncCoordinator(
     }
 
     /** Starts a periodic check (every 30 seconds) for disconnected/unreachable enabled devices. */
+    @RequiresPermission(Manifest.permission.POST_NOTIFICATIONS)
     private fun startPeriodicCheck() {
         if (periodicCheckJob != null) return
 
@@ -195,6 +201,7 @@ class MultiDeviceSyncCoordinator(
     }
 
     /** Manually triggers a scan for all enabled but disconnected devices. */
+    @RequiresPermission(Manifest.permission.POST_NOTIFICATIONS)
     fun refreshConnections() {
         Log.info(tag = TAG) { "Manual refresh requested" }
         coroutineScope.launch {
@@ -207,6 +214,7 @@ class MultiDeviceSyncCoordinator(
         }
     }
 
+    @RequiresPermission(Manifest.permission.POST_NOTIFICATIONS)
     private suspend fun checkAndConnectEnabledDevices(ignorePresence: Boolean = false) {
         Log.debug(tag = TAG) { "Checking enabled devices (ignorePresence=$ignorePresence)" }
 
@@ -309,6 +317,7 @@ class MultiDeviceSyncCoordinator(
      *
      * @param device The paired device to connect to.
      */
+    @RequiresPermission(Manifest.permission.POST_NOTIFICATIONS)
     fun startDeviceSync(device: PairedDevice) {
         val macAddress = device.macAddress.uppercase()
 
@@ -387,6 +396,9 @@ class MultiDeviceSyncCoordinator(
                             DeviceConnectionState.Syncing(firmwareVersion = firmwareVersion),
                         )
 
+                        // Check if firmware update is available and show notification
+                        checkAndNotifyFirmwareUpdate(macAddress, firmwareVersion)
+
                         // Start the global location sync if not already running
                         ensureLocationSyncRunning()
 
@@ -400,7 +412,7 @@ class MultiDeviceSyncCoordinator(
                             "Marked device $macAddress as not present (connection lost)"
                         }
                         cleanup(macAddress, preserveErrorState = false)
-                    } catch (e: TimeoutCancellationException) {
+                    } catch (_: TimeoutCancellationException) {
                         Log.error(tag = TAG) { "Connection timed out for $macAddress" }
                         updateDeviceState(macAddress, DeviceConnectionState.Unreachable)
                         cleanup(macAddress, preserveErrorState = true)
@@ -414,9 +426,8 @@ class MultiDeviceSyncCoordinator(
                         // Check if this is an unreachable device scenario (timeout, not found,
                         // etc.)
                         val isUnreachable =
-                            e is TimeoutCancellationException ||
-                                (e is IllegalStateException &&
-                                    e.cause is TimeoutCancellationException) ||
+                            (e is IllegalStateException &&
+                                e.cause is TimeoutCancellationException) ||
                                 e.message?.contains("timeout", ignoreCase = true) == true ||
                                 e.message?.contains("not found", ignoreCase = true) == true ||
                                 e.message?.contains("unreachable", ignoreCase = true) == true ||
@@ -480,7 +491,13 @@ class MultiDeviceSyncCoordinator(
                     Log.debug(tag = TAG) {
                         "Reading firmware version for ${connection.camera.macAddress}"
                     }
-                    connection.readFirmwareVersion()
+                    val version = connection.readFirmwareVersion()
+                    // Persist firmware version to repository
+                    pairedDevicesRepository.updateFirmwareVersion(
+                        connection.camera.macAddress,
+                        version,
+                    )
+                    version
                 } catch (e: Exception) {
                     Log.warn(tag = TAG, throwable = e) { "Failed to read firmware version" }
                     null
@@ -620,7 +637,7 @@ class MultiDeviceSyncCoordinator(
         // Cancel all jobs
         jobs.forEach { it.cancel() }
         // Wait for all to complete
-        jobs.forEach { it.join() }
+        jobs.joinAll()
 
         locationSyncJob?.cancel()
         locationSyncJob = null
@@ -709,20 +726,6 @@ class MultiDeviceSyncCoordinator(
         _deviceStates.update { currentStates -> currentStates - normalizedMac }
     }
 
-    /** Attempts to reconnect to a device that failed. */
-    fun retryDeviceConnection(device: PairedDevice) {
-        val macAddress = device.macAddress.uppercase()
-        val currentState = getDeviceState(macAddress)
-
-        if (
-            currentState is DeviceConnectionState.Unreachable ||
-                (currentState is DeviceConnectionState.Error && currentState.isRecoverable)
-        ) {
-            Log.info(tag = TAG) { "Retrying connection for $macAddress" }
-            startDeviceSync(device)
-        }
-    }
-
     /** Starts the passive scan using PendingIntent. */
     fun startPassiveScan() {
         Log.info(tag = TAG) { "Starting passive scan" }
@@ -751,14 +754,83 @@ class MultiDeviceSyncCoordinator(
         cameraRepository.stopPassiveScan(pendingIntent)
     }
 
+    /** Checks if a firmware update is available for the device and shows a notification if so. */
+    @RequiresPermission(Manifest.permission.POST_NOTIFICATIONS)
+    private suspend fun checkAndNotifyFirmwareUpdate(macAddress: String, firmwareVersion: String?) {
+        if (firmwareVersion == null) {
+            Log.debug(tag = TAG) {
+                "Skipping firmware update check for $macAddress: firmware version is null"
+            }
+            return
+        }
+
+        val device = pairedDevicesRepository.getDevice(macAddress)
+        if (device == null) {
+            Log.warn(tag = TAG) {
+                "Cannot check firmware update for $macAddress: device not found in repository"
+            }
+            return
+        }
+
+        // Only show notification if there's an update available and we haven't notified yet
+        val latestVersion = device.latestFirmwareVersion
+        if (latestVersion == null) {
+            Log.debug(tag = TAG) {
+                "No firmware update available for $macAddress (current: $firmwareVersion)"
+            }
+            return
+        }
+
+        if (device.firmwareUpdateNotificationShown) {
+            Log.debug(tag = TAG) {
+                "Firmware update notification already shown for $macAddress ($firmwareVersion → $latestVersion)"
+            }
+            return
+        }
+
+        // Device has a firmware update available and user hasn't been notified - show notification
+        try {
+            val deviceName = device.name ?: context.getString(R.string.label_unknown)
+            Log.info(tag = TAG) {
+                "Showing firmware update notification for $macAddress ($deviceName): " +
+                    "$firmwareVersion → $latestVersion"
+            }
+
+            val notification =
+                createFirmwareUpdateNotification(
+                    notificationBuilder = AndroidNotificationBuilder(context),
+                    pendingIntentFactory = pendingIntentFactory,
+                    context = context,
+                    deviceName = deviceName,
+                    currentVersion = firmwareVersion,
+                    latestVersion = latestVersion,
+                    macAddress = macAddress,
+                )
+
+            // Use macAddress + currentVersion for unique notification ID. This ensures that
+            // if a device has multiple updates available but hasn't updated yet, we replace
+            // the old notification (e.g., "2.01 → 2.02") with the new one (e.g., "2.01 → 2.03")
+            // rather than showing multiple notifications.
+            val notificationId = "$macAddress:$firmwareVersion".hashCode()
+            NotificationManagerCompat.from(context).notify(notificationId, notification)
+
+            // Mark notification as shown
+            pairedDevicesRepository.setFirmwareUpdateNotificationShown(macAddress)
+
+            Log.info(tag = TAG) {
+                "Successfully showed firmware update notification for $macAddress " +
+                    "(notification ID: $notificationId)"
+            }
+        } catch (e: Exception) {
+            Log.error(tag = TAG, throwable = e) {
+                "Failed to show firmware update notification for $macAddress " +
+                    "(current: $firmwareVersion, latest: $latestVersion): ${e.message}"
+            }
+            // Don't rethrow - this is a non-critical operation that shouldn't break sync
+        }
+    }
+
     companion object {
         private const val PASSIVE_SCAN_REQUEST_CODE = 999
-
-        /** Suspends until cancellation. Used to keep a coroutine alive. */
-        private suspend fun awaitCancellation(): Nothing {
-            while (true) {
-                delay(Long.MAX_VALUE)
-            }
-        }
     }
 }

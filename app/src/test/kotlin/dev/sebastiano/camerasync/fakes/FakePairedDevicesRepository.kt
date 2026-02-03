@@ -136,6 +136,46 @@ class FakePairedDevicesRepository : PairedDevicesRepository {
         return _devices.value.any { it.isEnabled }
     }
 
+    override suspend fun updateFirmwareVersion(macAddress: String, firmwareVersion: String?) {
+        _devices.update { devices ->
+            devices.map { device ->
+                if (device.macAddress == macAddress) {
+                    device.copy(firmwareVersion = firmwareVersion)
+                } else {
+                    device
+                }
+            }
+        }
+    }
+
+    override suspend fun setFirmwareUpdateInfo(macAddress: String, latestVersion: String?) {
+        _devices.update { devices ->
+            devices.map { device ->
+                if (device.macAddress == macAddress) {
+                    device.copy(
+                        latestFirmwareVersion = latestVersion,
+                        firmwareUpdateNotificationShown =
+                            false, // Clear flag when update info changes
+                    )
+                } else {
+                    device
+                }
+            }
+        }
+    }
+
+    override suspend fun setFirmwareUpdateNotificationShown(macAddress: String) {
+        _devices.update { devices ->
+            devices.map { device ->
+                if (device.macAddress == macAddress) {
+                    device.copy(firmwareUpdateNotificationShown = true)
+                } else {
+                    device
+                }
+            }
+        }
+    }
+
     // Test helpers
 
     /** Adds a device directly for test setup. */
@@ -144,8 +184,13 @@ class FakePairedDevicesRepository : PairedDevicesRepository {
     }
 
     /** Sets devices directly for test setup. */
-    fun setTestDevices(devices: List<PairedDevice>) {
+    fun setPairedDevices(devices: List<PairedDevice>) {
         _devices.value = devices
+    }
+
+    /** Sets devices directly for test setup (alias for compatibility). */
+    fun setTestDevices(devices: List<PairedDevice>) {
+        setPairedDevices(devices)
     }
 
     /** Clears all devices. */

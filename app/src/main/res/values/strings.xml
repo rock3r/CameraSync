@@ -116,6 +116,10 @@
     </plurals>
     <string name="time_yesterday_at">yesterday at %1$s</string>
     <string name="notification_channel_name">Camera connection</string>
+    <string name="firmware_update_notification_channel_name">Firmware updates</string>
+    <string name="firmware_update_notification_title">Firmware update available</string>
+    <string name="firmware_update_notification_content">%1$s has a firmware update available (%2$s → %3$s)</string>
+    <string name="badge_firmware_update_available">%1$s available</string>
     <string name="notification_no_devices">No devices enabled</string>
     <plurals name="notification_searching">
         <item quantity="one">Searching for 1 device…</item>

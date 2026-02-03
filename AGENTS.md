@@ -78,6 +78,7 @@ This is an Android project built with:
 7. **Manual Control**: Notification actions to "Refresh" (restart sync) or "Stop All" (persistent stop).
 8. **Battery Optimization Warnings**: Proactive UI warnings when battery optimizations are enabled, with direct links to disable them (including OEM-specific settings).
 9. **Issue Reporting**: Integrated feedback system that collects system info, BLE metadata (bonding state, firmware version, hardware revision), and app logs to troubleshoot connectivity issues.
+10. **Firmware Update Notifications**: Automatic detection and notification of available firmware updates for paired cameras. Daily background checks via WorkManager, with notifications shown when devices connect. UI displays firmware version with badge indicating available updates.
 
 ### Testing
 - Unit tests use coroutine test dispatchers with `TestScope`

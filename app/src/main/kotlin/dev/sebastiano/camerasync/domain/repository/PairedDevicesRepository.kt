@@ -80,6 +80,31 @@ interface PairedDevicesRepository {
     suspend fun updateLastSyncedAt(macAddress: String, timestamp: Long)
 
     /**
+     * Updates the firmware version for a device.
+     *
+     * @param macAddress The MAC address of the device.
+     * @param firmwareVersion The firmware version string (e.g., "2.01"), or null to clear.
+     */
+    suspend fun updateFirmwareVersion(macAddress: String, firmwareVersion: String?)
+
+    /**
+     * Updates firmware update information for a device.
+     *
+     * @param macAddress The MAC address of the device.
+     * @param latestVersion The latest firmware version available, or null to clear (no update
+     *   available). When an update is found, this clears the notification shown flag so the user
+     *   can be notified.
+     */
+    suspend fun setFirmwareUpdateInfo(macAddress: String, latestVersion: String?)
+
+    /**
+     * Marks that the firmware update notification has been shown to the user.
+     *
+     * @param macAddress The MAC address of the device.
+     */
+    suspend fun setFirmwareUpdateNotificationShown(macAddress: String)
+
+    /**
      * Checks if a device with the given MAC address is already paired.
      *
      * @param macAddress The MAC address to check.

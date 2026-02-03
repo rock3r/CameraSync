@@ -3,10 +3,15 @@ package dev.sebastiano.camerasync
 import android.app.Application
 import android.os.Build
 import androidx.glance.appwidget.GlanceAppWidgetManager
+import androidx.work.Configuration
+import androidx.work.WorkManager
 import com.juul.khronicle.ConsoleLogger
 import com.juul.khronicle.Log
 import com.juul.khronicle.Logger
+import dev.sebastiano.camerasync.devicesync.registerNotificationChannel
 import dev.sebastiano.camerasync.di.AppGraph
+import dev.sebastiano.camerasync.firmware.FirmwareUpdateCheckWorkerFactory
+import dev.sebastiano.camerasync.firmware.FirmwareUpdateScheduler
 import dev.sebastiano.camerasync.widget.SyncWidgetReceiver
 import dev.zacsweers.metro.createGraphFactory
 import kotlin.getValue
@@ -31,6 +36,33 @@ class CameraSyncApp : Application() {
         super.onCreate()
         // Initialize Khronicle logging early in application lifecycle
         initializeLogging()
+
+        // Register notification channels early so they're available before any service tries to use
+        // them
+        registerNotificationChannel(this)
+
+        // Initialize WorkManager with custom factory for firmware update checks
+        try {
+            val firmwareUpdateCheckers = appGraph.provideFirmwareUpdateCheckers()
+            val workerFactory =
+                FirmwareUpdateCheckWorkerFactory(
+                    pairedDevicesRepository = appGraph.pairedDevicesRepository(),
+                    firmwareUpdateCheckers = firmwareUpdateCheckers,
+                )
+            WorkManager.initialize(
+                this,
+                Configuration.Builder().setWorkerFactory(workerFactory).build(),
+            )
+
+            // Schedule daily firmware update checks
+            FirmwareUpdateScheduler.scheduleDailyCheck(this)
+        } catch (e: IllegalStateException) {
+            // WorkManager already initialized (e.g., in tests) - just schedule the check
+            Log.warn("CameraSyncApp") {
+                "WorkManager already initialized, skipping custom factory setup"
+            }
+            FirmwareUpdateScheduler.scheduleDailyCheck(this)
+        }
 
         // Start observing state for widget updates
         appGraph.widgetUpdateManager().start(applicationScope)

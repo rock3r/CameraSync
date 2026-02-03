@@ -9,6 +9,7 @@ import android.content.pm.PackageManager
 import android.content.pm.ServiceInfo
 import android.os.Binder
 import android.os.IBinder
+import androidx.annotation.RequiresPermission
 import androidx.core.app.ActivityCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.app.ServiceCompat
@@ -126,6 +127,7 @@ class MultiDeviceSyncService(
         return binder
     }
 
+    @RequiresPermission(Manifest.permission.POST_NOTIFICATIONS)
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         when (intent?.action) {
             ACTION_STOP -> {
@@ -193,6 +195,7 @@ class MultiDeviceSyncService(
     }
 
     /** Starts monitoring enabled devices and connecting to them. */
+    @RequiresPermission(Manifest.permission.POST_NOTIFICATIONS)
     private fun startDeviceMonitoring() {
         if (deviceMonitorJob != null) return
 
@@ -257,13 +260,7 @@ class MultiDeviceSyncService(
                     )
                 }
                 .collect {
-                    (
-                        connectedCount,
-                        enabledCount,
-                        presentCount,
-                        isScanning,
-                        lastSyncTime,
-                        isSyncEnabled) ->
+                    (connectedCount, enabledCount, _, isScanning, lastSyncTime, isSyncEnabled) ->
 
                     // Update the shared sync status repository
                     syncStatusRepository.updateConnectedDevicesCount(connectedCount)
@@ -334,11 +331,13 @@ class MultiDeviceSyncService(
      * Refreshes connections to all enabled devices. Disconnects and reconnects to trigger a fresh
      * scan.
      */
+    @RequiresPermission(Manifest.permission.POST_NOTIFICATIONS)
     private fun refreshConnections() {
         syncCoordinator.refreshConnections()
     }
 
     /** Connects to a specific device. */
+    @RequiresPermission(Manifest.permission.POST_NOTIFICATIONS)
     fun connectDevice(device: PairedDevice) {
         launch { syncCoordinator.startDeviceSync(device) }
     }

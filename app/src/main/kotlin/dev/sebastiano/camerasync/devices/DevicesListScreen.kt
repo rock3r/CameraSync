@@ -1,5 +1,6 @@
 package dev.sebastiano.camerasync.devices
 
+import android.annotation.SuppressLint
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.animateColorAsState
@@ -42,6 +43,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Badge
 import androidx.compose.material3.ButtonColors
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -296,6 +298,7 @@ fun DevicesListScreen(
                             },
                             onUnpairClick = { device -> deviceToUnpair = device },
                             onRetryClick = { device ->
+                                @SuppressLint("MissingPermission")
                                 viewModel.retryConnection(device.device.macAddress)
                             },
                         )
@@ -531,8 +534,19 @@ private fun DeviceCard(
 
                     if (connectionState is DeviceConnectionState.Syncing) {
                         connectionState.firmwareVersion?.let { version ->
-                            DeviceDetailRow(stringResource(R.string.label_firmware), version)
+                            DeviceDetailRowWithBadge(
+                                label = stringResource(R.string.label_firmware),
+                                value = version,
+                                latestVersion = device.latestFirmwareVersion,
+                            )
                         }
+                    } else if (device.firmwareVersion != null) {
+                        // Show firmware version even when not syncing if we have it stored
+                        DeviceDetailRowWithBadge(
+                            label = stringResource(R.string.label_firmware),
+                            value = device.firmwareVersion,
+                            latestVersion = device.latestFirmwareVersion,
+                        )
                     }
 
                     if (connectionState is DeviceConnectionState.Unreachable) {
@@ -780,6 +794,43 @@ private fun DeviceDetailRow(label: String, value: String) {
             color = MaterialTheme.colorScheme.onSurface,
             modifier = Modifier.alignByBaseline(),
         )
+    }
+}
+
+@Composable
+private fun DeviceDetailRowWithBadge(label: String, value: String, latestVersion: String?) {
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.width(100.dp).alignByBaseline(),
+        )
+        Row(
+            modifier = Modifier.alignByBaseline(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Text(
+                text = value,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
+            if (latestVersion != null) {
+                Badge(
+                    modifier = Modifier.alignByBaseline(),
+                    containerColor = MaterialTheme.colorScheme.primary,
+                ) {
+                    Text(
+                        text =
+                            stringResource(R.string.badge_firmware_update_available, latestVersion),
+                        style = MaterialTheme.typography.labelSmall,
+                    )
+                }
+            }
+        }
     }
 }
 

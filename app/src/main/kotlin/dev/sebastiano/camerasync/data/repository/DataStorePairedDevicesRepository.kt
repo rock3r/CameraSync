@@ -129,6 +129,69 @@ class DataStorePairedDevicesRepository(private val dataStore: DataStore<PairedDe
     override suspend fun hasEnabledDevices(): Boolean {
         return dataStore.data.first().devicesList.any { it.enabled }
     }
+
+    override suspend fun updateFirmwareVersion(macAddress: String, firmwareVersion: String?) {
+        dataStore.updateData { currentData ->
+            val deviceIndex = currentData.devicesList.indexOfFirst { it.macAddress == macAddress }
+
+            if (deviceIndex < 0) return@updateData currentData
+
+            val updatedDevice =
+                currentData.devicesList[deviceIndex]
+                    .toBuilder()
+                    .apply {
+                        if (firmwareVersion != null) {
+                            setFirmwareVersion(firmwareVersion)
+                        } else {
+                            clearFirmwareVersion()
+                        }
+                    }
+                    .build()
+
+            currentData.toBuilder().setDevices(deviceIndex, updatedDevice).build()
+        }
+    }
+
+    override suspend fun setFirmwareUpdateInfo(macAddress: String, latestVersion: String?) {
+        dataStore.updateData { currentData ->
+            val deviceIndex = currentData.devicesList.indexOfFirst { it.macAddress == macAddress }
+
+            if (deviceIndex < 0) return@updateData currentData
+
+            val updatedDevice =
+                currentData.devicesList[deviceIndex]
+                    .toBuilder()
+                    .apply {
+                        if (latestVersion != null) {
+                            setLatestFirmwareVersion(latestVersion)
+                            // Clear notification shown flag when new update is found
+                            setFirmwareUpdateNotificationShown(false)
+                        } else {
+                            clearLatestFirmwareVersion()
+                            setFirmwareUpdateNotificationShown(false)
+                        }
+                    }
+                    .build()
+
+            currentData.toBuilder().setDevices(deviceIndex, updatedDevice).build()
+        }
+    }
+
+    override suspend fun setFirmwareUpdateNotificationShown(macAddress: String) {
+        dataStore.updateData { currentData ->
+            val deviceIndex = currentData.devicesList.indexOfFirst { it.macAddress == macAddress }
+
+            if (deviceIndex < 0) return@updateData currentData
+
+            val updatedDevice =
+                currentData.devicesList[deviceIndex]
+                    .toBuilder()
+                    .setFirmwareUpdateNotificationShown(true)
+                    .build()
+
+            currentData.toBuilder().setDevices(deviceIndex, updatedDevice).build()
+        }
+    }
 }
 
 /** Converts a proto [PairedDeviceProto] to a domain [PairedDevice]. */
@@ -139,6 +202,9 @@ private fun PairedDeviceProto.toDomain(): PairedDevice =
         vendorId = vendorId,
         isEnabled = enabled,
         lastSyncedAt = if (hasLastSyncedAt()) lastSyncedAt else null,
+        firmwareVersion = if (hasFirmwareVersion()) firmwareVersion else null,
+        latestFirmwareVersion = if (hasLatestFirmwareVersion()) latestFirmwareVersion else null,
+        firmwareUpdateNotificationShown = firmwareUpdateNotificationShown,
     )
 
 /** Serializer for [PairedDevicesProto] used by DataStore. */

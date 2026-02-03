@@ -14,6 +14,12 @@ import dev.sebastiano.camerasync.domain.vendor.CameraVendor
  * @param isEnabled Whether the device should be auto-connected and synced.
  * @param lastSyncedAt The timestamp of the last successful sync (millis since epoch), or null if
  *   never synced.
+ * @param firmwareVersion The firmware version currently installed on the device (e.g., "2.01"), or
+ *   null if unknown.
+ * @param latestFirmwareVersion The latest firmware version available for this device (e.g.,
+ *   "2.02"), or null if no update is available or unknown.
+ * @param firmwareUpdateNotificationShown Whether the user has already been notified about the
+ *   firmware update. This prevents showing the notification multiple times.
  */
 data class PairedDevice(
     val macAddress: String,
@@ -21,6 +27,9 @@ data class PairedDevice(
     val vendorId: String,
     val isEnabled: Boolean,
     val lastSyncedAt: Long? = null,
+    val firmwareVersion: String? = null,
+    val latestFirmwareVersion: String? = null,
+    val firmwareUpdateNotificationShown: Boolean = false,
 )
 
 /** Represents the current connection state of a paired device. */

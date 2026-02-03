@@ -26,6 +26,7 @@ import dev.sebastiano.camerasync.domain.vendor.CameraVendorRegistry
 import dev.sebastiano.camerasync.domain.vendor.DefaultCameraVendorRegistry
 import dev.sebastiano.camerasync.feedback.AndroidIssueReporter
 import dev.sebastiano.camerasync.feedback.IssueReporter
+import dev.sebastiano.camerasync.firmware.FirmwareUpdateChecker
 import dev.sebastiano.camerasync.logging.LogRepository
 import dev.sebastiano.camerasync.logging.LogViewerViewModel
 import dev.sebastiano.camerasync.logging.LogcatLogRepository
@@ -59,6 +60,8 @@ interface AppGraph {
     fun mainActivity(): MainActivity
 
     fun multiDeviceSyncService(): MultiDeviceSyncService
+
+    fun provideFirmwareUpdateCheckers(): List<FirmwareUpdateChecker>
 
     fun syncTileService(): SyncTileService
 
@@ -184,6 +187,11 @@ interface AppGraph {
     @SingleIn(AppGraph::class)
     fun provideWidgetUpdateHelper(context: Context): WidgetUpdateHelper =
         GlanceWidgetUpdateHelper(context)
+
+    @Provides
+    @SingleIn(AppGraph::class)
+    fun provideFirmwareUpdateCheckers(context: Context): List<FirmwareUpdateChecker> =
+        listOf(dev.sebastiano.camerasync.firmware.sony.SonyFirmwareUpdateChecker(context))
 
     @DependencyGraph.Factory
     interface Factory {

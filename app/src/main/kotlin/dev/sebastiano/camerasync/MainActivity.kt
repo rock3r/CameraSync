@@ -37,7 +37,6 @@ import com.google.accompanist.permissions.rememberPermissionState
 import dev.sebastiano.camerasync.devices.DevicesListScreen
 import dev.sebastiano.camerasync.devices.DevicesListViewModel
 import dev.sebastiano.camerasync.devicesync.MultiDeviceSyncService
-import dev.sebastiano.camerasync.devicesync.registerNotificationChannel
 import dev.sebastiano.camerasync.di.AppGraph
 import dev.sebastiano.camerasync.logging.LogViewerScreen
 import dev.sebastiano.camerasync.logging.LogViewerViewModel
@@ -57,7 +56,8 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
 
         enableEdgeToEdge()
-        registerNotificationChannel(this)
+        // Notification channels are registered in CameraSyncApp.onCreate() to ensure they're
+        // available before any service tries to use them
 
         shouldShowPermissionsState =
             intent.getBooleanExtra(MultiDeviceSyncService.EXTRA_SHOW_PERMISSIONS, false)

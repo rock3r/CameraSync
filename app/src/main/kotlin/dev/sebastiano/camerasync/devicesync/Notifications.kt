@@ -17,6 +17,7 @@ import java.time.format.DateTimeFormatter
 import java.time.temporal.ChronoUnit
 
 internal const val NOTIFICATION_CHANNEL = "SYNC_SERVICE_NOTIFICATION_CHANNEL"
+internal const val FIRMWARE_UPDATE_NOTIFICATION_CHANNEL = "FIRMWARE_UPDATE_NOTIFICATION_CHANNEL"
 
 /**
  * Formats the elapsed time since the last sync in a human-readable format.
@@ -122,18 +123,24 @@ fun createErrorNotificationBuilder(context: Context): NotificationCompat.Builder
  * Should be called during app initialization.
  */
 fun registerNotificationChannel(context: Context) {
-    val channel =
+    val notificationManager =
+        context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+
+    val syncChannel =
         NotificationChannel(
             /* id = */ NOTIFICATION_CHANNEL,
             /* name = */ context.getString(R.string.notification_channel_name),
             /* importance = */ NotificationManager.IMPORTANCE_MIN,
         )
+    notificationManager.createNotificationChannel(syncChannel)
 
-    @Suppress("UNCHECKED_CAST")
-    val notificationManager =
-        context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-
-    notificationManager.createNotificationChannel(channel)
+    val firmwareUpdateChannel =
+        NotificationChannel(
+            /* id = */ FIRMWARE_UPDATE_NOTIFICATION_CHANNEL,
+            /* name = */ context.getString(R.string.firmware_update_notification_channel_name),
+            /* importance = */ NotificationManager.IMPORTANCE_DEFAULT,
+        )
+    notificationManager.createNotificationChannel(firmwareUpdateChannel)
 }
 
 // --- Multi-device notification functions ---
@@ -247,6 +254,57 @@ internal fun createMultiDeviceNotification(
         category = Notification.CATEGORY_LOCATION_SHARING,
         isSilent = true,
         actions = actions,
+        contentIntent = contentIntent,
+    )
+}
+
+/** Creates a notification indicating that a firmware update is available for a connected device. */
+internal fun createFirmwareUpdateNotification(
+    notificationBuilder: NotificationBuilder,
+    pendingIntentFactory: PendingIntentFactory,
+    context: Context,
+    deviceName: String,
+    currentVersion: String,
+    latestVersion: String,
+    macAddress: String,
+): Notification {
+    val title = context.getString(R.string.firmware_update_notification_title)
+    val content =
+        context.getString(
+            R.string.firmware_update_notification_content,
+            deviceName,
+            currentVersion,
+            latestVersion,
+        )
+
+    // Create intent to open MainActivity
+    val mainIntent =
+        android.content.Intent(context, dev.sebastiano.camerasync.MainActivity::class.java).apply {
+            action = android.content.Intent.ACTION_MAIN
+            addCategory(android.content.Intent.CATEGORY_LAUNCHER)
+            flags =
+                android.content.Intent.FLAG_ACTIVITY_NEW_TASK or
+                    android.content.Intent.FLAG_ACTIVITY_CLEAR_TOP
+        }
+
+    val contentIntent =
+        pendingIntentFactory.createActivityPendingIntent(
+            context,
+            MultiDeviceSyncService.MAIN_ACTIVITY_REQUEST_CODE,
+            mainIntent,
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+        )
+
+    return notificationBuilder.build(
+        channelId = FIRMWARE_UPDATE_NOTIFICATION_CHANNEL,
+        title = title,
+        content = content,
+        icon = R.drawable.ic_sync,
+        isOngoing = false,
+        priority = PRIORITY_HIGH,
+        category = Notification.CATEGORY_STATUS,
+        isSilent = false,
+        actions = emptyList(),
         contentIntent = contentIntent,
     )
 }

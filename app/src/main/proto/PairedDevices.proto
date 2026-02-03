@@ -19,6 +19,15 @@ message PairedDeviceProto {
 
   // The timestamp of the last successful sync (millis since epoch)
   optional int64 last_synced_at = 5;
+
+  // The firmware version currently installed on the device (e.g., "2.01")
+  optional string firmware_version = 6;
+
+  // The latest firmware version available for this device (e.g., "2.02"), or empty if no update available
+  optional string latest_firmware_version = 7;
+
+  // Whether the user has already been notified about the firmware update
+  bool firmware_update_notification_shown = 8;
 }
 
 // Collection of all paired devices

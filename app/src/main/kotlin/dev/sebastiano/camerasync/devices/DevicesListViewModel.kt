@@ -1,9 +1,11 @@
 package dev.sebastiano.camerasync.devices
 
+import android.Manifest
 import android.content.ComponentName
 import android.content.Context
 import android.content.ServiceConnection
 import android.os.IBinder
+import androidx.annotation.RequiresPermission
 import androidx.compose.runtime.State
 import androidx.compose.runtime.mutableStateOf
 import androidx.core.content.ContextCompat
@@ -312,6 +314,7 @@ class DevicesListViewModel(
     }
 
     /** Retries connection to a failed device. */
+    @RequiresPermission(Manifest.permission.POST_NOTIFICATIONS)
     fun retryConnection(macAddress: String) {
         viewModelScope.launch(ioDispatcher) {
             val device = pairedDevicesRepository.getDevice(macAddress) ?: return@launch
