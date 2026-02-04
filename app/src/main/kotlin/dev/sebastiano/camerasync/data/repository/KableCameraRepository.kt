@@ -260,7 +260,8 @@ class KableCameraRepository(
                     "and the camera is in pairing/discoverable mode."
             }
         Log.error(tag = TAG, throwable = lastException) { errorMessage }
-        if (lastException is TimeoutCancellationException) throw lastException else throw IllegalStateException(errorMessage, lastException)
+        if (lastException is TimeoutCancellationException) throw lastException
+        else throw IllegalStateException(errorMessage, lastException)
     }
 
     private fun isDeviceBonded(macAddress: String): Boolean {

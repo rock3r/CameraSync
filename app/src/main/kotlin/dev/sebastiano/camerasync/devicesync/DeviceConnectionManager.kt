@@ -4,8 +4,6 @@ import dev.sebastiano.camerasync.domain.repository.CameraConnection
 import dev.zacsweers.metro.Inject
 import kotlinx.coroutines.Job
 
-private const val TAG = "DeviceConnectionManager"
-
 /**
  * Manages active camera connections and their associated coroutine jobs.
  *

@@ -414,6 +414,7 @@ constructor(
         }
     }
 
+    @Suppress("TooGenericExceptionCaught")
     private suspend fun performInitialSetup(
         connection: CameraConnection,
         device: PairedDevice,
@@ -426,6 +427,8 @@ constructor(
             try {
                 val deviceName = connection.camera.vendor.getPairedDeviceName(deviceNameProvider)
                 connection.setPairedDeviceName(deviceName)
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
                 Log.warn(tag = TAG, throwable = e) {
                     "Failed to set device name for ${device.macAddress}"
@@ -436,6 +439,8 @@ constructor(
         if (capabilities.supportsDateTimeSync) {
             try {
                 connection.syncDateTime(ZonedDateTime.now())
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
                 Log.warn(tag = TAG, throwable = e) {
                     "Failed to sync date time for ${device.macAddress}"
@@ -446,6 +451,8 @@ constructor(
         if (capabilities.supportsGeoTagging) {
             try {
                 connection.setGeoTaggingEnabled(true)
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
                 Log.warn(tag = TAG, throwable = e) {
                     "Failed to enable geo tagging for ${device.macAddress}"
@@ -458,6 +465,8 @@ constructor(
             try {
                 firmwareVersion = connection.readFirmwareVersion()
                 pairedDevicesRepository.updateFirmwareVersion(device.macAddress, firmwareVersion)
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
                 Log.warn(tag = TAG, throwable = e) {
                     "Failed to read firmware version for ${device.macAddress}"
