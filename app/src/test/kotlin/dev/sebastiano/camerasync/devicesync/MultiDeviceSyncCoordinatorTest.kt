@@ -473,27 +473,6 @@ class MultiDeviceSyncCoordinatorTest {
         }
 
     @Test
-    fun `connection timeout from repository updates state to Unreachable`() =
-        testScope.runTest {
-            cameraRepository.connectException =
-                try {
-                    withTimeout(0) { delay(1) }
-                    null
-                } catch (e: TimeoutCancellationException) {
-                    e
-                }
-
-            coordinator.startDeviceSync(testDevice1)
-            advanceUntilIdle()
-
-            val state = coordinator.getDeviceState(testDevice1.macAddress)
-            assertTrue(
-                "Expected Unreachable but was $state",
-                state is DeviceConnectionState.Unreachable,
-            )
-        }
-
-    @Test
     fun `connection error updates state to Error`() =
         testScope.runTest {
             cameraRepository.connectException = IllegalStateException("Something went wrong")

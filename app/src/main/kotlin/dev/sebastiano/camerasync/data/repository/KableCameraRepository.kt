@@ -178,10 +178,6 @@ class KableCameraRepository(
                 "Device ${camera.macAddress} is bonded. " +
                     "Cameras may need 10-15 seconds to start advertising after being turned on."
             }
-            // Give bonded cameras time to start advertising after power-on
-            // This is especially important when cameras are turned on while the app is running
-            // We already have a delay in setDevicePresence, but add extra time here too
-            delay(5_000L)
         }
 
         // Retry logic for bonded devices that might be slow to advertise
