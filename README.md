@@ -69,7 +69,7 @@ The project has been refactored to support cameras from multiple manufacturers. 
 pattern where each vendor provides its own GATT specification and protocol implementation.
 
 For more details on how to add support for new vendors,
-see [MULTI_VENDOR_SUPPORT.md](MULTI_VENDOR_SUPPORT.md).
+see [docs/MULTI_VENDOR_SUPPORT.md](docs/MULTI_VENDOR_SUPPORT.md).
 
 ## Setup & Installation
 
@@ -105,7 +105,7 @@ This project uses Gradle with Kotlin DSL.
 - `./gradlew bundleRelease`: Build the release App Bundle.
 - `./gradlew test`: Run unit tests.
 - `./gradlew connectedAndroidTest`: Run instrumented tests on a device.
-- `./gradlew ktfmtFormat`: Format the code using ktfmt (if configured).
+- `./gradlew ktfmtFormat`: Format the code using ktfmt.
 
 ### Environment Variables
 

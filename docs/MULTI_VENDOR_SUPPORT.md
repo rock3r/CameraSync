@@ -53,7 +53,8 @@ app/src/main/kotlin/dev/sebastiano/camerasync/
 ├── data/
 │   └── repository/
 │       └── KableCameraRepository.kt (vendor-agnostic)
-└── CameraSyncApp.kt (vendor registry configuration)
+└── di/
+    └── AppGraph.kt (vendor registry configuration)
 ```
 
 ## Adding Support for a New Camera Vendor
@@ -165,24 +166,25 @@ object CanonCameraVendor : CameraVendor {
 
 ### Step 5: Register Vendor
 
-Update `CameraSyncApp.kt` to register the new vendor:
+Update `AppGraph.kt` to register the new vendor in the `provideVendorRegistry` method:
 
 > **Important**: Registering a new vendor automatically updates the global BLE scan filters. The
 `KableCameraRepository` queries the registry for all vendor UUIDs at startup. Ensure your vendor's
 `scanFilterServiceUuids` are correct, or the scanner will filter out your devices.
 
 ```kotlin
-fun createVendorRegistry(): CameraVendorRegistry {
-    return DefaultCameraVendorRegistry(
+@Provides
+@SingleIn(AppGraph::class)
+fun provideVendorRegistry(): CameraVendorRegistry =
+    DefaultCameraVendorRegistry(
         vendors = listOf(
             RicohCameraVendor,
             SonyCameraVendor,
             // Add more vendors here:
             // CanonCameraVendor,
             // NikonCameraVendor,
-        ),
+        )
     )
-}
 ```
 
 ## How It Works
