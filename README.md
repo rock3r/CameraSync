@@ -21,6 +21,7 @@ Bluetooth is active.
 - **Quick Settings Tile**: Toggle global synchronization on/off directly from your Android
   notification tray.
 - **Homescreen Widget**: View connection status and toggle sync directly from your home screen.
+  ![A quick showcase of the widget in action](docs/art/widget.gif)
 - **Firmware Update Notifications**: Automatically notifies you when a firmware update is available
   for your paired cameras.
 - **Battery Optimization Detection**: Proactive warnings and guidance to ensure stable background
