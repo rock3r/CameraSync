@@ -1,29 +1,31 @@
 # Multi-Vendor Camera Support
 
-This document describes the refactoring that enables CameraSync to support cameras from multiple manufacturers, not just Ricoh.
+This document describes the architecture that enables CameraSync to support cameras from multiple
+manufacturers, currently supporting Ricoh and Sony.
 
 ## Architecture Overview
 
-The refactoring introduces a vendor abstraction layer using the **Strategy Pattern**, allowing easy extension to support new camera brands.
+The app uses a vendor abstraction layer based on the **Strategy Pattern**, allowing easy extension
+to support new camera brands.
 
 ### Key Components
 
 1. **CameraVendor Interface** (`domain/vendor/CameraVendor.kt`)
-   - Defines what each vendor must provide
-   - Contains GATT specification, protocol encoder/decoder, and device recognition logic
+    - Defines what each vendor must provide
+    - Contains GATT specification, protocol encoder/decoder, and device recognition logic
 
 2. **CameraVendorRegistry** (`domain/vendor/CameraVendorRegistry.kt`)
-   - Manages all registered camera vendors
-   - Identifies which vendor a discovered BLE device belongs to
-   - Provides scan filter UUIDs for all vendors
+    - Manages all registered camera vendors
+    - Identifies which vendor a discovered BLE device belongs to
+    - Provides scan filter UUIDs and name prefixes for all vendors
 
 3. **Vendor Implementations** (`vendors/` package)
-   - Each vendor (Ricoh, Canon, Nikon, etc.) has its own sub-package
-   - Contains vendor-specific GATT specs, protocol encoding, and capabilities
+    - Each vendor (Ricoh, Sony, etc.) has its own sub-package
+    - Contains vendor-specific GATT specs, protocol encoding, and capabilities
 
 4. **Generic Domain Model**
-   - `Camera` (replaces `RicohCamera`) with vendor property
-   - Backward compatibility maintained via type alias
+    - `Camera` (replaces `RicohCamera`) with vendor property
+    - Backward compatibility maintained via type alias
 
 ## Directory Structure
 
@@ -40,10 +42,14 @@ app/src/main/kotlin/dev/sebastiano/camerasync/
 │   └── repository/
 │       └── CameraRepository.kt (vendor-agnostic)
 ├── vendors/
-│   └── ricoh/
-│       ├── RicohCameraVendor.kt
-│       ├── RicohGattSpec.kt (moved from ble/)
-│       └── RicohProtocol.kt (moved from data/encoding/)
+│   ├── ricoh/
+│   │   ├── RicohCameraVendor.kt
+│   │   ├── RicohGattSpec.kt
+│   │   └── RicohProtocol.kt
+│   └── sony/
+│       ├── SonyCameraVendor.kt
+│       ├── SonyGattSpec.kt
+│       └── SonyProtocol.kt
 ├── data/
 │   └── repository/
 │       └── KableCameraRepository.kt (vendor-agnostic)
@@ -52,7 +58,7 @@ app/src/main/kotlin/dev/sebastiano/camerasync/
 
 ## Adding Support for a New Camera Vendor
 
-Follow these steps to add support for a new camera brand (e.g., Canon, Nikon, Sony):
+Follow these steps to add support for a new camera brand (e.g., Canon, Nikon):
 
 ### Step 1: Create Vendor Package
 
@@ -99,7 +105,6 @@ Create `[VendorName]Protocol.kt` implementing `CameraProtocol`:
 object CanonProtocol : CameraProtocol {
     override fun encodeDateTime(dateTime: ZonedDateTime): ByteArray {
         // Implement Canon's specific date/time encoding
-        // This will vary by vendor!
     }
 
     override fun decodeDateTime(bytes: ByteArray): String {
@@ -136,8 +141,12 @@ object CanonCameraVendor : CameraVendor {
     override val gattSpec: CameraGattSpec = CanonGattSpec
     override val protocol: CameraProtocol = CanonProtocol
 
-    override fun recognizesDevice(deviceName: String?, serviceUuids: List<Uuid>): Boolean {
-        // Identify Canon cameras by service UUID or device name
+    override fun recognizesDevice(
+        deviceName: String?,
+        serviceUuids: List<Uuid>,
+        manufacturerData: Map<Int, ByteArray>
+    ): Boolean {
+        // Identify Canon cameras by service UUID, device name, or manufacturer data
         return serviceUuids.any { it in CanonGattSpec.scanFilterServiceUuids }
             || deviceName?.startsWith("EOS", ignoreCase = true) == true
     }
@@ -147,7 +156,7 @@ object CanonCameraVendor : CameraVendor {
             supportsFirmwareVersion = true,
             supportsDeviceName = true,
             supportsDateTimeSync = true,
-            supportsGeoTagging = true, // Set based on what Canon supports
+            supportsGeoTagging = true,
             supportsLocationSync = true,
         )
     }
@@ -158,7 +167,9 @@ object CanonCameraVendor : CameraVendor {
 
 Update `CameraSyncApp.kt` to register the new vendor:
 
-> **Important**: Registering a new vendor automatically updates the global BLE scan filters. The `KableCameraRepository` queries the registry for all vendor UUIDs at startup. Ensure your vendor's `scanFilterServiceUuids` are correct, or the scanner will filter out your devices.
+> **Important**: Registering a new vendor automatically updates the global BLE scan filters. The
+`KableCameraRepository` queries the registry for all vendor UUIDs at startup. Ensure your vendor's
+`scanFilterServiceUuids` are correct, or the scanner will filter out your devices.
 
 ```kotlin
 fun createVendorRegistry(): CameraVendorRegistry {
@@ -173,8 +184,6 @@ fun createVendorRegistry(): CameraVendorRegistry {
     )
 }
 ```
-
-That's it! The app will now automatically discover and sync with Canon cameras.
 
 ## How It Works
 
@@ -194,20 +203,15 @@ That's it! The app will now automatically discover and sync with Canon cameras.
 
 ### Vendor Capabilities
 
-Different vendors support different features. The `CameraCapabilities` class defines what each vendor supports:
+Different vendors support different features. The `CameraCapabilities` class defines what each
+vendor supports:
 
-- Firmware version reading
+- Firmware version and hardware revision reading
 - Setting paired device name
 - Date/time synchronization
 - Geo-tagging enable/disable
 - GPS location synchronization
-
-## Backward Compatibility
-
-- `RicohCamera` is now a deprecated type alias for `Camera`
-- Old `RicohGattSpec` and `RicohProtocol` classes are deprecated wrappers
-- Existing code continues to work with deprecation warnings
-- Tests remain functional with backward-compatible API
+- Vendor-specific pairing initialization (e.g., Sony's EE01 write)
 
 ## Benefits
 
@@ -216,7 +220,7 @@ Different vendors support different features. The `CameraCapabilities` class def
 ✅ **No Core Changes**: Adding vendors doesn't touch core sync logic
 ✅ **Type Safety**: Compile-time checks ensure vendor implementations are complete
 ✅ **Testability**: Each vendor can be tested independently
-✅ **Backward Compatible**: Existing Ricoh camera support unchanged
+✅ **Backward Compatible**: Existing Ricoh camera support remains functional
 
 ## Testing a New Vendor
 
@@ -226,49 +230,7 @@ Different vendors support different features. The `CameraCapabilities` class def
 4. Test device recognition with various device names and service UUIDs
 5. Test with actual hardware if available
 
-## Example: Testing Canon Protocol
-
-```kotlin
-class CanonProtocolTest {
-    @Test
-    fun `encodeDateTime produces correct format`() {
-        val dateTime = ZonedDateTime.of(2024, 12, 25, 14, 30, 45, 0, ZoneId.of("UTC"))
-        val encoded = CanonProtocol.encodeDateTime(dateTime)
-
-        // Verify Canon's specific byte format
-        // (This will vary based on Canon's actual protocol!)
-        assertEquals(expectedSize, encoded.size)
-        // ... more assertions
-    }
-}
-```
-
-## Common Issues
-
-### Device Not Recognized
-
-- Verify the scan filter UUID is correct for your camera
-- Check that `recognizesDevice()` logic matches your camera's advertisement
-- Use BLE scanner apps to inspect actual advertisement data
-
-### Wrong Data Format
-
-- Carefully reverse-engineer the vendor's protocol
-- Use a BLE sniffer to capture actual communication
-- Test encoding/decoding with known values
-
-### Missing Features
-
-- Some cameras may not support all features
-- Set capabilities correctly to avoid runtime errors
-- Handle `UnsupportedOperationException` gracefully in UI
-
-## Additional Resources
-
-- BLE GATT Specification: https://www.bluetooth.com/specifications/specs/
-- nRF Connect (BLE scanner): https://www.nordicsemi.com/Products/Development-tools/nrf-connect-for-mobile
-- Wireshark BLE plugin for protocol analysis
-
 ---
 
-**Note**: This refactoring maintains full backward compatibility with existing Ricoh camera support while enabling future expansion to any BLE-enabled camera brand.
+**Note**: This architecture ensures that CameraSync can grow to support any BLE-enabled camera brand
+while maintaining a clean, testable codebase.
