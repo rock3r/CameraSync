@@ -34,13 +34,14 @@ import kotlinx.coroutines.withTimeout
 
 private const val TAG = "PairingViewModel"
 internal const val PAIRING_CONNECTION_TIMEOUT_MS = 30_000L
+private const val BONDING_TIMEOUT_MS = 60_000L
+private const val BOND_CHECK_DELAY_MS = 500L
 
 /**
  * ViewModel for the pairing screen.
  *
  * Handles the companion device association flow and pairing process.
- */
-/**
+ *
  * @param ioDispatcher The dispatcher to use for IO operations. Can be overridden in tests to use a
  *   test dispatcher.
  */
@@ -77,7 +78,7 @@ class PairingViewModel(
 
                 override fun onFailure(error: CharSequence?) {
                     Log.error(tag = TAG) { "Companion Device Association failed: $error" }
-                    _state.value = PairingScreenState.Idle // Reset state?
+                    _state.value = PairingScreenState.Idle
                 }
             }
         )
@@ -91,36 +92,7 @@ class PairingViewModel(
             return
         }
 
-        // Try ScanResult first (BLE devices), then BluetoothDevice (classic Bluetooth)
-        // The Intent only contains one type, so we need to try them separately
-        val camera =
-            try {
-                val scanResult =
-                    data.getParcelableExtra(
-                        CompanionDeviceManager.EXTRA_DEVICE,
-                        ScanResult::class.java,
-                    )
-                scanResult?.toCamera()
-            } catch (e: ClassCastException) {
-                // If ScanResult fails, try BluetoothDevice
-                Log.debug(tag = TAG) {
-                    "EXTRA_DEVICE is not a ScanResult, trying BluetoothDevice: ${e.message}"
-                }
-                try {
-                    val device =
-                        data.getParcelableExtra(
-                            CompanionDeviceManager.EXTRA_DEVICE,
-                            BluetoothDevice::class.java,
-                        )
-                    device?.toCamera()
-                } catch (e2: Exception) {
-                    Log.warn(tag = TAG, throwable = e2) {
-                        "Could not extract device from Intent: ${e2.message}"
-                    }
-                    null
-                }
-            }
-
+        val camera = extractCameraFromIntent(data)
         if (camera != null) {
             Log.info(tag = TAG) {
                 "Companion device selected: ${camera.name} (${camera.macAddress})"
@@ -129,6 +101,24 @@ class PairingViewModel(
         } else {
             Log.warn(tag = TAG) { "Could not convert companion device result to Camera" }
             _state.value = PairingScreenState.Idle
+        }
+    }
+
+    @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
+    private fun extractCameraFromIntent(data: Intent): Camera? {
+        return try {
+            val scanResult =
+                data.getParcelableExtra(CompanionDeviceManager.EXTRA_DEVICE, ScanResult::class.java)
+            scanResult?.toCamera()
+                ?: data
+                    .getParcelableExtra(
+                        CompanionDeviceManager.EXTRA_DEVICE,
+                        BluetoothDevice::class.java,
+                    )
+                    ?.toCamera()
+        } catch (e: Exception) {
+            Log.warn(tag = TAG, throwable = e) { "Could not extract device from Intent" }
+            null
         }
     }
 
@@ -145,7 +135,6 @@ class PairingViewModel(
 
         val serviceUuids =
             record.serviceUuids?.map { Uuid.parse(it.uuid.toString()) } ?: emptyList()
-
         val name = device.name ?: record.deviceName
 
         val vendor =
@@ -153,9 +142,7 @@ class PairingViewModel(
                 deviceName = name,
                 serviceUuids = serviceUuids,
                 manufacturerData = mfrMap,
-            )
-
-        if (vendor == null) return null
+            ) ?: return null
 
         return Camera(
             identifier = device.address,
@@ -169,15 +156,12 @@ class PairingViewModel(
     @OptIn(ExperimentalUuidApi::class)
     private fun BluetoothDevice.toCamera(): Camera? {
         val name = name
-        // Try to identify based on name only (vendor registry supports it fallback)
         val vendor =
             vendorRegistry.identifyVendor(
                 deviceName = name,
                 serviceUuids = emptyList(),
                 manufacturerData = emptyMap(),
-            )
-
-        if (vendor == null) return null
+            ) ?: return null
 
         return Camera(identifier = address, name = name, macAddress = address, vendor = vendor)
     }
@@ -187,13 +171,7 @@ class PairingViewModel(
         pairingJob =
             viewModelScope.launch(ioDispatcher) {
                 if (pairedDevicesRepository.isDevicePaired(camera.macAddress)) {
-                    Log.info(tag = TAG) { "Device ${camera.macAddress} already paired" }
-                    pairedDevicesRepository.setSyncEnabled(true)
-
-                    // Presence is inferred from connection state, so the device will be connected
-                    // when background monitoring runs
-                    _state.value = PairingScreenState.Idle
-                    _navigationEvents.send(PairingNavigationEvent.DevicePaired)
+                    onDeviceAlreadyPaired(camera)
                     return@launch
                 }
 
@@ -209,172 +187,131 @@ class PairingViewModel(
 
                 _state.value = PairingScreenState.Pairing(camera)
 
-                // After CDM association, ensure Bluetooth bonding is complete before connecting
-                // CDM association doesn't automatically bond the device - we need to do it
-                // explicitly
-                if (!bluetoothBondingChecker.isDeviceBonded(camera.macAddress)) {
-                    Log.info(tag = TAG) {
-                        "Device ${camera.macAddress} is not bonded yet. " +
-                            "CDM association completed but Bluetooth bonding is required. " +
-                            "Initiating bonding..."
-                    }
-                    val bondingInitiated = bluetoothBondingChecker.createBond(camera.macAddress)
-                    if (!bondingInitiated) {
-                        Log.error(tag = TAG) {
-                            "Failed to initiate Bluetooth bonding for ${camera.macAddress}"
-                        }
-                        _state.value =
-                            PairingScreenState.Pairing(camera, error = PairingError.UNKNOWN)
-                        return@launch
-                    }
+                if (!ensureDeviceBonded(camera)) return@launch
 
-                    // Wait for bonding to complete (user will see PIN dialog here if required)
-                    // Some BLE devices bond without a PIN, so we check bond state directly
-                    Log.info(tag = TAG) {
-                        "Waiting for Bluetooth bonding to complete (PIN dialog may appear if required)..."
-                    }
-                    val bondingTimeout = 60_000L // 60 seconds for user to enter PIN if needed
-                    val bondingStartTime = System.currentTimeMillis()
-                    var bondingComplete = false
-                    var lastBondState: Int? = null
-
-                    while (
-                        !bondingComplete &&
-                            (System.currentTimeMillis() - bondingStartTime) < bondingTimeout
-                    ) {
-                        delay(500) // Check every 500ms
-                        val bondState = bluetoothBondingChecker.getBondState(camera.macAddress)
-
-                        // Log state changes
-                        if (bondState != lastBondState) {
-                            val stateName =
-                                when (bondState) {
-                                    android.bluetooth.BluetoothDevice.BOND_NONE -> "BOND_NONE"
-                                    android.bluetooth.BluetoothDevice.BOND_BONDING -> "BOND_BONDING"
-                                    android.bluetooth.BluetoothDevice.BOND_BONDED -> "BOND_BONDED"
-                                    else -> "UNKNOWN($bondState)"
-                                }
-                            Log.info(tag = TAG) {
-                                "Bond state changed for ${camera.macAddress}: $stateName"
-                            }
-                            lastBondState = bondState
-                        }
-
-                        // Check if bonding is complete
-                        bondingComplete =
-                            bondState == android.bluetooth.BluetoothDevice.BOND_BONDED ||
-                                bluetoothBondingChecker.isDeviceBonded(camera.macAddress)
-
-                        if (bondingComplete) {
-                            Log.info(tag = TAG) {
-                                "Bluetooth bonding completed for ${camera.macAddress}"
-                            }
-                        } else if (bondState == android.bluetooth.BluetoothDevice.BOND_BONDING) {
-                            // Still bonding, continue waiting
-                            Log.debug(tag = TAG) {
-                                "Bonding in progress for ${camera.macAddress}..."
-                            }
-                        }
-                    }
-
-                    if (!bondingComplete) {
-                        val finalState = bluetoothBondingChecker.getBondState(camera.macAddress)
-                        Log.error(tag = TAG) {
-                            "Bluetooth bonding timed out for ${camera.macAddress}. " +
-                                "Final bond state: $finalState. " +
-                                "User may have cancelled the PIN dialog or bonding failed."
-                        }
-                        _state.value =
-                            PairingScreenState.Pairing(camera, error = PairingError.TIMEOUT)
-                        return@launch
-                    }
-                } else {
-                    Log.info(tag = TAG) {
-                        "Device ${camera.macAddress} is already bonded, proceeding with connection"
-                    }
-                }
-
-                var connection: CameraConnection? = null
-                try {
-                    // Now establish a BLE connection to verify everything works
-                    Log.info(tag = TAG) { "Connecting to ${camera.name ?: camera.macAddress}..." }
-                    connection =
-                        withTimeout(PAIRING_CONNECTION_TIMEOUT_MS) {
-                            cameraRepository.connect(camera)
-                        }
-
-                    // Perform vendor-specific pairing initialization if required
-                    // (e.g., Sony cameras need a specific command written to EE01)
-                    val pairingSuccess = connection.initializePairing()
-                    if (!pairingSuccess) {
-                        Log.error(tag = TAG) { "Vendor-specific pairing initialization failed" }
-                        _state.value =
-                            PairingScreenState.Pairing(camera, error = PairingError.UNKNOWN)
-                        return@launch
-                    }
-
-                    // If we get here, pairing was successful (user accepted the dialog)
-                    Log.info(tag = TAG) { "Pairing successful, adding device to repository..." }
-
-                    // Now add the device to the paired devices repository
-                    pairedDevicesRepository.addDevice(camera, enabled = true)
-                    pairedDevicesRepository.setSyncEnabled(true)
-
-                    // Presence is inferred from connection state, so the device will be connected
-                    // when background monitoring runs
-
-                    Log.info(tag = TAG) {
-                        "Device paired successfully: ${camera.name ?: camera.macAddress}"
-                    }
-                    // Reset state to Idle before emitting navigation event
-                    _state.value = PairingScreenState.Idle
-                    // Emit navigation event instead of setting success flag in state
-                    _navigationEvents.send(PairingNavigationEvent.DevicePaired)
-                } catch (e: TimeoutCancellationException) {
-                    Log.error(tag = TAG, throwable = e) {
-                        "Pairing timed out while connecting to ${camera.macAddress}"
-                    }
-                    _state.value = PairingScreenState.Pairing(camera, error = PairingError.TIMEOUT)
-                } catch (e: Exception) {
-                    Log.error(tag = TAG, throwable = e) { "Pairing failed" }
-                    val error =
-                        when {
-                            e.message?.contains("reject", ignoreCase = true) == true ->
-                                PairingError.REJECTED
-                            e.message?.contains("timeout", ignoreCase = true) == true ->
-                                PairingError.TIMEOUT
-                            else -> PairingError.UNKNOWN
-                        }
-                    _state.value = PairingScreenState.Pairing(camera, error = error)
-                } finally {
-                    // Disconnect after pairing - the sync coordinator will reconnect
-                    // when the device is enabled
-                    try {
-                        connection?.disconnect()
-                    } catch (e: Exception) {
-                        Log.warn(tag = TAG, throwable = e) { "Error disconnecting after pairing" }
-                    }
-                }
+                performPairingConnection(camera)
             }
+    }
+
+    private suspend fun onDeviceAlreadyPaired(camera: Camera) {
+        Log.info(tag = TAG) { "Device ${camera.macAddress} already paired" }
+        pairedDevicesRepository.setSyncEnabled(true)
+        _state.value = PairingScreenState.Idle
+        _navigationEvents.send(PairingNavigationEvent.DevicePaired)
+    }
+
+    private suspend fun ensureDeviceBonded(camera: Camera): Boolean {
+        if (bluetoothBondingChecker.isDeviceBonded(camera.macAddress)) {
+            Log.info(tag = TAG) { "Device ${camera.macAddress} is already bonded" }
+            return true
+        }
+
+        Log.info(tag = TAG) { "Initiating Bluetooth bonding for ${camera.macAddress}..." }
+        if (!bluetoothBondingChecker.createBond(camera.macAddress)) {
+            Log.error(tag = TAG) { "Failed to initiate Bluetooth bonding for ${camera.macAddress}" }
+            _state.value = PairingScreenState.Pairing(camera, error = PairingError.UNKNOWN)
+            return false
+        }
+
+        return waitForBonding(camera)
+    }
+
+    private suspend fun waitForBonding(camera: Camera): Boolean {
+        val bondingStartTime = System.currentTimeMillis()
+        var lastBondState: Int? = null
+
+        while ((System.currentTimeMillis() - bondingStartTime) < BONDING_TIMEOUT_MS) {
+            delay(BOND_CHECK_DELAY_MS)
+            val bondState = bluetoothBondingChecker.getBondState(camera.macAddress)
+
+            if (bondState != lastBondState) {
+                logBondStateChange(camera.macAddress, bondState)
+                lastBondState = bondState
+            }
+
+            if (
+                bondState == android.bluetooth.BluetoothDevice.BOND_BONDED ||
+                    bluetoothBondingChecker.isDeviceBonded(camera.macAddress)
+            ) {
+                Log.info(tag = TAG) { "Bluetooth bonding completed for ${camera.macAddress}" }
+                return true
+            }
+        }
+
+        Log.error(tag = TAG) { "Bluetooth bonding timed out for ${camera.macAddress}" }
+        _state.value = PairingScreenState.Pairing(camera, error = PairingError.TIMEOUT)
+        return false
+    }
+
+    private fun logBondStateChange(macAddress: String, bondState: Int?) {
+        val stateName =
+            when (bondState) {
+                android.bluetooth.BluetoothDevice.BOND_NONE -> "BOND_NONE"
+                android.bluetooth.BluetoothDevice.BOND_BONDING -> "BOND_BONDING"
+                android.bluetooth.BluetoothDevice.BOND_BONDED -> "BOND_BONDED"
+                else -> "UNKNOWN($bondState)"
+            }
+        Log.info(tag = TAG) { "Bond state changed for $macAddress: $stateName" }
+    }
+
+    private suspend fun performPairingConnection(camera: Camera) {
+        var connection: CameraConnection? = null
+        try {
+            Log.info(tag = TAG) { "Connecting to ${camera.name ?: camera.macAddress}..." }
+            connection =
+                withTimeout(PAIRING_CONNECTION_TIMEOUT_MS) { cameraRepository.connect(camera) }
+
+            if (!connection.initializePairing()) {
+                Log.error(tag = TAG) { "Vendor-specific pairing initialization failed" }
+                _state.value = PairingScreenState.Pairing(camera, error = PairingError.UNKNOWN)
+                return
+            }
+
+            onPairingSuccessful(camera)
+        } catch (e: TimeoutCancellationException) {
+            Log.error(tag = TAG, throwable = e) { "Pairing timed out for ${camera.macAddress}" }
+            _state.value = PairingScreenState.Pairing(camera, error = PairingError.TIMEOUT)
+        } catch (e: Exception) {
+            Log.error(tag = TAG, throwable = e) { "Pairing failed" }
+            val error =
+                when {
+                    e.message?.contains("reject", ignoreCase = true) == true ->
+                        PairingError.REJECTED
+                    e.message?.contains("timeout", ignoreCase = true) == true ->
+                        PairingError.TIMEOUT
+                    else -> PairingError.UNKNOWN
+                }
+            _state.value = PairingScreenState.Pairing(camera, error = error)
+        } finally {
+            try {
+                connection?.disconnect()
+            } catch (e: Exception) {
+                Log.warn(tag = TAG, throwable = e) { "Error disconnecting after pairing" }
+            }
+        }
+    }
+
+    private suspend fun onPairingSuccessful(camera: Camera) {
+        Log.info(tag = TAG) { "Pairing successful, adding ${camera.macAddress} to repository..." }
+        pairedDevicesRepository.addDevice(camera, enabled = true)
+        pairedDevicesRepository.setSyncEnabled(true)
+        _state.value = PairingScreenState.Idle
+        _navigationEvents.send(PairingNavigationEvent.DevicePaired)
     }
 
     /** Removes the system-level bond and restarts the system pairing flow. */
     fun removeBondAndRetry(camera: Camera) {
         pairingJob =
             viewModelScope.launch(ioDispatcher) {
-                val removed = bluetoothBondingChecker.removeBond(camera.macAddress)
-                if (removed) {
+                if (bluetoothBondingChecker.removeBond(camera.macAddress)) {
                     Log.info(tag = TAG) {
-                        "Bond removed for ${camera.macAddress}, restarting companion pairing"
+                        "Bond removed for ${camera.macAddress}, restarting pairing"
                     }
-                    // Wait a moment for the system to process the unbond
-                    delay(500)
+                    delay(BOND_CHECK_DELAY_MS)
                     _state.value = PairingScreenState.Idle
                     requestCompanionPairing()
                 } else {
-                    Log.warn(tag = TAG) {
-                        "Failed to remove bond for ${camera.macAddress}, showing manual instructions"
-                    }
+                    Log.warn(tag = TAG) { "Failed to remove bond for ${camera.macAddress}" }
                     _state.value = PairingScreenState.AlreadyBonded(camera, removeFailed = true)
                 }
             }
@@ -413,19 +350,15 @@ class PairingViewModel(
 
 /** State of the pairing screen. */
 sealed interface PairingScreenState {
-    /** Initial state, ready to pair. */
     data object Idle : PairingScreenState
 
-    /** Device is already bonded at system level. */
     data class AlreadyBonded(val camera: Camera, val removeFailed: Boolean = false) :
         PairingScreenState
 
-    /** Pairing with a selected camera. */
     data class Pairing(val camera: Camera, val error: PairingError? = null) : PairingScreenState
 }
 
 /** Navigation events emitted by the PairingViewModel. */
 sealed interface PairingNavigationEvent {
-    /** Emitted when a device is successfully paired. */
     data object DevicePaired : PairingNavigationEvent
 }

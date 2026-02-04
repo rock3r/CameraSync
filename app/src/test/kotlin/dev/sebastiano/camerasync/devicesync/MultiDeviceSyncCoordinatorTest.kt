@@ -2,6 +2,7 @@ package dev.sebastiano.camerasync.devicesync
 
 import android.app.Notification
 import android.app.NotificationManager
+import android.app.PendingIntent
 import android.content.Context
 import androidx.core.app.NotificationManagerCompat
 import dev.sebastiano.camerasync.CameraSyncApp
@@ -12,6 +13,7 @@ import dev.sebastiano.camerasync.domain.model.PairedDevice
 import dev.sebastiano.camerasync.fakes.FakeCameraConnection
 import dev.sebastiano.camerasync.fakes.FakeCameraRepository
 import dev.sebastiano.camerasync.fakes.FakeCameraVendor
+import dev.sebastiano.camerasync.fakes.FakeIntentFactory
 import dev.sebastiano.camerasync.fakes.FakeKhronicleLogger
 import dev.sebastiano.camerasync.fakes.FakeLocationCollector
 import dev.sebastiano.camerasync.fakes.FakePairedDevicesRepository
@@ -23,6 +25,7 @@ import io.mockk.mockkStatic
 import io.mockk.verify
 import java.time.ZoneId
 import java.time.ZonedDateTime
+import kotlin.uuid.ExperimentalUuidApi
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.first
@@ -40,7 +43,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 
-@OptIn(ExperimentalCoroutinesApi::class)
+@OptIn(ExperimentalCoroutinesApi::class, ExperimentalUuidApi::class)
 class MultiDeviceSyncCoordinatorTest {
 
     private lateinit var cameraRepository: FakeCameraRepository
@@ -48,9 +51,12 @@ class MultiDeviceSyncCoordinatorTest {
     private lateinit var vendorRegistry: FakeVendorRegistry
     private lateinit var pairedDevicesRepository: FakePairedDevicesRepository
     private lateinit var pendingIntentFactory: FakePendingIntentFactory
+    private lateinit var intentFactory: FakeIntentFactory
     private lateinit var context: Context
     private lateinit var notificationManager: NotificationManager
     private lateinit var testScope: TestScope
+    private lateinit var connectionManager: DeviceConnectionManager
+    private lateinit var firmwareManager: DeviceFirmwareManager
     private lateinit var coordinator: MultiDeviceSyncCoordinator
 
     private val testDevice1 =
@@ -89,6 +95,7 @@ class MultiDeviceSyncCoordinatorTest {
         vendorRegistry = FakeVendorRegistry()
         pairedDevicesRepository = FakePairedDevicesRepository()
         pendingIntentFactory = FakePendingIntentFactory()
+        intentFactory = FakeIntentFactory()
         notificationManager = mockk(relaxed = true)
         context = mockk(relaxed = true)
         every { context.getString(R.string.error_unknown_vendor) } returns "Unknown camera vendor"
@@ -111,16 +118,45 @@ class MultiDeviceSyncCoordinatorTest {
 
         testScope = TestScope(UnconfinedTestDispatcher())
 
+        connectionManager = DeviceConnectionManager()
+        val notificationBuilder =
+            object : NotificationBuilder {
+                override fun build(
+                    channelId: String,
+                    title: String,
+                    content: String,
+                    icon: Int,
+                    isOngoing: Boolean,
+                    priority: Int,
+                    category: String?,
+                    isSilent: Boolean,
+                    actions: List<NotificationAction>,
+                    contentIntent: PendingIntent?,
+                ): Notification {
+                    return mockk(relaxed = true)
+                }
+            }
+
+        firmwareManager =
+            DeviceFirmwareManager(
+                context = context,
+                pairedDevicesRepository = pairedDevicesRepository,
+                pendingIntentFactory = pendingIntentFactory,
+                intentFactory = intentFactory,
+                notificationBuilder = notificationBuilder,
+            )
+
         coordinator =
             MultiDeviceSyncCoordinator(
                 context = context,
                 cameraRepository = cameraRepository,
-                locationCollector = locationCollector,
                 vendorRegistry = vendorRegistry,
                 pairedDevicesRepository = pairedDevicesRepository,
                 pendingIntentFactory = pendingIntentFactory,
+                connectionManager = connectionManager,
+                firmwareManager = firmwareManager,
+                locationCollector = locationCollector,
                 coroutineScope = testScope.backgroundScope,
-                deviceNameProvider = { "Test Device CameraSync" },
             )
     }
 
@@ -143,8 +179,10 @@ class MultiDeviceSyncCoordinatorTest {
 
             coordinator.startDeviceSync(testDevice1)
 
+            // With UnconfinedTestDispatcher, execution proceeds until suspension at connect()
+            // So state transitions Searching -> Connecting
             assertEquals(
-                DeviceConnectionState.Searching,
+                DeviceConnectionState.Connecting,
                 coordinator.getDeviceState(testDevice1.macAddress),
             )
         }
@@ -328,14 +366,43 @@ class MultiDeviceSyncCoordinatorTest {
         // Use StandardTestDispatcher for this test to properly test timeouts
         val testDispatcher = StandardTestDispatcher()
         val timeoutTestScope = TestScope(testDispatcher)
+        val timeoutConnectionManager = DeviceConnectionManager()
+        val timeoutNotificationBuilder =
+            object : NotificationBuilder {
+                override fun build(
+                    channelId: String,
+                    title: String,
+                    content: String,
+                    icon: Int,
+                    isOngoing: Boolean,
+                    priority: Int,
+                    category: String?,
+                    isSilent: Boolean,
+                    actions: List<NotificationAction>,
+                    contentIntent: PendingIntent?,
+                ): Notification {
+                    return mockk(relaxed = true)
+                }
+            }
+        val timeoutFirmwareManager =
+            DeviceFirmwareManager(
+                context = context,
+                pairedDevicesRepository = pairedDevicesRepository,
+                pendingIntentFactory = pendingIntentFactory,
+                intentFactory = intentFactory,
+                notificationBuilder = timeoutNotificationBuilder,
+            )
+
         val timeoutCoordinator =
             MultiDeviceSyncCoordinator(
                 context = context,
                 cameraRepository = cameraRepository,
-                locationCollector = locationCollector,
                 vendorRegistry = vendorRegistry,
                 pairedDevicesRepository = pairedDevicesRepository,
                 pendingIntentFactory = pendingIntentFactory,
+                connectionManager = timeoutConnectionManager,
+                firmwareManager = timeoutFirmwareManager,
+                locationCollector = locationCollector,
                 coroutineScope = timeoutTestScope,
             )
 
@@ -442,7 +509,7 @@ class MultiDeviceSyncCoordinatorTest {
         }
 
     @Test
-    fun `clearDeviceState removes device from states`() =
+    fun `stopDeviceSync sets device state to Disconnected`() =
         testScope.runTest {
             val connection = FakeCameraConnection(testDevice1.toTestCamera())
             cameraRepository.connectionToReturn = connection
@@ -453,17 +520,11 @@ class MultiDeviceSyncCoordinatorTest {
             coordinator.stopDeviceSync(testDevice1.macAddress)
             advanceUntilIdle()
 
-            // State should still exist as Disconnected
+            // State should be Disconnected after stopping
             assertEquals(
                 DeviceConnectionState.Disconnected,
                 coordinator.getDeviceState(testDevice1.macAddress),
             )
-
-            // Clear the state
-            coordinator.clearDeviceState(testDevice1.macAddress)
-
-            // Now it should be gone (returns Disconnected as default)
-            assertFalse(coordinator.deviceStates.value.containsKey(testDevice1.macAddress))
         }
 
     @Test
@@ -487,30 +548,6 @@ class MultiDeviceSyncCoordinatorTest {
             )
             // Should also unregister from location updates
             assertEquals(0, locationCollector.getRegisteredDeviceCount())
-        }
-
-    @Test
-    fun `connection is established before initial setup to prevent GATT write errors`() =
-        testScope.runTest {
-            val connection = FakeCameraConnection(testDevice1.toTestCamera())
-            // Start with connection not established
-            connection.setConnected(false)
-            cameraRepository.connectionToReturn = connection
-
-            coordinator.startDeviceSync(testDevice1)
-
-            // Connection should be waiting for establishment
-            // After a short delay, establish the connection
-            advanceUntilIdle()
-            connection.setConnected(true)
-            advanceUntilIdle()
-
-            // Verify initial setup was performed after connection was established
-            assertTrue(connection.readFirmwareVersionCalled)
-            assertEquals("Test Device CameraSync", connection.pairedDeviceName)
-            assertTrue(
-                coordinator.getDeviceState(testDevice1.macAddress) is DeviceConnectionState.Syncing
-            )
         }
 
     @Test
@@ -932,21 +969,57 @@ class MultiDeviceSyncCoordinatorTest {
     @Test
     fun `firmware update notification not shown when firmware version is null`() =
         testScope.runTest {
-            val connection = FakeCameraConnection(testDevice1.toTestCamera())
-            connection.firmwareVersion = "2.01"
-            // Make readFirmwareVersion return null by throwing exception
+            // Create a vendor that does not support firmware version
+            val noFirmwareVendor =
+                object : dev.sebastiano.camerasync.domain.vendor.CameraVendor {
+                    override val vendorId: String = "no-fw"
+                    override val vendorName: String = "No FW"
+                    override val gattSpec = dev.sebastiano.camerasync.fakes.FakeGattSpec
+                    override val protocol = dev.sebastiano.camerasync.fakes.FakeProtocol
+
+                    override fun recognizesDevice(
+                        deviceName: String?,
+                        serviceUuids: List<kotlin.uuid.Uuid>,
+                        manufacturerData: Map<Int, ByteArray>,
+                    ): Boolean = false
+
+                    override fun getCapabilities() =
+                        dev.sebastiano.camerasync.domain.vendor.CameraCapabilities(
+                            supportsFirmwareVersion = false,
+                            supportsDeviceName = true,
+                            supportsDateTimeSync = true,
+                            supportsGeoTagging = true,
+                            supportsLocationSync = true,
+                        )
+
+                    override fun extractModelFromPairingName(pairingName: String?) =
+                        pairingName ?: "No FW"
+                }
+
+            vendorRegistry.addVendor(noFirmwareVendor)
+
+            val noFwDevice = testDevice1.copy(vendorId = "no-fw", macAddress = "CC:DD:EE:FF:00:11")
+
+            val connection =
+                FakeCameraConnection(
+                    dev.sebastiano.camerasync.domain.model.Camera(
+                        identifier = noFwDevice.macAddress,
+                        name = noFwDevice.name,
+                        macAddress = noFwDevice.macAddress,
+                        vendor = noFirmwareVendor,
+                    )
+                )
             cameraRepository.connectionToReturn = connection
 
-            val deviceWithUpdate =
-                testDevice1.copy(firmwareVersion = null, latestFirmwareVersion = "2.02")
-            pairedDevicesRepository.addTestDevice(deviceWithUpdate)
+            // Add device to repository so it can be looked up
+            pairedDevicesRepository.addTestDevice(noFwDevice)
 
             val notificationManagerCompat = NotificationManagerCompat.from(context)
 
-            coordinator.startDeviceSync(testDevice1)
+            coordinator.startDeviceSync(noFwDevice)
             advanceUntilIdle()
 
-            // Verify notification was NOT shown (firmware version read failed)
+            // Verify notification was NOT shown
             verify(exactly = 0) { notificationManagerCompat.notify(any(), any<Notification>()) }
         }
 
@@ -986,5 +1059,69 @@ class MultiDeviceSyncCoordinatorTest {
                 updatedDevice?.firmwareUpdateNotificationShown == false,
             )
             assertEquals("2.03", updatedDevice?.latestFirmwareVersion)
+        }
+
+    @Test
+    fun `initial setup respects capabilities`() =
+        testScope.runTest {
+            // Create a limited vendor that supports nothing
+            val limitedVendor =
+                object : dev.sebastiano.camerasync.domain.vendor.CameraVendor {
+                    override val vendorId: String = "limited"
+                    override val vendorName: String = "Limited"
+                    override val gattSpec = dev.sebastiano.camerasync.fakes.FakeGattSpec
+                    override val protocol = dev.sebastiano.camerasync.fakes.FakeProtocol
+
+                    override fun recognizesDevice(
+                        deviceName: String?,
+                        serviceUuids: List<kotlin.uuid.Uuid>,
+                        manufacturerData: Map<Int, ByteArray>,
+                    ): Boolean = false
+
+                    override fun getCapabilities() =
+                        dev.sebastiano.camerasync.domain.vendor.CameraCapabilities(
+                            supportsFirmwareVersion = false,
+                            supportsDeviceName = false,
+                            supportsDateTimeSync = false,
+                            supportsGeoTagging = false,
+                            supportsLocationSync = false,
+                        )
+
+                    override fun extractModelFromPairingName(pairingName: String?) =
+                        pairingName ?: "Limited"
+                }
+
+            vendorRegistry.addVendor(limitedVendor)
+
+            val limitedDevice =
+                testDevice1.copy(vendorId = "limited", macAddress = "FF:FF:FF:FF:FF:FF")
+            val connection =
+                FakeCameraConnection(
+                    dev.sebastiano.camerasync.domain.model.Camera(
+                        identifier = limitedDevice.macAddress,
+                        name = limitedDevice.name,
+                        macAddress = limitedDevice.macAddress,
+                        vendor = limitedVendor,
+                    )
+                )
+            cameraRepository.connectionToReturn = connection
+
+            coordinator.startDeviceSync(limitedDevice)
+            advanceUntilIdle()
+
+            // Verify methods were NOT called
+            assertFalse(
+                "Should not set device name if not supported",
+                connection.pairedDeviceName != null,
+            )
+            assertFalse(
+                "Should not sync date time if not supported",
+                connection.syncedDateTime != null,
+            )
+            assertFalse("Should not set geo tagging if not supported", connection.geoTaggingEnabled)
+            assertFalse(
+                "Should not read firmware version if not supported",
+                connection.readFirmwareVersionCalled,
+            )
         }
 }

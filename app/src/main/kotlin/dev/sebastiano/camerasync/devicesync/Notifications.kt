@@ -73,43 +73,6 @@ internal fun formatElapsedTimeSince(context: Context, lastSyncTimestamp: Long?):
     }
 }
 
-/**
- * Backwards compatibility for usages that don't have a context. **Note**: This will use hardcoded
- * strings and should be avoided in favor of the context-aware version.
- */
-@Deprecated(
-    "Use context-aware version instead",
-    ReplaceWith("formatElapsedTimeSince(context, lastSyncTime)"),
-)
-internal fun formatElapsedTimeSince(lastSyncTime: ZonedDateTime?): String {
-    if (lastSyncTime == null) return "never"
-
-    val now = Instant.now()
-    val then = lastSyncTime.toInstant()
-    val diffSeconds = ChronoUnit.SECONDS.between(then, now)
-
-    if (diffSeconds < 0) return "just now"
-
-    return when {
-        diffSeconds < 60 -> "seconds ago"
-        diffSeconds < 3600 -> "${diffSeconds / 60} minutes ago"
-        diffSeconds < 24 * 3600 -> "${diffSeconds / 3600} hours ago"
-        else -> {
-            val thenDateTime = LocalDateTime.ofInstant(then, ZoneId.systemDefault())
-            val nowDateTime = LocalDateTime.ofInstant(now, ZoneId.systemDefault())
-
-            val yesterday = nowDateTime.minusDays(1).toLocalDate()
-            if (thenDateTime.toLocalDate() == yesterday) {
-                val timeFormatter = DateTimeFormatter.ofPattern("HH:mm")
-                "yesterday at ${thenDateTime.format(timeFormatter)}"
-            } else {
-                val dateTimeFormatter = DateTimeFormatter.ofPattern("MMM d, yyyy, HH:mm")
-                thenDateTime.format(dateTimeFormatter)
-            }
-        }
-    }
-}
-
 /** Creates a notification builder for error notifications. */
 fun createErrorNotificationBuilder(context: Context): NotificationCompat.Builder =
     NotificationCompat.Builder(context, NOTIFICATION_CHANNEL)
@@ -145,68 +108,73 @@ fun registerNotificationChannel(context: Context) {
 
 // --- Multi-device notification functions ---
 
+/** Parameters for creating a multi-device sync notification. */
+internal data class MultiDeviceNotificationParams(
+    val connectedCount: Int,
+    val totalEnabled: Int,
+    val lastSyncTime: ZonedDateTime?,
+)
+
 /** Creates a notification for multi-device sync showing connection status. */
 internal fun createMultiDeviceNotification(
+    context: Context,
     notificationBuilder: NotificationBuilder,
     pendingIntentFactory: PendingIntentFactory,
     intentFactory: IntentFactory,
-    context: Context,
-    connectedCount: Int,
-    totalEnabled: Int,
-    lastSyncTime: java.time.ZonedDateTime?,
+    params: MultiDeviceNotificationParams,
 ): Notification {
     val title =
         when {
-            totalEnabled == 0 -> context.getString(R.string.notification_no_devices)
-            connectedCount == 0 ->
+            params.totalEnabled == 0 -> context.getString(R.string.notification_no_devices)
+            params.connectedCount == 0 ->
                 context.resources.getQuantityString(
                     R.plurals.notification_searching,
-                    totalEnabled,
-                    totalEnabled,
+                    params.totalEnabled,
+                    params.totalEnabled,
                 )
-            connectedCount == totalEnabled -> {
+            params.connectedCount == params.totalEnabled -> {
                 context.resources.getQuantityString(
                     R.plurals.notification_syncing,
-                    connectedCount,
-                    connectedCount,
+                    params.connectedCount,
+                    params.connectedCount,
                 )
             }
             else ->
                 context.getString(
                     R.string.notification_syncing_partial,
-                    connectedCount,
-                    totalEnabled,
+                    params.connectedCount,
+                    params.totalEnabled,
                 )
         }
 
     val content =
         when {
-            totalEnabled == 0 -> context.getString(R.string.notification_enable_to_start)
-            connectedCount == 0 -> context.getString(R.string.notification_will_connect)
-            connectedCount < totalEnabled -> {
-                val missing = totalEnabled - connectedCount
+            params.totalEnabled == 0 -> context.getString(R.string.notification_enable_to_start)
+            params.connectedCount == 0 -> context.getString(R.string.notification_will_connect)
+            params.connectedCount < params.totalEnabled -> {
+                val missing = params.totalEnabled - params.connectedCount
                 val syncText =
-                    if (lastSyncTime != null) {
+                    if (params.lastSyncTime != null) {
                         context.getString(
                             R.string.notification_last_sync,
-                            formatElapsedTimeSince(context, lastSyncTime),
+                            formatElapsedTimeSince(context, params.lastSyncTime),
                         )
                     } else {
                         context.getString(R.string.notification_connected_syncing)
                     }
                 context.getString(R.string.notification_sync_waiting, syncText, missing)
             }
-            lastSyncTime != null ->
+            params.lastSyncTime != null ->
                 context.getString(
                     R.string.notification_last_sync,
-                    formatElapsedTimeSince(context, lastSyncTime),
+                    formatElapsedTimeSince(context, params.lastSyncTime),
                 )
             else -> context.getString(R.string.notification_connected_syncing)
         }
 
     val icon =
         when {
-            connectedCount == 0 -> R.drawable.ic_sync_disabled
+            params.connectedCount == 0 -> R.drawable.ic_sync_disabled
             else -> R.drawable.ic_sync
         }
 
@@ -258,40 +226,35 @@ internal fun createMultiDeviceNotification(
     )
 }
 
+/** Parameters for creating a firmware update notification. */
+internal data class FirmwareUpdateNotificationParams(
+    val deviceName: String,
+    val currentVersion: String,
+    val latestVersion: String,
+)
+
 /** Creates a notification indicating that a firmware update is available for a connected device. */
 internal fun createFirmwareUpdateNotification(
+    context: Context,
     notificationBuilder: NotificationBuilder,
     pendingIntentFactory: PendingIntentFactory,
-    context: Context,
-    deviceName: String,
-    currentVersion: String,
-    latestVersion: String,
-    macAddress: String,
+    intentFactory: IntentFactory,
+    params: FirmwareUpdateNotificationParams,
 ): Notification {
     val title = context.getString(R.string.firmware_update_notification_title)
     val content =
         context.getString(
             R.string.firmware_update_notification_content,
-            deviceName,
-            currentVersion,
-            latestVersion,
+            params.deviceName,
+            params.currentVersion,
+            params.latestVersion,
         )
-
-    // Create intent to open MainActivity
-    val mainIntent =
-        android.content.Intent(context, dev.sebastiano.camerasync.MainActivity::class.java).apply {
-            action = android.content.Intent.ACTION_MAIN
-            addCategory(android.content.Intent.CATEGORY_LAUNCHER)
-            flags =
-                android.content.Intent.FLAG_ACTIVITY_NEW_TASK or
-                    android.content.Intent.FLAG_ACTIVITY_CLEAR_TOP
-        }
 
     val contentIntent =
         pendingIntentFactory.createActivityPendingIntent(
             context,
             MultiDeviceSyncService.MAIN_ACTIVITY_REQUEST_CODE,
-            mainIntent,
+            intentFactory.createMainActivityIntent(context),
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
         )
 

@@ -91,7 +91,7 @@ class DevicesListViewModel(
                     locationRepository.locationUpdates,
                     batteryOptimizationStatus,
                 ) { flows ->
-                    val pairedDevices = flows[0] as List<*>
+                    @Suppress("UNCHECKED_CAST") val pairedDevices = flows[0] as List<PairedDevice>
                     @Suppress("UNCHECKED_CAST")
                     val connectionStates = flows[1] as Map<String, DeviceConnectionState>
                     val isScanning = flows[2] as Boolean
@@ -104,7 +104,6 @@ class DevicesListViewModel(
                     } else {
                         val devicesWithState =
                             pairedDevices.map { device ->
-                                device as PairedDevice
                                 val connectionState =
                                     when {
                                         !device.isEnabled -> DeviceConnectionState.Disabled
@@ -197,36 +196,33 @@ class DevicesListViewModel(
     }
 
     private fun unbindFromService() {
-        if (!isServiceBound || serviceConnection == null) {
+        if (!isServiceBound) {
             // Already unbound or never bound, just clean up state
-            serviceConnection = null
-            service = null
-            stateCollectionJob?.cancel()
-            scanningCollectionJob?.cancel()
-            deviceStatesFromService.value = emptyMap()
-            isScanningFromService.value = false
+            cleanupServiceState()
             return
         }
 
-        val connection = serviceConnection!!
-        try {
-            context.unbindService(connection)
-            isServiceBound = false
-        } catch (e: IllegalArgumentException) {
-            // Service was already unbound or never bound
-            Log.debug(tag = TAG) { "Service already unbound: ${e.message}" }
-            isServiceBound = false
-        } catch (e: Exception) {
-            Log.warn(tag = TAG, throwable = e) { "Error unbinding service" }
-            isServiceBound = false
-        } finally {
-            serviceConnection = null
-            service = null
-            stateCollectionJob?.cancel()
-            scanningCollectionJob?.cancel()
-            deviceStatesFromService.value = emptyMap()
-            isScanningFromService.value = false
+        serviceConnection?.let { connection ->
+            try {
+                context.unbindService(connection)
+            } catch (e: IllegalArgumentException) {
+                // Service was already unbound or never bound
+                Log.debug(tag = TAG) { "Service already unbound: ${e.message}" }
+            } catch (e: Exception) {
+                Log.warn(tag = TAG, throwable = e) { "Error unbinding service" }
+            }
         }
+        cleanupServiceState()
+    }
+
+    private fun cleanupServiceState() {
+        isServiceBound = false
+        serviceConnection = null
+        service = null
+        stateCollectionJob?.cancel()
+        scanningCollectionJob?.cancel()
+        deviceStatesFromService.value = emptyMap()
+        isScanningFromService.value = false
     }
 
     private fun observeAutoStartSync() {
@@ -365,31 +361,28 @@ class DevicesListViewModel(
     ): Map<String, DeviceDisplayInfo> {
         val unknownString = context.getString(R.string.label_unknown)
 
-        // Group devices by make/model to determine if we need to show pairing names
-        val makeModelGroups =
-            devices.groupBy { device ->
+        // Precompute display info for each device
+        val deviceInfos =
+            devices.associate { device ->
                 val vendor = vendorRegistry.getVendorById(device.vendorId)
                 val make = vendor?.vendorName ?: device.vendorId.replaceFirstChar { it.uppercase() }
                 val model =
                     vendor?.extractModelFromPairingName(device.name) ?: device.name ?: unknownString
-                MakeModel(make, model)
+                device.macAddress to
+                    DeviceDisplayInfo(
+                        make = make,
+                        model = model,
+                        pairingName = device.name,
+                        showPairingName = false, // Will be updated below
+                    )
             }
 
-        return devices.associate { device ->
-            val vendor = vendorRegistry.getVendorById(device.vendorId)
-            val make = vendor?.vendorName ?: device.vendorId.replaceFirstChar { it.uppercase() }
-            val model =
-                vendor?.extractModelFromPairingName(device.name) ?: device.name ?: unknownString
-            val makeModel = MakeModel(make, model)
-            val showPairingName = (makeModelGroups[makeModel]?.size ?: 0) > 1
+        // Group by make/model to determine if we need to show pairing names for disambiguation
+        val makeModelGroups = deviceInfos.values.groupBy { MakeModel(it.make, it.model) }
 
-            device.macAddress to
-                DeviceDisplayInfo(
-                    make = make,
-                    model = model,
-                    pairingName = device.name,
-                    showPairingName = showPairingName,
-                )
+        return deviceInfos.mapValues { (_, info) ->
+            val isAmbiguous = (makeModelGroups[MakeModel(info.make, info.model)]?.size ?: 0) > 1
+            info.copy(showPairingName = isAmbiguous)
         }
     }
 
@@ -399,22 +392,7 @@ class DevicesListViewModel(
         stateCollectionJob?.cancel()
         scanningCollectionJob?.cancel()
         autoStartJob?.cancel()
-        if (isServiceBound && serviceConnection != null) {
-            val connection = serviceConnection!!
-            try {
-                context.unbindService(connection)
-                isServiceBound = false
-            } catch (e: IllegalArgumentException) {
-                // Service was already unbound
-                Log.debug(tag = TAG) { "Service already unbound in onCleared: ${e.message}" }
-                isServiceBound = false
-            } catch (e: Exception) {
-                Log.warn(tag = TAG, throwable = e) { "Error unbinding service in onCleared" }
-                isServiceBound = false
-            } finally {
-                serviceConnection = null
-            }
-        }
+        unbindFromService()
     }
 }
 

@@ -22,10 +22,8 @@ import com.juul.khronicle.Log
 import dev.sebastiano.camerasync.R
 import dev.sebastiano.camerasync.domain.model.DeviceConnectionState
 import dev.sebastiano.camerasync.domain.model.PairedDevice
-import dev.sebastiano.camerasync.domain.repository.CameraRepository
 import dev.sebastiano.camerasync.domain.repository.PairedDevicesRepository
 import dev.sebastiano.camerasync.domain.repository.SyncStatusRepository
-import dev.sebastiano.camerasync.domain.vendor.CameraVendorRegistry
 import dev.zacsweers.metro.Inject
 import kotlin.coroutines.CoroutineContext
 import kotlinx.coroutines.CoroutineName
@@ -56,14 +54,13 @@ private const val TAG = "MultiDeviceSyncService"
  */
 @Inject
 class MultiDeviceSyncService(
-    private val vendorRegistry: CameraVendorRegistry,
-    private val cameraRepository: CameraRepository,
     private val pairedDevicesRepository: PairedDevicesRepository,
     private val syncStatusRepository: SyncStatusRepository,
     private val notificationBuilder: NotificationBuilder,
     private val intentFactory: IntentFactory,
     private val pendingIntentFactory: PendingIntentFactory,
     private val locationCollectorFactory: DefaultLocationCollector.Factory,
+    private val syncCoordinatorFactory: MultiDeviceSyncCoordinator.Factory,
 ) : Service(), CoroutineScope {
 
     override val coroutineContext: CoroutineContext =
@@ -74,15 +71,7 @@ class MultiDeviceSyncService(
     private val locationCollector by lazy { locationCollectorFactory.create(this) }
 
     private val syncCoordinator by lazy {
-        MultiDeviceSyncCoordinator(
-            context = this,
-            cameraRepository = cameraRepository,
-            locationCollector = locationCollector,
-            vendorRegistry = vendorRegistry,
-            pairedDevicesRepository = pairedDevicesRepository,
-            pendingIntentFactory = pendingIntentFactory,
-            coroutineScope = this,
-        )
+        syncCoordinatorFactory.create(locationCollector = locationCollector, coroutineScope = this)
     }
 
     private val vibrator by lazy { SyncErrorVibrator(applicationContext) }
@@ -164,17 +153,21 @@ class MultiDeviceSyncService(
 
     private fun startForegroundService() {
         try {
+            val params =
+                MultiDeviceNotificationParams(
+                    connectedCount = 0,
+                    totalEnabled = 0,
+                    lastSyncTime = null,
+                )
             ServiceCompat.startForeground(
                 this,
                 NOTIFICATION_ID,
                 createMultiDeviceNotification(
+                    context = this,
                     notificationBuilder = notificationBuilder,
                     pendingIntentFactory = pendingIntentFactory,
                     intentFactory = intentFactory,
-                    context = this,
-                    connectedCount = 0,
-                    totalEnabled = 0,
-                    lastSyncTime = null,
+                    params = params,
                 ),
                 ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE or
                     ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION,
@@ -202,8 +195,6 @@ class MultiDeviceSyncService(
         // Stop any existing passive scan when we become active
         syncCoordinator.stopPassiveScan()
 
-        // Presence is inferred from connection state, not from external observations.
-
         // Start background monitoring in the coordinator
         syncCoordinator.startBackgroundMonitoring(pairedDevicesRepository.enabledDevices)
 
@@ -219,9 +210,6 @@ class MultiDeviceSyncService(
 
         // Start state collection for notification updates
         stateCollectionJob = launch {
-            // Wait a bit to allow initial scan to start and avoid race condition where we think we
-            // are idle
-            // before the coordinator has a chance to set isScanning = true.
             kotlinx.coroutines.delay(2000)
 
             combine(
@@ -275,16 +263,9 @@ class MultiDeviceSyncService(
                         return@collect
                     }
 
-                    // Check for idle state: enabled devices exist, but none connected and not
-                    // scanning.
-                    // We check for isScanning to ensure we don't stop while a connection attempt is
-                    // in progress.
                     val isActive =
                         connectedCount > 0 ||
                             isScanning ||
-                            // Also check if any device is in a transitional state that isScanning
-                            // might miss
-                            // (though isScanning covers Connecting/Searching)
                             syncCoordinator.getConnectedDeviceCount() > 0
 
                     if (!isActive) {
@@ -352,15 +333,19 @@ class MultiDeviceSyncService(
         enabledCount: Int,
         lastSyncTime: java.time.ZonedDateTime?,
     ) {
-        val notification =
-            createMultiDeviceNotification(
-                notificationBuilder = notificationBuilder,
-                pendingIntentFactory = pendingIntentFactory,
-                intentFactory = intentFactory,
-                context = this,
+        val params =
+            MultiDeviceNotificationParams(
                 connectedCount = connectedCount,
                 totalEnabled = enabledCount,
                 lastSyncTime = lastSyncTime,
+            )
+        val notification =
+            createMultiDeviceNotification(
+                context = this,
+                notificationBuilder = notificationBuilder,
+                pendingIntentFactory = pendingIntentFactory,
+                intentFactory = intentFactory,
+                params = params,
             )
 
         if (
@@ -467,7 +452,6 @@ class MultiDeviceSyncService(
     companion object {
         private const val NOTIFICATION_ID = 112
         private const val ERROR_NOTIFICATION_ID = 124
-        private const val LOCATION_UPDATE_INTERVAL_SECONDS = 60L
 
         private val _isRunning = MutableStateFlow(false)
         val isRunning: StateFlow<Boolean> = _isRunning.asStateFlow()

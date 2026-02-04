@@ -137,15 +137,15 @@ class NotificationsTest {
 
     @Test
     fun `notification shows no devices when none enabled`() {
+        val params =
+            MultiDeviceNotificationParams(connectedCount = 0, totalEnabled = 0, lastSyncTime = null)
         val notification =
             createMultiDeviceNotification(
                 notificationBuilder = notificationBuilder,
                 pendingIntentFactory = pendingIntentFactory,
                 intentFactory = intentFactory,
                 context = context,
-                connectedCount = 0,
-                totalEnabled = 0,
-                lastSyncTime = null,
+                params = params,
             )
 
         assertEquals(context.getString(R.string.notification_no_devices), notification.getTitle())
@@ -157,15 +157,15 @@ class NotificationsTest {
 
     @Test
     fun `notification shows searching when enabled but not connected`() {
+        val params =
+            MultiDeviceNotificationParams(connectedCount = 0, totalEnabled = 2, lastSyncTime = null)
         val notification =
             createMultiDeviceNotification(
                 notificationBuilder = notificationBuilder,
                 pendingIntentFactory = pendingIntentFactory,
                 intentFactory = intentFactory,
                 context = context,
-                connectedCount = 0,
-                totalEnabled = 2,
-                lastSyncTime = null,
+                params = params,
             )
 
         assertEquals(
@@ -177,15 +177,15 @@ class NotificationsTest {
 
     @Test
     fun `notification shows single device syncing when all connected`() {
+        val params =
+            MultiDeviceNotificationParams(connectedCount = 1, totalEnabled = 1, lastSyncTime = null)
         val notification =
             createMultiDeviceNotification(
                 notificationBuilder = notificationBuilder,
                 pendingIntentFactory = pendingIntentFactory,
                 intentFactory = intentFactory,
                 context = context,
-                connectedCount = 1,
-                totalEnabled = 1,
-                lastSyncTime = null,
+                params = params,
             )
 
         assertEquals(
@@ -200,15 +200,15 @@ class NotificationsTest {
 
     @Test
     fun `notification shows multiple devices syncing when all connected`() {
+        val params =
+            MultiDeviceNotificationParams(connectedCount = 3, totalEnabled = 3, lastSyncTime = null)
         val notification =
             createMultiDeviceNotification(
                 notificationBuilder = notificationBuilder,
                 pendingIntentFactory = pendingIntentFactory,
                 intentFactory = intentFactory,
                 context = context,
-                connectedCount = 3,
-                totalEnabled = 3,
-                lastSyncTime = null,
+                params = params,
             )
 
         assertEquals(
@@ -223,15 +223,15 @@ class NotificationsTest {
 
     @Test
     fun `notification shows partial connection with X of Y format`() {
+        val params =
+            MultiDeviceNotificationParams(connectedCount = 2, totalEnabled = 3, lastSyncTime = null)
         val notification =
             createMultiDeviceNotification(
                 notificationBuilder = notificationBuilder,
                 pendingIntentFactory = pendingIntentFactory,
                 intentFactory = intentFactory,
                 context = context,
-                connectedCount = 2,
-                totalEnabled = 3,
-                lastSyncTime = null,
+                params = params,
             )
 
         assertEquals(
@@ -243,15 +243,15 @@ class NotificationsTest {
 
     @Test
     fun `notification shows waiting count when partially connected`() {
+        val params =
+            MultiDeviceNotificationParams(connectedCount = 1, totalEnabled = 3, lastSyncTime = null)
         val notification =
             createMultiDeviceNotification(
                 notificationBuilder = notificationBuilder,
                 pendingIntentFactory = pendingIntentFactory,
                 intentFactory = intentFactory,
                 context = context,
-                connectedCount = 1,
-                totalEnabled = 3,
-                lastSyncTime = null,
+                params = params,
             )
 
         assertEquals(
@@ -265,15 +265,19 @@ class NotificationsTest {
     @Test
     fun `notification shows last sync time when available`() {
         val lastSyncTime = ZonedDateTime.of(2024, 12, 25, 14, 30, 0, 0, ZoneId.of("UTC"))
+        val params =
+            MultiDeviceNotificationParams(
+                connectedCount = 2,
+                totalEnabled = 2,
+                lastSyncTime = lastSyncTime,
+            )
         val notification =
             createMultiDeviceNotification(
                 notificationBuilder = notificationBuilder,
                 pendingIntentFactory = pendingIntentFactory,
                 intentFactory = intentFactory,
                 context = context,
-                connectedCount = 2,
-                totalEnabled = 2,
-                lastSyncTime = lastSyncTime,
+                params = params,
             )
 
         assertEquals(
@@ -287,15 +291,19 @@ class NotificationsTest {
     @Test
     fun `notification shows last sync time with waiting count when partially connected`() {
         val lastSyncTime = ZonedDateTime.of(2024, 12, 25, 14, 30, 0, 0, ZoneId.of("UTC"))
+        val params =
+            MultiDeviceNotificationParams(
+                connectedCount = 1,
+                totalEnabled = 3,
+                lastSyncTime = lastSyncTime,
+            )
         val notification =
             createMultiDeviceNotification(
                 notificationBuilder = notificationBuilder,
                 pendingIntentFactory = pendingIntentFactory,
                 intentFactory = intentFactory,
                 context = context,
-                connectedCount = 1,
-                totalEnabled = 3,
-                lastSyncTime = lastSyncTime,
+                params = params,
             )
 
         assertEquals(
@@ -309,15 +317,15 @@ class NotificationsTest {
 
     @Test
     fun `notification has refresh and stop actions`() {
+        val params =
+            MultiDeviceNotificationParams(connectedCount = 1, totalEnabled = 1, lastSyncTime = null)
         val notification =
             createMultiDeviceNotification(
                 notificationBuilder = notificationBuilder,
                 pendingIntentFactory = pendingIntentFactory,
                 intentFactory = intentFactory,
                 context = context,
-                connectedCount = 1,
-                totalEnabled = 1,
-                lastSyncTime = null,
+                params = params,
             )
 
         // Verify notification builder received 2 actions
