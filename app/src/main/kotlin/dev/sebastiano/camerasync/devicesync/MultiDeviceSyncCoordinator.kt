@@ -100,6 +100,7 @@ constructor(
     val presentDevices: StateFlow<Set<String>> = _presentDevices.asStateFlow()
 
     private val scanMutex = Mutex()
+    private val connectionMutex = Mutex()
 
     private var backgroundMonitoringJob: Job? = null
     private var periodicCheckJob: Job? = null
@@ -263,14 +264,15 @@ constructor(
         coroutineScope.launch {
             val macAddress = device.macAddress.uppercase()
 
-            if (isDeviceSyncingOrConnecting(macAddress)) {
-                Log.debug(tag = TAG) {
-                    "Device $macAddress is already syncing or connecting, skipping"
+            connectionMutex.withLock {
+                if (isDeviceSyncingOrConnecting(macAddress)) {
+                    Log.debug(tag = TAG) {
+                        "Device $macAddress is already syncing or connecting, skipping"
+                    }
+                    return@launch
                 }
-                return@launch
+                updateDeviceState(macAddress, DeviceConnectionState.Searching)
             }
-
-            updateDeviceState(macAddress, DeviceConnectionState.Searching)
 
             try {
                 val vendor =
@@ -302,6 +304,8 @@ constructor(
                     macAddress,
                     DeviceConnectionState.Syncing(firmwareVersion = firmwareVersion),
                 )
+                _presentDevices.update { it + macAddress }
+
                 val syncJob =
                     currentCoroutineContext()[Job] ?: coroutineScope.launch {}.also { it.cancel() }
                 connectionManager.addConnection(macAddress, connection, syncJob)
@@ -320,6 +324,7 @@ constructor(
             } catch (e: CancellationException) {
                 Log.debug(tag = TAG, throwable = e) { "Cancelled connection to $macAddress" }
                 updateDeviceState(macAddress, DeviceConnectionState.Disconnected)
+                throw e
             } catch (e: IOException) {
                 Log.error(tag = TAG, throwable = e) { "Error connecting to $macAddress" }
                 updateDeviceState(
@@ -346,7 +351,10 @@ constructor(
                 )
             } finally {
                 locationCollector.unregisterDevice(macAddress)
-                connectionManager.removeConnection(macAddress)
+                val (connection, _) = connectionManager.removeConnection(macAddress)
+                // We don't cancel the job here as this finally block runs IN that job
+                // or if the job was cancelled externally.
+                // The connection removal ensures future lookups don't find it.
                 _presentDevices.update { it - macAddress }
 
                 val state = getDeviceState(macAddress)
@@ -369,47 +377,76 @@ constructor(
         val capabilities = connection.camera.vendor.getCapabilities()
 
         if (capabilities.supportsDeviceName) {
-            val deviceName = connection.camera.vendor.getPairedDeviceName(deviceNameProvider)
-            connection.setPairedDeviceName(deviceName)
+            try {
+                val deviceName = connection.camera.vendor.getPairedDeviceName(deviceNameProvider)
+                connection.setPairedDeviceName(deviceName)
+            } catch (e: Exception) {
+                Log.warn(tag = TAG, throwable = e) {
+                    "Failed to set device name for ${device.macAddress}"
+                }
+            }
         }
 
         if (capabilities.supportsDateTimeSync) {
-            connection.syncDateTime(ZonedDateTime.now())
+            try {
+                connection.syncDateTime(ZonedDateTime.now())
+            } catch (e: Exception) {
+                Log.warn(tag = TAG, throwable = e) {
+                    "Failed to sync date time for ${device.macAddress}"
+                }
+            }
         }
 
         if (capabilities.supportsGeoTagging) {
-            connection.setGeoTaggingEnabled(true)
+            try {
+                connection.setGeoTaggingEnabled(true)
+            } catch (e: Exception) {
+                Log.warn(tag = TAG, throwable = e) {
+                    "Failed to enable geo tagging for ${device.macAddress}"
+                }
+            }
         }
 
         var firmwareVersion: String? = null
         if (capabilities.supportsFirmwareVersion) {
-            firmwareVersion = connection.readFirmwareVersion()
-            pairedDevicesRepository.updateFirmwareVersion(device.macAddress, firmwareVersion)
+            try {
+                firmwareVersion = connection.readFirmwareVersion()
+                pairedDevicesRepository.updateFirmwareVersion(device.macAddress, firmwareVersion)
+            } catch (e: Exception) {
+                Log.warn(tag = TAG, throwable = e) {
+                    "Failed to read firmware version for ${device.macAddress}"
+                }
+            }
         }
 
         return firmwareVersion
     }
 
-    fun stopDeviceSync(macAddress: String) {
-        coroutineScope.launch {
-            val upperMacAddress = macAddress.uppercase()
+    suspend fun stopDeviceSync(macAddress: String) {
+        val upperMacAddress = macAddress.uppercase()
 
-            // Stop location updates first
-            locationCollector.unregisterDevice(upperMacAddress)
+        // Stop location updates first
+        locationCollector.unregisterDevice(upperMacAddress)
 
-            // Disconnect camera connection
-            connectionManager.removeConnection(upperMacAddress)?.disconnect()
+        // Disconnect camera connection and cancel job
+        val (connection, job) = connectionManager.removeConnection(upperMacAddress)
+        connection?.disconnect()
+        job?.cancel()
 
-            updateDeviceState(upperMacAddress, DeviceConnectionState.Disconnected)
-        }
+        updateDeviceState(upperMacAddress, DeviceConnectionState.Disconnected)
     }
 
-    fun stopAllDevices() {
-        coroutineScope.launch {
-            val connections = connectionManager.getConnections()
-            connections.keys.forEach { macAddress -> stopDeviceSync(macAddress) }
-            _presentDevices.value = emptySet()
-        }
+    suspend fun stopAllDevices() {
+        backgroundMonitoringJob?.cancel()
+        backgroundMonitoringJob = null
+        periodicCheckJob?.cancel()
+        periodicCheckJob = null
+        locationSyncJob?.cancel()
+        locationSyncJob = null
+
+        val connections = connectionManager.getConnections()
+        connections.keys.forEach { macAddress -> stopDeviceSync(macAddress) }
+        _presentDevices.value = emptySet()
     }
 
     fun getDeviceState(macAddress: String): DeviceConnectionState {
@@ -422,8 +459,10 @@ constructor(
             state is DeviceConnectionState.Connected || state is DeviceConnectionState.Syncing
         }
 
-    fun isDeviceConnected(macAddress: String): Boolean =
-        getDeviceState(macAddress) is DeviceConnectionState.Syncing
+    fun isDeviceConnected(macAddress: String): Boolean {
+        val state = getDeviceState(macAddress)
+        return state is DeviceConnectionState.Connected || state is DeviceConnectionState.Syncing
+    }
 
     private fun updateDeviceState(macAddress: String, state: DeviceConnectionState) {
         _deviceStates.update { currentStates ->
@@ -451,34 +490,6 @@ constructor(
             intent = intent,
             flags = PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_MUTABLE,
         )
-    }
-
-    @RequiresPermission(Manifest.permission.POST_NOTIFICATIONS)
-    fun updatePresence(presentDevices: Set<String>) {
-        _presentDevices.value = presentDevices
-        if (presentDevices.isNotEmpty()) {
-            coroutineScope.launch { checkAndConnectEnabledDevices() }
-        }
-    }
-
-    fun updateDeviceLastSync(macAddress: String, lastSyncTime: ZonedDateTime) {
-        val currentState = getDeviceState(macAddress)
-        if (currentState is DeviceConnectionState.Syncing) {
-            val existingSyncInfo = currentState.lastSyncInfo
-            if (existingSyncInfo != null) {
-                updateDeviceState(
-                    macAddress,
-                    DeviceConnectionState.Syncing(
-                        firmwareVersion = currentState.firmwareVersion,
-                        lastSyncInfo =
-                            LocationSyncInfo(
-                                syncTime = lastSyncTime,
-                                location = existingSyncInfo.location,
-                            ),
-                    ),
-                )
-            }
-        }
     }
 
     /**
