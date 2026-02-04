@@ -10,6 +10,8 @@ import dev.sebastiano.camerasync.R
 import dev.sebastiano.camerasync.domain.model.DeviceConnectionState
 import dev.sebastiano.camerasync.domain.model.GpsLocation
 import dev.sebastiano.camerasync.domain.model.PairedDevice
+import dev.sebastiano.camerasync.domain.model.toCamera
+import dev.sebastiano.camerasync.domain.vendor.CameraVendor
 import dev.sebastiano.camerasync.fakes.FakeCameraConnection
 import dev.sebastiano.camerasync.fakes.FakeCameraRepository
 import dev.sebastiano.camerasync.fakes.FakeCameraVendor
@@ -966,6 +968,35 @@ class MultiDeviceSyncCoordinatorTest {
             advanceUntilIdle()
 
             assertTrue(coordinator.isDeviceConnected(testDevice1.macAddress))
+        }
+
+    @Test
+    fun `connection is disconnected if performInitialSetup fails`() =
+        testScope.runTest {
+            // We need performInitialSetup to throw.
+            // One way is to make getCapabilities throw.
+            val throwingVendor = mockk<CameraVendor>()
+            every { throwingVendor.vendorId } returns "throwing"
+            every { throwingVendor.getCapabilities() } throws IllegalStateException("Setup failed")
+            vendorRegistry.addVendor(throwingVendor)
+
+            val throwingDevice = testDevice1.copy(vendorId = "throwing")
+            val connection = FakeCameraConnection(throwingDevice.toCamera(throwingVendor))
+            cameraRepository.connectionToReturn = connection
+
+            coordinator.startDeviceSync(throwingDevice)
+            advanceUntilIdle()
+
+            assertTrue(
+                "Connection should be disconnected on setup failure",
+                connection.disconnectCalled,
+            )
+            assertFalse(
+                "Connection should not be in connection manager",
+                connectionManager
+                    .getConnections()
+                    .containsKey(throwingDevice.macAddress.uppercase()),
+            )
         }
 
     private fun PairedDevice.toTestCamera() =

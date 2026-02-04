@@ -305,6 +305,7 @@ constructor(
     fun startDeviceSync(device: PairedDevice) {
         coroutineScope.launch {
             val macAddress = device.macAddress.uppercase()
+            var activeConnection: CameraConnection? = null
 
             connectionMutex.withLock {
                 if (isDeviceSyncingOrConnecting(macAddress)) {
@@ -339,6 +340,7 @@ constructor(
                             },
                         )
                     }
+                activeConnection = connection
 
                 val firmwareVersion = performInitialSetup(connection, device)
 
@@ -393,7 +395,9 @@ constructor(
                 )
             } finally {
                 locationCollector.unregisterDevice(macAddress)
-                val (connection, _) = connectionManager.removeConnection(macAddress)
+                val (managedConnection, _) = connectionManager.removeConnection(macAddress)
+                (managedConnection ?: activeConnection)?.disconnect()
+
                 // We don't cancel the job here as this finally block runs IN that job
                 // or if the job was cancelled externally.
                 // The connection removal ensures future lookups don't find it.
