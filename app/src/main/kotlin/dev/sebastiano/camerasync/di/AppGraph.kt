@@ -35,7 +35,9 @@ import dev.sebastiano.camerasync.pairing.BluetoothBondingChecker
 import dev.sebastiano.camerasync.pairing.CompanionDeviceManagerHelper
 import dev.sebastiano.camerasync.pairing.PairingViewModel
 import dev.sebastiano.camerasync.util.AndroidBatteryOptimizationChecker
+import dev.sebastiano.camerasync.util.AndroidDeviceNameProvider
 import dev.sebastiano.camerasync.util.BatteryOptimizationChecker
+import dev.sebastiano.camerasync.util.DeviceNameProvider
 import dev.sebastiano.camerasync.vendors.ricoh.RicohCameraVendor
 import dev.sebastiano.camerasync.vendors.sony.SonyCameraVendor
 import dev.sebastiano.camerasync.widget.GlanceWidgetUpdateHelper
@@ -91,6 +93,11 @@ interface AppGraph {
     @SingleIn(AppGraph::class)
     fun provideBatteryOptimizationChecker(): BatteryOptimizationChecker =
         AndroidBatteryOptimizationChecker()
+
+    @Provides
+    @SingleIn(AppGraph::class)
+    fun provideDeviceNameProvider(context: Context): DeviceNameProvider =
+        AndroidDeviceNameProvider(context)
 
     @Provides
     @SingleIn(AppGraph::class)

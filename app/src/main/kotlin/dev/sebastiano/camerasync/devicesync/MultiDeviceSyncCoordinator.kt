@@ -4,7 +4,6 @@ import android.Manifest
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
-import android.os.Build
 import androidx.annotation.RequiresPermission
 import com.juul.khronicle.Log
 import dev.sebastiano.camerasync.R
@@ -18,6 +17,7 @@ import dev.sebastiano.camerasync.domain.repository.CameraConnection
 import dev.sebastiano.camerasync.domain.repository.CameraRepository
 import dev.sebastiano.camerasync.domain.repository.PairedDevicesRepository
 import dev.sebastiano.camerasync.domain.vendor.CameraVendorRegistry
+import dev.sebastiano.camerasync.util.DeviceNameProvider
 import dev.zacsweers.metro.Assisted
 import dev.zacsweers.metro.AssistedFactory
 import dev.zacsweers.metro.AssistedInject
@@ -69,6 +69,7 @@ constructor(
     private val pendingIntentFactory: PendingIntentFactory,
     private val connectionManager: DeviceConnectionManager,
     private val firmwareManager: DeviceFirmwareManager,
+    private val deviceNameProvider: DeviceNameProvider,
     @Assisted private val locationCollector: LocationCollectionCoordinator,
     @Assisted private val coroutineScope: CoroutineScope,
 ) {
@@ -368,7 +369,7 @@ constructor(
         val capabilities = connection.camera.vendor.getCapabilities()
 
         if (capabilities.supportsDeviceName) {
-            val deviceName = device.name ?: Build.MODEL
+            val deviceName = connection.camera.vendor.getPairedDeviceName(deviceNameProvider)
             connection.setPairedDeviceName(deviceName)
         }
 

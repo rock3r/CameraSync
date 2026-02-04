@@ -13,6 +13,7 @@ import dev.sebastiano.camerasync.domain.model.PairedDevice
 import dev.sebastiano.camerasync.fakes.FakeCameraConnection
 import dev.sebastiano.camerasync.fakes.FakeCameraRepository
 import dev.sebastiano.camerasync.fakes.FakeCameraVendor
+import dev.sebastiano.camerasync.fakes.FakeDeviceNameProvider
 import dev.sebastiano.camerasync.fakes.FakeIntentFactory
 import dev.sebastiano.camerasync.fakes.FakeKhronicleLogger
 import dev.sebastiano.camerasync.fakes.FakeLocationCollector
@@ -152,6 +153,7 @@ class MultiDeviceSyncCoordinatorTest {
                 pendingIntentFactory = pendingIntentFactory,
                 connectionManager = connectionManager,
                 firmwareManager = firmwareManager,
+                deviceNameProvider = FakeDeviceNameProvider(),
                 locationCollector = locationCollector,
                 coroutineScope = testScope.backgroundScope,
             )
@@ -397,6 +399,7 @@ class MultiDeviceSyncCoordinatorTest {
                 pendingIntentFactory = pendingIntentFactory,
                 connectionManager = timeoutConnectionManager,
                 firmwareManager = timeoutFirmwareManager,
+                deviceNameProvider = FakeDeviceNameProvider(),
                 locationCollector = locationCollector,
                 coroutineScope = timeoutTestScope,
             )

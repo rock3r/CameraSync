@@ -2,6 +2,7 @@ package dev.sebastiano.camerasync.domain.vendor
 
 import android.companion.DeviceFilter
 import dev.sebastiano.camerasync.domain.model.GpsLocation
+import dev.sebastiano.camerasync.util.DeviceNameProvider
 import java.time.ZonedDateTime
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
@@ -74,6 +75,16 @@ interface CameraVendor {
      * @return List of filters to match this vendor's devices, or empty list if not supported.
      */
     fun getCompanionDeviceFilters(): List<DeviceFilter<*>> = emptyList()
+
+    /**
+     * Returns the name that should be sent to the camera to identify this paired device (the
+     * phone).
+     *
+     * @param deviceNameProvider Provider for the phone's device name.
+     * @return The name to set on the camera.
+     */
+    fun getPairedDeviceName(deviceNameProvider: DeviceNameProvider): String =
+        deviceNameProvider.getDeviceName()
 }
 
 /** Defines the BLE GATT service and characteristic UUIDs for a camera vendor. */
