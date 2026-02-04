@@ -8,6 +8,7 @@ import dev.sebastiano.camerasync.domain.vendor.CameraCapabilities
 import dev.sebastiano.camerasync.domain.vendor.CameraGattSpec
 import dev.sebastiano.camerasync.domain.vendor.CameraProtocol
 import dev.sebastiano.camerasync.domain.vendor.CameraVendor
+import dev.sebastiano.camerasync.util.DeviceNameProvider
 import java.util.regex.Pattern
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
@@ -119,4 +120,7 @@ object RicohCameraVendor : CameraVendor {
 
         return listOf(serviceFilter, nameFilter)
     }
+
+    override fun getPairedDeviceName(deviceNameProvider: DeviceNameProvider): String =
+        "${deviceNameProvider.getDeviceName()} (CameraSync)"
 }

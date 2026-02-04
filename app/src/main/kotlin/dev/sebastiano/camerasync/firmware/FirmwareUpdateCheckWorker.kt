@@ -5,6 +5,7 @@ import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import com.juul.khronicle.Log
 import dev.sebastiano.camerasync.domain.repository.PairedDevicesRepository
+import java.io.IOException
 import kotlinx.coroutines.flow.first
 
 private const val TAG = "FirmwareUpdateCheckWorker"
@@ -84,9 +85,11 @@ class FirmwareUpdateCheckWorker(
             }
 
             Result.success()
-        } catch (e: Exception) {
+        } catch (e: IOException) {
             Log.error(tag = TAG, throwable = e) { "Error during firmware update check" }
-            // Retry on failure
+            Result.retry()
+        } catch (e: IllegalStateException) {
+            Log.error(tag = TAG, throwable = e) { "Error during firmware update check" }
             Result.retry()
         }
     }

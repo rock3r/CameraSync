@@ -38,7 +38,6 @@ simultaneously, with centralized location collection and independent device conn
 │  LocationCollectionCoordinator                                  │
 │  - Centralized location collection                              │
 │  - Device registration for automatic start/stop                 │
-│  - 30-second update interval                                    │
 │                                                                 │
 │  FirmwareUpdateCheckWorker (WorkManager)                        │
 │  - Periodic background check for firmware updates               │
@@ -97,6 +96,10 @@ message PairedDeviceProto {
   optional string name = 2;
   string vendor_id = 3;
   bool enabled = 4;
+  optional int64 last_synced_at = 5;
+  optional string firmware_version = 6;
+  optional string latest_firmware_version = 7;
+  bool firmware_update_notification_shown = 8;
 }
 
 message PairedDevicesProto {
@@ -124,7 +127,7 @@ interface LocationCollectionCoordinator : LocationCollector {
 - Automatically starts collecting when first device registers
 - Automatically stops when last device unregisters
 - Exposes `StateFlow<GpsLocation?>` for consumers
-- 30-second update interval
+- Uses `LocationRepository` (default 30-second update interval)
 
 ### 3. MultiDeviceSyncCoordinator
 
@@ -355,7 +358,7 @@ All key interfaces have fake implementations for testing:
 | `WidgetUpdateHelper`            | `FakeWidgetUpdateHelper`      |
 
 **Dependency Injection**: The project uses Metro for compile-time DI. Tests use `TestGraphFactory`
-to access fake dependencies, while production code uses `AppGraphFactory`. This allows for clean
+to access fake dependencies, while production code uses `AppGraph.Factory`. This allows for clean
 separation between test and production implementations without requiring Robolectric or extensive
 Android framework mocking.
 

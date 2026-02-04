@@ -32,8 +32,15 @@ constructor(
     @Assisted private val coroutineScope: CoroutineScope,
 ) : LocationCollectionCoordinator {
 
+    /** Factory for creating [DefaultLocationCollector] with assisted injection. */
     @AssistedFactory
     interface Factory {
+        /**
+         * Creates a [DefaultLocationCollector].
+         *
+         * @param coroutineScope Scope for launching collection coroutines.
+         * @return The created collector.
+         */
         fun create(coroutineScope: CoroutineScope): DefaultLocationCollector
     }
 

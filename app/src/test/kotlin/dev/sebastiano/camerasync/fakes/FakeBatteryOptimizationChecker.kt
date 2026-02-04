@@ -12,9 +12,7 @@ import dev.sebastiano.camerasync.util.BatteryOptimizationChecker
 class FakeBatteryOptimizationChecker(private var isIgnoring: Boolean = true) :
     BatteryOptimizationChecker {
 
-    override fun isIgnoringBatteryOptimizations(context: Context): Boolean {
-        return isIgnoring
-    }
+    override fun isIgnoringBatteryOptimizations(context: Context): Boolean = isIgnoring
 
     fun setIgnoringBatteryOptimizations(ignoring: Boolean) {
         isIgnoring = ignoring

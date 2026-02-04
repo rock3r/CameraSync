@@ -73,7 +73,7 @@ class FakeCameraRepository : CameraRepository {
                 connectionToReturn == null &&
                 !connectionsByMac.containsKey(camera.macAddress)
         ) {
-            throw RuntimeException("Connection not available (connectionToReturn is null)")
+            error("Connection not available (connectionToReturn is null)")
         }
         val connection =
             connectionsByMac[camera.macAddress]

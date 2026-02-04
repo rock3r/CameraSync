@@ -1,7 +1,9 @@
 package dev.sebastiano.camerasync.logging
 
 import android.content.Context
+import com.juul.khronicle.Log
 import java.io.BufferedReader
+import java.io.IOException
 import java.io.InputStreamReader
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
@@ -10,7 +12,9 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.withContext
 
 /** Implementation of [LogRepository] that reads from Android's logcat. */
-class LogcatLogRepository(private val context: Context) : LogRepository {
+class LogcatLogRepository(context: Context) : LogRepository {
+
+    private val packageName: String = context.applicationInfo.packageName
 
     private val _logs = MutableStateFlow<List<LogEntry>>(emptyList())
 
@@ -34,7 +38,13 @@ class LogcatLogRepository(private val context: Context) : LogRepository {
                 reader.forEachLine { line ->
                     val match = logRegex.matchEntire(line)
                     if (match != null) {
-                        val (timestamp, pid, tid, level, tag, message) = match.destructured
+                        val g = match.groupValues
+                        val timestamp = g[1]
+                        val pid = g[2]
+                        val tid = g[3]
+                        val level = g[4]
+                        val tag = g[5]
+                        val message = g[6]
                         newLogs.add(
                             LogEntry(
                                 timestamp = timestamp,
@@ -50,9 +60,10 @@ class LogcatLogRepository(private val context: Context) : LogRepository {
 
                 // We want newest logs first in the viewer
                 _logs.value = newLogs.reversed()
-            } catch (e: Exception) {
-                // Log the error using Khronicle if possible, but avoid infinite loops
-                // For now, just return empty list or keep old logs
+            } catch (e: IOException) {
+                Log.warn("LogcatLogRepository", throwable = e) {
+                    "Failed to refresh logs for $packageName"
+                }
             }
         }
     }

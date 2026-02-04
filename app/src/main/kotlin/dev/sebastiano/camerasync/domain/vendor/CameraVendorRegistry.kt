@@ -73,15 +73,12 @@ class DefaultCameraVendorRegistry(private val vendors: List<CameraVendor>) : Cam
         }
     }
 
-    override fun getVendorById(vendorId: String): CameraVendor? {
-        return vendors.find { it.vendorId == vendorId }
-    }
+    override fun getVendorById(vendorId: String): CameraVendor? =
+        vendors.find { it.vendorId == vendorId }
 
-    override fun getAllScanFilterUuids(): List<Uuid> {
-        return vendors.flatMap { it.gattSpec.scanFilterServiceUuids }.distinct()
-    }
+    override fun getAllScanFilterUuids(): List<Uuid> =
+        vendors.flatMap { it.gattSpec.scanFilterServiceUuids }.distinct()
 
-    override fun getAllScanFilterDeviceNames(): List<String> {
-        return vendors.flatMap { it.gattSpec.scanFilterDeviceNames }.distinct()
-    }
+    override fun getAllScanFilterDeviceNames(): List<String> =
+        vendors.flatMap { it.gattSpec.scanFilterDeviceNames }.distinct()
 }

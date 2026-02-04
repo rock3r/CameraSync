@@ -3,6 +3,7 @@ package dev.sebastiano.camerasync.widget
 import android.content.Context
 import androidx.glance.appwidget.updateAll
 import com.juul.khronicle.Log
+import java.io.IOException
 
 /** Interface for triggering updates for the sync widget. */
 interface WidgetUpdateHelper {
@@ -17,7 +18,9 @@ class GlanceWidgetUpdateHelper(private val context: Context) : WidgetUpdateHelpe
         Log.debug(tag = TAG) { "Updating all sync widgets" }
         try {
             SyncWidget().updateAll(context)
-        } catch (e: Exception) {
+        } catch (e: IOException) {
+            Log.warn(tag = TAG, throwable = e) { "Failed to update widgets" }
+        } catch (e: IllegalStateException) {
             Log.warn(tag = TAG, throwable = e) { "Failed to update widgets" }
         }
     }

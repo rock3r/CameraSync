@@ -3,6 +3,7 @@ package dev.sebastiano.camerasync.fakes
 import dev.sebastiano.camerasync.domain.model.Camera
 import dev.sebastiano.camerasync.domain.model.GpsLocation
 import dev.sebastiano.camerasync.domain.repository.CameraConnection
+import java.io.IOException
 import java.time.ZonedDateTime
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -45,6 +46,8 @@ class FakeCameraConnection(override val camera: Camera) : CameraConnection {
 
     var initializePairingResult = true
 
+    var throwOnFirmwareRead = false
+
     override suspend fun initializePairing(): Boolean {
         initializePairingCalled = true
         return initializePairingResult
@@ -52,6 +55,9 @@ class FakeCameraConnection(override val camera: Camera) : CameraConnection {
 
     override suspend fun readFirmwareVersion(): String {
         readFirmwareVersionCalled = true
+        if (throwOnFirmwareRead) {
+            throw IOException("Simulated firmware read failure")
+        }
         return firmwareVersion
     }
 

@@ -47,7 +47,10 @@ class ScanRestartWorker(context: Context, params: WorkerParameters) :
             val serviceIntent = MultiDeviceSyncService.createDeviceFoundIntent(applicationContext)
             // Use startForegroundService to ensure we can run
             applicationContext.startForegroundService(serviceIntent)
-        } catch (e: Exception) {
+        } catch (e: SecurityException) {
+            Log.error(tag = TAG, throwable = e) { "Failed to trigger service from Worker" }
+            return Result.failure()
+        } catch (e: IllegalStateException) {
             Log.error(tag = TAG, throwable = e) { "Failed to trigger service from Worker" }
             return Result.failure()
         }

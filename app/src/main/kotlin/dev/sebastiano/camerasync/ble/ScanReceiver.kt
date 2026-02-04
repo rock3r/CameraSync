@@ -9,6 +9,12 @@ import dev.sebastiano.camerasync.devicesync.MultiDeviceSyncService
 
 private const val TAG = "ScanReceiver"
 
+/**
+ * [BroadcastReceiver] that receives BLE scan results from background scans.
+ *
+ * When a camera is discovered during a passive scan (via PendingIntent), this receiver triggers the
+ * [MultiDeviceSyncService] to handle the connection and synchronization.
+ */
 class ScanReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         val callbackType = intent.getIntExtra(BluetoothLeScanner.EXTRA_CALLBACK_TYPE, -1)
@@ -29,7 +35,9 @@ class ScanReceiver : BroadcastReceiver() {
             val serviceIntent = MultiDeviceSyncService.createDeviceFoundIntent(context)
             try {
                 context.startForegroundService(serviceIntent)
-            } catch (e: Exception) {
+            } catch (e: SecurityException) {
+                Log.error(tag = TAG, throwable = e) { "Failed to start service from ScanReceiver" }
+            } catch (e: IllegalStateException) {
                 Log.error(tag = TAG, throwable = e) { "Failed to start service from ScanReceiver" }
             }
         }

@@ -22,10 +22,8 @@ import com.juul.khronicle.Log
 import dev.sebastiano.camerasync.R
 import dev.sebastiano.camerasync.domain.model.DeviceConnectionState
 import dev.sebastiano.camerasync.domain.model.PairedDevice
-import dev.sebastiano.camerasync.domain.repository.CameraRepository
 import dev.sebastiano.camerasync.domain.repository.PairedDevicesRepository
 import dev.sebastiano.camerasync.domain.repository.SyncStatusRepository
-import dev.sebastiano.camerasync.domain.vendor.CameraVendorRegistry
 import dev.zacsweers.metro.Inject
 import kotlin.coroutines.CoroutineContext
 import kotlinx.coroutines.CoroutineName
@@ -56,14 +54,13 @@ private const val TAG = "MultiDeviceSyncService"
  */
 @Inject
 class MultiDeviceSyncService(
-    private val vendorRegistry: CameraVendorRegistry,
-    private val cameraRepository: CameraRepository,
     private val pairedDevicesRepository: PairedDevicesRepository,
     private val syncStatusRepository: SyncStatusRepository,
     private val notificationBuilder: NotificationBuilder,
     private val intentFactory: IntentFactory,
     private val pendingIntentFactory: PendingIntentFactory,
     private val locationCollectorFactory: DefaultLocationCollector.Factory,
+    private val syncCoordinatorFactory: MultiDeviceSyncCoordinator.Factory,
 ) : Service(), CoroutineScope {
 
     override val coroutineContext: CoroutineContext =
@@ -74,15 +71,7 @@ class MultiDeviceSyncService(
     private val locationCollector by lazy { locationCollectorFactory.create(this) }
 
     private val syncCoordinator by lazy {
-        MultiDeviceSyncCoordinator(
-            context = this,
-            cameraRepository = cameraRepository,
-            locationCollector = locationCollector,
-            vendorRegistry = vendorRegistry,
-            pairedDevicesRepository = pairedDevicesRepository,
-            pendingIntentFactory = pendingIntentFactory,
-            coroutineScope = this,
-        )
+        syncCoordinatorFactory.create(locationCollector = locationCollector, coroutineScope = this)
     }
 
     private val vibrator by lazy { SyncErrorVibrator(applicationContext) }
@@ -164,17 +153,21 @@ class MultiDeviceSyncService(
 
     private fun startForegroundService() {
         try {
+            val params =
+                MultiDeviceNotificationParams(
+                    connectedCount = 0,
+                    totalEnabled = 0,
+                    lastSyncTime = null,
+                )
             ServiceCompat.startForeground(
                 this,
                 NOTIFICATION_ID,
                 createMultiDeviceNotification(
+                    context = this,
                     notificationBuilder = notificationBuilder,
                     pendingIntentFactory = pendingIntentFactory,
                     intentFactory = intentFactory,
-                    context = this,
-                    connectedCount = 0,
-                    totalEnabled = 0,
-                    lastSyncTime = null,
+                    params = params,
                 ),
                 ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE or
                     ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION,
@@ -184,10 +177,16 @@ class MultiDeviceSyncService(
                     connectedDeviceCount = 0,
                     enabledDeviceCount = 0,
                 )
-        } catch (e: Exception) {
-            if (e is ForegroundServiceStartNotAllowedException) {
-                Log.error(tag = TAG, throwable = e) { "Cannot start foreground service" }
-            }
+        } catch (e: ForegroundServiceStartNotAllowedException) {
+            Log.error(tag = TAG, throwable = e) { "Cannot start foreground service" }
+            val errorMessage = getString(R.string.error_service_start_failed, e.message ?: "")
+            _serviceState.value = MultiDeviceSyncServiceState.Error(errorMessage)
+            vibrator.vibrate()
+        } catch (e: SecurityException) {
+            val errorMessage = getString(R.string.error_service_start_failed, e.message ?: "")
+            _serviceState.value = MultiDeviceSyncServiceState.Error(errorMessage)
+            vibrator.vibrate()
+        } catch (e: IllegalStateException) {
             val errorMessage = getString(R.string.error_service_start_failed, e.message ?: "")
             _serviceState.value = MultiDeviceSyncServiceState.Error(errorMessage)
             vibrator.vibrate()
@@ -201,8 +200,6 @@ class MultiDeviceSyncService(
 
         // Stop any existing passive scan when we become active
         syncCoordinator.stopPassiveScan()
-
-        // Presence is inferred from connection state, not from external observations.
 
         // Start background monitoring in the coordinator
         syncCoordinator.startBackgroundMonitoring(pairedDevicesRepository.enabledDevices)
@@ -219,9 +216,6 @@ class MultiDeviceSyncService(
 
         // Start state collection for notification updates
         stateCollectionJob = launch {
-            // Wait a bit to allow initial scan to start and avoid race condition where we think we
-            // are idle
-            // before the coordinator has a chance to set isScanning = true.
             kotlinx.coroutines.delay(2000)
 
             combine(
@@ -259,8 +253,12 @@ class MultiDeviceSyncService(
                         isSyncEnabled,
                     )
                 }
-                .collect {
-                    (connectedCount, enabledCount, _, isScanning, lastSyncTime, isSyncEnabled) ->
+                .collect { state ->
+                    val connectedCount = state.first
+                    val enabledCount = state.second
+                    val isScanning = state.fourth
+                    val lastSyncTime = state.fifth
+                    val isSyncEnabled = state.sixth
 
                     // Update the shared sync status repository
                     syncStatusRepository.updateConnectedDevicesCount(connectedCount)
@@ -275,16 +273,9 @@ class MultiDeviceSyncService(
                         return@collect
                     }
 
-                    // Check for idle state: enabled devices exist, but none connected and not
-                    // scanning.
-                    // We check for isScanning to ensure we don't stop while a connection attempt is
-                    // in progress.
                     val isActive =
                         connectedCount > 0 ||
                             isScanning ||
-                            // Also check if any device is in a transitional state that isScanning
-                            // might miss
-                            // (though isScanning covers Connecting/Searching)
                             syncCoordinator.getConnectedDeviceCount() > 0
 
                     if (!isActive) {
@@ -336,13 +327,21 @@ class MultiDeviceSyncService(
         syncCoordinator.refreshConnections()
     }
 
-    /** Connects to a specific device. */
+    /**
+     * Connects to a specific [device].
+     *
+     * @param device The paired device to connect to.
+     */
     @RequiresPermission(Manifest.permission.POST_NOTIFICATIONS)
     fun connectDevice(device: PairedDevice) {
         launch { syncCoordinator.startDeviceSync(device) }
     }
 
-    /** Disconnects from a specific device without disabling it. */
+    /**
+     * Disconnects from a specific device without disabling it.
+     *
+     * @param macAddress The MAC address of the device to disconnect.
+     */
     fun disconnectDevice(macAddress: String) {
         launch { syncCoordinator.stopDeviceSync(macAddress) }
     }
@@ -352,15 +351,19 @@ class MultiDeviceSyncService(
         enabledCount: Int,
         lastSyncTime: java.time.ZonedDateTime?,
     ) {
-        val notification =
-            createMultiDeviceNotification(
-                notificationBuilder = notificationBuilder,
-                pendingIntentFactory = pendingIntentFactory,
-                intentFactory = intentFactory,
-                context = this,
+        val params =
+            MultiDeviceNotificationParams(
                 connectedCount = connectedCount,
                 totalEnabled = enabledCount,
                 lastSyncTime = lastSyncTime,
+            )
+        val notification =
+            createMultiDeviceNotification(
+                context = this,
+                notificationBuilder = notificationBuilder,
+                pendingIntentFactory = pendingIntentFactory,
+                intentFactory = intentFactory,
+                params = params,
             )
 
         if (
@@ -460,42 +463,89 @@ class MultiDeviceSyncService(
         _isRunning.value = false
     }
 
+    /** Binder class for [MultiDeviceSyncService]. */
     inner class MultiDeviceSyncServiceBinder : Binder() {
+        /** Returns the [MultiDeviceSyncService] instance. */
         fun getService(): MultiDeviceSyncService = this@MultiDeviceSyncService
     }
 
     companion object {
         private const val NOTIFICATION_ID = 112
         private const val ERROR_NOTIFICATION_ID = 124
-        private const val LOCATION_UPDATE_INTERVAL_SECONDS = 60L
 
         private val _isRunning = MutableStateFlow(false)
+
+        /** A flow that emits true when the service is currently running. */
         val isRunning: StateFlow<Boolean> = _isRunning.asStateFlow()
 
+        /** Action to stop all active synchronizations. */
         const val ACTION_STOP = "dev.sebastiano.camerasync.STOP_ALL_SYNC"
+
+        /** Action to manually refresh connections. */
         const val ACTION_REFRESH = "dev.sebastiano.camerasync.REFRESH_CONNECTIONS"
+
+        /** Action triggered when a device is found during background scanning. */
         const val ACTION_DEVICE_FOUND = "dev.sebastiano.camerasync.DEVICE_FOUND"
+
+        /** Extra containing the device's MAC address. */
         const val EXTRA_DEVICE_ADDRESS = "device_address"
+
+        /** Extra indicating whether to show the permissions screen. */
         const val EXTRA_SHOW_PERMISSIONS = "show_permissions"
 
+        /** Request code for the stop intent. */
         const val STOP_REQUEST_CODE = 667
+
+        /** Request code for the refresh intent. */
         const val REFRESH_REQUEST_CODE = 668
+
+        /** Request code for the main activity intent. */
         const val MAIN_ACTIVITY_REQUEST_CODE = 669
 
+        /**
+         * Extracts the [MultiDeviceSyncService] instance from a [Binder].
+         *
+         * @param binder The binder returned from [onBind].
+         * @return The service instance.
+         */
         fun getInstanceFrom(binder: Binder): MultiDeviceSyncService =
             (binder as MultiDeviceSyncServiceBinder).getService()
 
+        /**
+         * Creates an [Intent] to stop the service.
+         *
+         * @param context The context.
+         * @return The stop intent.
+         */
         fun createStopIntent(context: Context): Intent =
             Intent(context, MultiDeviceSyncService::class.java).apply { action = ACTION_STOP }
 
+        /**
+         * Creates an [Intent] to refresh connections.
+         *
+         * @param context The context.
+         * @return The refresh intent.
+         */
         fun createRefreshIntent(context: Context): Intent =
             Intent(context, MultiDeviceSyncService::class.java).apply { action = ACTION_REFRESH }
 
+        /**
+         * Creates an [Intent] to notify that a device was found.
+         *
+         * @param context The context.
+         * @return The device found intent.
+         */
         fun createDeviceFoundIntent(context: Context): Intent =
             Intent(context, MultiDeviceSyncService::class.java).apply {
                 action = ACTION_DEVICE_FOUND
             }
 
+        /**
+         * Creates an [Intent] to start the service.
+         *
+         * @param context The context.
+         * @return The start intent.
+         */
         fun createStartIntent(context: Context): Intent =
             Intent(context, MultiDeviceSyncService::class.java)
     }

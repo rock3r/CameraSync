@@ -40,6 +40,14 @@ private const val TAG = "DevicesListViewModel"
  * Manages the list of paired devices and their connection states. Communicates with the
  * [MultiDeviceSyncService] to control device sync.
  *
+ * @param pairedDevicesRepository Repository for managing paired devices.
+ * @param locationRepository Repository for location updates.
+ * @param context Application context.
+ * @param vendorRegistry Registry of supported camera vendors.
+ * @param bluetoothBondingChecker Utility to check and manage Bluetooth bonding.
+ * @param issueReporter Utility for sending feedback reports.
+ * @param batteryOptimizationChecker Utility for checking battery optimization status.
+ * @param intentFactory Factory for creating intents.
  * @param ioDispatcher The dispatcher to use for IO operations. Can be overridden in tests to use a
  *   test dispatcher.
  */
@@ -57,6 +65,8 @@ class DevicesListViewModel(
 ) : ViewModel() {
 
     private val _state = mutableStateOf<DevicesListState>(DevicesListState.Loading)
+
+    /** The current UI state of the devices list. */
     val state: State<DevicesListState> = _state
 
     private var service: MultiDeviceSyncService? = null
@@ -91,7 +101,7 @@ class DevicesListViewModel(
                     locationRepository.locationUpdates,
                     batteryOptimizationStatus,
                 ) { flows ->
-                    val pairedDevices = flows[0] as List<*>
+                    @Suppress("UNCHECKED_CAST") val pairedDevices = flows[0] as List<PairedDevice>
                     @Suppress("UNCHECKED_CAST")
                     val connectionStates = flows[1] as Map<String, DeviceConnectionState>
                     val isScanning = flows[2] as Boolean
@@ -104,7 +114,6 @@ class DevicesListViewModel(
                     } else {
                         val devicesWithState =
                             pairedDevices.map { device ->
-                                device as PairedDevice
                                 val connectionState =
                                     when {
                                         !device.isEnabled -> DeviceConnectionState.Disabled
@@ -197,36 +206,33 @@ class DevicesListViewModel(
     }
 
     private fun unbindFromService() {
-        if (!isServiceBound || serviceConnection == null) {
+        if (!isServiceBound) {
             // Already unbound or never bound, just clean up state
-            serviceConnection = null
-            service = null
-            stateCollectionJob?.cancel()
-            scanningCollectionJob?.cancel()
-            deviceStatesFromService.value = emptyMap()
-            isScanningFromService.value = false
+            cleanupServiceState()
             return
         }
 
-        val connection = serviceConnection!!
-        try {
-            context.unbindService(connection)
-            isServiceBound = false
-        } catch (e: IllegalArgumentException) {
-            // Service was already unbound or never bound
-            Log.debug(tag = TAG) { "Service already unbound: ${e.message}" }
-            isServiceBound = false
-        } catch (e: Exception) {
-            Log.warn(tag = TAG, throwable = e) { "Error unbinding service" }
-            isServiceBound = false
-        } finally {
-            serviceConnection = null
-            service = null
-            stateCollectionJob?.cancel()
-            scanningCollectionJob?.cancel()
-            deviceStatesFromService.value = emptyMap()
-            isScanningFromService.value = false
+        serviceConnection?.let { connection ->
+            try {
+                context.unbindService(connection)
+            } catch (e: IllegalArgumentException) {
+                // Service was already unbound or never bound
+                Log.debug(tag = TAG) { "Service already unbound: ${e.message}" }
+            } catch (e: IllegalStateException) {
+                Log.warn(tag = TAG, throwable = e) { "Error unbinding service" }
+            }
         }
+        cleanupServiceState()
+    }
+
+    private fun cleanupServiceState() {
+        isServiceBound = false
+        serviceConnection = null
+        service = null
+        stateCollectionJob?.cancel()
+        scanningCollectionJob?.cancel()
+        deviceStatesFromService.value = emptyMap()
+        isScanningFromService.value = false
     }
 
     private fun observeAutoStartSync() {
@@ -255,7 +261,11 @@ class DevicesListViewModel(
                                 val intent = intentFactory.createRefreshIntent(context)
                                 ContextCompat.startForegroundService(context, intent)
                                 autoStartTriggered = true
-                            } catch (e: Exception) {
+                            } catch (e: SecurityException) {
+                                Log.warn(tag = TAG, throwable = e) {
+                                    "Failed to auto-start sync service"
+                                }
+                            } catch (e: IllegalStateException) {
                                 Log.warn(tag = TAG, throwable = e) {
                                     "Failed to auto-start sync service"
                                 }
@@ -265,7 +275,11 @@ class DevicesListViewModel(
             }
     }
 
-    /** Sets whether sync is globally enabled. */
+    /**
+     * Sets whether sync is globally enabled.
+     *
+     * @param enabled Whether global sync should be enabled.
+     */
     fun setSyncEnabled(enabled: Boolean) {
         viewModelScope.launch(ioDispatcher) {
             pairedDevicesRepository.setSyncEnabled(enabled)
@@ -275,9 +289,12 @@ class DevicesListViewModel(
                 try {
                     val intent = intentFactory.createRefreshIntent(context)
                     ContextCompat.startForegroundService(context, intent)
-                } catch (e: Exception) {
+                } catch (e: SecurityException) {
                     // Ignore service start errors (e.g. background restrictions)
-                    // The user will see a warning or it will retry later
+                    Log.warn(tag = TAG, throwable = e) {
+                        "Failed to start service when enabling sync"
+                    }
+                } catch (e: IllegalStateException) {
                     Log.warn(tag = TAG, throwable = e) {
                         "Failed to start service when enabling sync"
                     }
@@ -287,14 +304,25 @@ class DevicesListViewModel(
         }
     }
 
-    /** Sets whether a device is enabled for sync. */
+    /**
+     * Sets whether a specific device is enabled for synchronization.
+     *
+     * @param macAddress The MAC address of the device.
+     * @param enabled Whether to enable or disable the device.
+     */
     fun setDeviceEnabled(macAddress: String, enabled: Boolean) {
         viewModelScope.launch(ioDispatcher) {
             pairedDevicesRepository.setDeviceEnabled(macAddress, enabled)
         }
     }
 
-    /** Unpairs (removes) a device. */
+    /**
+     * Unpairs (removes) a device from the application.
+     *
+     * Also attempts to remove the OS-level Bluetooth bond if possible.
+     *
+     * @param macAddress The MAC address of the device to unpair.
+     */
     fun unpairDevice(macAddress: String) {
         viewModelScope.launch(ioDispatcher) {
             // First disconnect if connected
@@ -313,7 +341,11 @@ class DevicesListViewModel(
         }
     }
 
-    /** Retries connection to a failed device. */
+    /**
+     * Retries the connection to a device that encountered an error.
+     *
+     * @param macAddress The MAC address of the device to retry.
+     */
     @RequiresPermission(Manifest.permission.POST_NOTIFICATIONS)
     fun retryConnection(macAddress: String) {
         viewModelScope.launch(ioDispatcher) {
@@ -322,7 +354,7 @@ class DevicesListViewModel(
         }
     }
 
-    /** Manually triggers a scan for all enabled but disconnected devices. */
+    /** Manually triggers a scan and reconnection pass for all enabled but disconnected devices. */
     fun refreshConnections() {
         viewModelScope.launch(ioDispatcher) {
             pairedDevicesRepository.setSyncEnabled(true)
@@ -332,7 +364,7 @@ class DevicesListViewModel(
         }
     }
 
-    /** Sends a feedback report. */
+    /** Gathers diagnostic information and triggers the system intent to send a feedback report. */
     fun sendFeedback() {
         viewModelScope.launch(ioDispatcher) {
             // For devices list, we might want to attach info about all devices or just general
@@ -365,31 +397,28 @@ class DevicesListViewModel(
     ): Map<String, DeviceDisplayInfo> {
         val unknownString = context.getString(R.string.label_unknown)
 
-        // Group devices by make/model to determine if we need to show pairing names
-        val makeModelGroups =
-            devices.groupBy { device ->
+        // Precompute display info for each device
+        val deviceInfos =
+            devices.associate { device ->
                 val vendor = vendorRegistry.getVendorById(device.vendorId)
                 val make = vendor?.vendorName ?: device.vendorId.replaceFirstChar { it.uppercase() }
                 val model =
                     vendor?.extractModelFromPairingName(device.name) ?: device.name ?: unknownString
-                MakeModel(make, model)
+                device.macAddress to
+                    DeviceDisplayInfo(
+                        make = make,
+                        model = model,
+                        pairingName = device.name,
+                        showPairingName = false, // Will be updated below
+                    )
             }
 
-        return devices.associate { device ->
-            val vendor = vendorRegistry.getVendorById(device.vendorId)
-            val make = vendor?.vendorName ?: device.vendorId.replaceFirstChar { it.uppercase() }
-            val model =
-                vendor?.extractModelFromPairingName(device.name) ?: device.name ?: unknownString
-            val makeModel = MakeModel(make, model)
-            val showPairingName = (makeModelGroups[makeModel]?.size ?: 0) > 1
+        // Group by make/model to determine if we need to show pairing names for disambiguation
+        val makeModelGroups = deviceInfos.values.groupBy { MakeModel(it.make, it.model) }
 
-            device.macAddress to
-                DeviceDisplayInfo(
-                    make = make,
-                    model = model,
-                    pairingName = device.name,
-                    showPairingName = showPairingName,
-                )
+        return deviceInfos.mapValues { (_, info) ->
+            val isAmbiguous = (makeModelGroups[MakeModel(info.make, info.model)]?.size ?: 0) > 1
+            info.copy(showPairingName = isAmbiguous)
         }
     }
 
@@ -399,26 +428,18 @@ class DevicesListViewModel(
         stateCollectionJob?.cancel()
         scanningCollectionJob?.cancel()
         autoStartJob?.cancel()
-        if (isServiceBound && serviceConnection != null) {
-            val connection = serviceConnection!!
-            try {
-                context.unbindService(connection)
-                isServiceBound = false
-            } catch (e: IllegalArgumentException) {
-                // Service was already unbound
-                Log.debug(tag = TAG) { "Service already unbound in onCleared: ${e.message}" }
-                isServiceBound = false
-            } catch (e: Exception) {
-                Log.warn(tag = TAG, throwable = e) { "Error unbinding service in onCleared" }
-                isServiceBound = false
-            } finally {
-                serviceConnection = null
-            }
-        }
+        unbindFromService()
     }
 }
 
-/** Display information for a device in the UI. */
+/**
+ * Display information for a device in the UI.
+ *
+ * @property make The camera manufacturer.
+ * @property model The camera model.
+ * @property pairingName The name used during pairing (often user-customizable).
+ * @property showPairingName Whether to show the pairing name in the UI (e.g., for disambiguation).
+ */
 data class DeviceDisplayInfo(
     val make: String,
     val model: String,
@@ -443,7 +464,17 @@ sealed interface DevicesListState {
     /** No paired devices. */
     data class Empty(override val isSyncEnabled: Boolean = true) : DevicesListState
 
-    /** Has one or more paired devices. */
+    /**
+     * Has one or more paired devices.
+     *
+     * @property devices The list of devices with their current connection states.
+     * @property displayInfoMap Map of MAC address to display information.
+     * @property isScanning Whether a scan/discovery pass is currently active.
+     * @property isSyncEnabled Whether global sync is enabled.
+     * @property currentLocation The last known GPS location, if available.
+     * @property isIgnoringBatteryOptimizations Whether the app is exempt from battery
+     *   optimizations.
+     */
     data class HasDevices(
         val devices: List<PairedDeviceWithState>,
         val displayInfoMap: Map<String, DeviceDisplayInfo>,

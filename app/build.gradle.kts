@@ -9,6 +9,7 @@ plugins {
     alias(libs.plugins.metro)
     alias(libs.plugins.protobuf)
     alias(libs.plugins.ktfmt)
+    alias(libs.plugins.detekt)
     id("kotlin-parcelize")
 }
 
@@ -82,6 +83,11 @@ ktfmt { kotlinLangStyle() }
 
 kotlin { compilerOptions { jvmTarget.set(JvmTarget.JVM_11) } }
 
+detekt {
+    config.setFrom(files("${project.rootDir}/detekt.yml"))
+    buildUponDefaultConfig = true
+}
+
 dependencies {
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.accompanist.permissions)
@@ -122,6 +128,8 @@ dependencies {
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.ui.test.junit4)
     androidTestImplementation(platform(libs.androidx.compose.bom))
+
+    detektPlugins(libs.compose.rules.detekt)
 }
 
 // Setup protobuf configuration, generating lite Java and Kotlin classes

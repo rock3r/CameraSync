@@ -120,21 +120,15 @@ class FakePairedDevicesRepository : PairedDevicesRepository {
         }
     }
 
-    override suspend fun isDevicePaired(macAddress: String): Boolean {
-        return _devices.value.any { it.macAddress == macAddress }
-    }
+    override suspend fun isDevicePaired(macAddress: String): Boolean =
+        _devices.value.any { it.macAddress == macAddress }
 
-    override suspend fun getDevice(macAddress: String): PairedDevice? {
-        return _devices.value.find { it.macAddress == macAddress }
-    }
+    override suspend fun getDevice(macAddress: String): PairedDevice? =
+        _devices.value.find { it.macAddress == macAddress }
 
-    override suspend fun hasAnyDevices(): Boolean {
-        return _devices.value.isNotEmpty()
-    }
+    override suspend fun hasAnyDevices(): Boolean = _devices.value.isNotEmpty()
 
-    override suspend fun hasEnabledDevices(): Boolean {
-        return _devices.value.any { it.isEnabled }
-    }
+    override suspend fun hasEnabledDevices(): Boolean = _devices.value.any { it.isEnabled }
 
     override suspend fun updateFirmwareVersion(macAddress: String, firmwareVersion: String?) {
         _devices.update { devices ->
