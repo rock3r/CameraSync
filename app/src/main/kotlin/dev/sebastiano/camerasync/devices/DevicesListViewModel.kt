@@ -208,7 +208,7 @@ class DevicesListViewModel(
             } catch (e: IllegalArgumentException) {
                 // Service was already unbound or never bound
                 Log.debug(tag = TAG) { "Service already unbound: ${e.message}" }
-            } catch (e: Exception) {
+            } catch (e: IllegalStateException) {
                 Log.warn(tag = TAG, throwable = e) { "Error unbinding service" }
             }
         }
@@ -251,7 +251,11 @@ class DevicesListViewModel(
                                 val intent = intentFactory.createRefreshIntent(context)
                                 ContextCompat.startForegroundService(context, intent)
                                 autoStartTriggered = true
-                            } catch (e: Exception) {
+                            } catch (e: SecurityException) {
+                                Log.warn(tag = TAG, throwable = e) {
+                                    "Failed to auto-start sync service"
+                                }
+                            } catch (e: IllegalStateException) {
                                 Log.warn(tag = TAG, throwable = e) {
                                     "Failed to auto-start sync service"
                                 }
@@ -271,9 +275,12 @@ class DevicesListViewModel(
                 try {
                     val intent = intentFactory.createRefreshIntent(context)
                     ContextCompat.startForegroundService(context, intent)
-                } catch (e: Exception) {
+                } catch (e: SecurityException) {
                     // Ignore service start errors (e.g. background restrictions)
-                    // The user will see a warning or it will retry later
+                    Log.warn(tag = TAG, throwable = e) {
+                        "Failed to start service when enabling sync"
+                    }
+                } catch (e: IllegalStateException) {
                     Log.warn(tag = TAG, throwable = e) {
                         "Failed to start service when enabling sync"
                     }

@@ -155,7 +155,7 @@ class PairingViewModelTest {
     fun `pairDevice sets REJECTED error when BLE connection throws rejection exception`() =
         runTest {
             // Make connect throw an exception with "reject" in the message
-            val exception = Exception("Device rejected pairing request")
+            val exception = java.io.IOException("Device rejected pairing request")
             cameraRepository.connectException = exception
 
             viewModel.pairDevice(testCamera)
@@ -173,7 +173,7 @@ class PairingViewModelTest {
     @Test
     fun `pairDevice sets TIMEOUT error when BLE connection throws timeout exception`() = runTest {
         // Make connect throw an exception with "timeout" in the message
-        val exception = Exception("Connection timeout")
+        val exception = java.io.IOException("Connection timeout")
         cameraRepository.connectException = exception
 
         viewModel.pairDevice(testCamera)
@@ -207,7 +207,7 @@ class PairingViewModelTest {
     @Test
     fun `pairDevice sets UNKNOWN error when BLE connection throws other exception`() = runTest {
         // Make connect throw an exception without "reject" or "timeout"
-        val exception = Exception("Unexpected error occurred")
+        val exception = java.io.IOException("Unexpected error occurred")
         cameraRepository.connectException = exception
 
         viewModel.pairDevice(testCamera)
@@ -225,7 +225,7 @@ class PairingViewModelTest {
     @Test
     fun `pairDevice does not emit navigation event on error`() = runTest {
         // Make BLE connection fail
-        val exception = Exception("Pairing failed")
+        val exception = java.io.IOException("Pairing failed")
         cameraRepository.connectException = exception
 
         val events = mutableListOf<PairingNavigationEvent>()

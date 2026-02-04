@@ -16,9 +16,7 @@ import dev.sebastiano.camerasync.widget.SyncWidgetReceiver
 import dev.zacsweers.metro.createGraphFactory
 import kotlin.getValue
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.DelicateCoroutinesApi
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 
@@ -58,7 +56,7 @@ class CameraSyncApp : Application() {
             FirmwareUpdateScheduler.scheduleDailyCheck(this)
         } catch (e: IllegalStateException) {
             // WorkManager already initialized (e.g., in tests) - just schedule the check
-            Log.warn("CameraSyncApp") {
+            Log.warn("CameraSyncApp", throwable = e) {
                 "WorkManager already initialized, skipping custom factory setup"
             }
             FirmwareUpdateScheduler.scheduleDailyCheck(this)
@@ -69,8 +67,7 @@ class CameraSyncApp : Application() {
 
         // Generate widget preview
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.VANILLA_ICE_CREAM) {
-            @OptIn(DelicateCoroutinesApi::class) // Fine for this case
-            GlobalScope.launch {
+            applicationScope.launch {
                 Log.info("CameraSyncApp") { "Generating widget preview" }
                 val glanceManager = GlanceAppWidgetManager(this@CameraSyncApp)
                 glanceManager.setWidgetPreviews(SyncWidgetReceiver::class)

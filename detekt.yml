@@ -191,17 +191,11 @@ naming:
 
 Compose:
   active: true
-  ComposableEventParameterNaming:
-    active: true
-  ComposableFunctionName:
-    active: true
-  ComposableModifierParameter:
+  ComposableAnnotationNaming:
     active: true
   ComposableNaming:
     active: true
   ComposableParamOrder:
-    active: true
-  ComposableReturnType:
     active: true
   CompositionLocalAllowlist:
     active: true
@@ -211,31 +205,25 @@ Compose:
     active: true
   ModifierClickableOrder:
     active: true
-  ModifierComposable:
+  ModifierComposed:
     active: true
   ModifierMissing:
     active: true
   ModifierNaming:
     active: true
-  ModifierOrder:
-    active: true
-  ModifierParameterNaming:
-    active: true
   ModifierReused:
+    active: true
+  ModifierWithoutDefault:
     active: true
   MutableStateAutoboxing:
     active: true
-  MutableStateParameter:
-    active: true
-  ParameterOrder:
+  MutableStateParam:
     active: true
   PreviewNaming:
     active: true
   PreviewPublic:
     active: true
   RememberMissing:
-    active: true
-  UnnecessaryEventAlias:
     active: true
   ViewModelForwarding:
     active: true

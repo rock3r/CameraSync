@@ -11,6 +11,7 @@ import androidx.annotation.RequiresPermission
 import androidx.core.content.FileProvider
 import dev.sebastiano.camerasync.domain.repository.CameraConnection
 import java.io.File
+import java.io.IOException
 import java.time.ZonedDateTime
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -64,21 +65,27 @@ class AndroidIssueReporter(private val context: Context) : IssueReporter {
                             // We can't easily get the current MTU without tracking it or requesting
                             // it
                         }
-                    } catch (e: Exception) {
+                    } catch (e: IOException) {
+                        appendLine("Error reading bonding info: $e")
+                    } catch (e: SecurityException) {
                         appendLine("Error reading bonding info: $e")
                     }
 
                     try {
                         val fw = connection.readFirmwareVersion()
                         appendLine("Firmware Version: $fw")
-                    } catch (e: Exception) {
+                    } catch (e: IOException) {
+                        appendLine("Firmware Version: Error ($e)")
+                    } catch (e: UnsupportedOperationException) {
                         appendLine("Firmware Version: Error ($e)")
                     }
 
                     try {
                         val hw = connection.readHardwareRevision()
                         appendLine("Hardware Revision: $hw")
-                    } catch (e: Exception) {
+                    } catch (e: IOException) {
+                        appendLine("Hardware Revision: Error ($e)")
+                    } catch (e: UnsupportedOperationException) {
                         appendLine("Hardware Revision: Error ($e)")
                     }
                 } else {

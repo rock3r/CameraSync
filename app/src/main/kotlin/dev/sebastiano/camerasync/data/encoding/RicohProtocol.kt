@@ -63,7 +63,10 @@ object RicohProtocol {
             Regex("""\(([-\d.]+), ([-\d.]+)\), altitude: ([-\d.]+)\. Time: (.+)""")
                 .find(decodedString) ?: error("Failed to parse location string: $decodedString")
 
-        val (lat, lon, alt, timeStr) = match.destructured
+        val lat = match.groupValues[1]
+        val lon = match.groupValues[2]
+        val alt = match.groupValues[3]
+        val timeStr = match.groupValues[4]
         val timeParts = timeStr.split(" ", "-", ":")
 
         return DecodedLocation(

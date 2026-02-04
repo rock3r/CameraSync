@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.Intent
 import com.juul.khronicle.Log
 import dev.sebastiano.camerasync.CameraSyncApp
+import java.io.IOException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -49,7 +50,11 @@ class SyncStartupReceiver : BroadcastReceiver() {
 
                 Log.info(javaClass.simpleName) { "Updating widgets..." }
                 widgetUpdateHelper.updateWidgets()
-            } catch (e: Exception) {
+            } catch (e: IOException) {
+                Log.error(javaClass.simpleName, throwable = e) {
+                    "Error during startup sync initialization"
+                }
+            } catch (e: IllegalStateException) {
                 Log.error(javaClass.simpleName, throwable = e) {
                     "Error during startup sync initialization"
                 }

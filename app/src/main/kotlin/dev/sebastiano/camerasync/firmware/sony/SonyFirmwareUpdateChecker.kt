@@ -1,11 +1,13 @@
 package dev.sebastiano.camerasync.firmware.sony
 
+import android.content.pm.PackageManager
 import android.os.Build
 import com.juul.khronicle.Log
 import dev.sebastiano.camerasync.domain.model.PairedDevice
 import dev.sebastiano.camerasync.firmware.FirmwareUpdateCheckResult
 import dev.sebastiano.camerasync.firmware.FirmwareUpdateChecker
 import java.io.BufferedReader
+import java.io.IOException
 import java.io.InputStreamReader
 import java.net.HttpURLConnection
 import java.net.URL
@@ -13,6 +15,7 @@ import java.util.Locale
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
+import org.json.JSONException
 import org.json.JSONObject
 
 private const val TAG = "SonyFirmwareUpdateChecker"
@@ -54,7 +57,12 @@ class SonyFirmwareUpdateChecker(private val appContext: android.content.Context)
             try {
                 val latestVersion = fetchLatestFirmwareVersion(modelName, currentFirmwareVersion)
                 handleUpdateCheckResult(latestVersion, currentFirmwareVersion, modelName)
-            } catch (e: Exception) {
+            } catch (e: IOException) {
+                Log.warn(tag = TAG, throwable = e) {
+                    "Failed to check for firmware update for ${device.macAddress}"
+                }
+                FirmwareUpdateCheckResult.CheckFailed("Network error: ${e.message}")
+            } catch (e: IllegalStateException) {
                 Log.warn(tag = TAG, throwable = e) {
                     "Failed to check for firmware update for ${device.macAddress}"
                 }
@@ -112,7 +120,12 @@ class SonyFirmwareUpdateChecker(private val appContext: android.content.Context)
 
             val responseBody = readResponse(connection)
             parseFirmwareVersionFromResponse(responseBody, modelName)
-        } catch (e: Exception) {
+        } catch (e: IOException) {
+            Log.warn(tag = TAG, throwable = e) {
+                "Error fetching firmware version for model $modelName"
+            }
+            null
+        } catch (e: IllegalStateException) {
             Log.warn(tag = TAG, throwable = e) {
                 "Error fetching firmware version for model $modelName"
             }
@@ -177,7 +190,10 @@ class SonyFirmwareUpdateChecker(private val appContext: android.content.Context)
                 .firstOrNull { it.optString("modelName", "").equals(modelName, ignoreCase = true) }
                 ?.optString("firmwareVersion", null)
                 ?.takeIf { it.isNotEmpty() }
-        } catch (e: Exception) {
+        } catch (e: JSONException) {
+            Log.warn(tag = TAG, throwable = e) { "Error parsing firmware API response" }
+            null
+        } catch (e: IllegalArgumentException) {
             Log.warn(tag = TAG, throwable = e) { "Error parsing firmware API response" }
             null
         }
@@ -194,7 +210,12 @@ class SonyFirmwareUpdateChecker(private val appContext: android.content.Context)
             val latest = latestVersion.toFloatOrNull() ?: return false
             val current = currentVersion.toFloatOrNull() ?: return false
             latest > current
-        } catch (e: Exception) {
+        } catch (e: NumberFormatException) {
+            Log.warn(tag = TAG, throwable = e) {
+                "Error comparing firmware versions: $currentVersion vs $latestVersion"
+            }
+            false
+        } catch (e: IllegalArgumentException) {
             Log.warn(tag = TAG, throwable = e) {
                 "Error comparing firmware versions: $currentVersion vs $latestVersion"
             }
@@ -209,7 +230,8 @@ class SonyFirmwareUpdateChecker(private val appContext: android.content.Context)
                 val packageInfo =
                     appContext.packageManager.getPackageInfo(appContext.packageName, 0)
                 packageInfo.versionName ?: "1.0.0"
-            } catch (e: Exception) {
+            } catch (e: PackageManager.NameNotFoundException) {
+                Log.warn(tag = TAG, throwable = e) { "Could not get package version" }
                 "1.0.0"
             }
         val osVersion = Build.VERSION.RELEASE

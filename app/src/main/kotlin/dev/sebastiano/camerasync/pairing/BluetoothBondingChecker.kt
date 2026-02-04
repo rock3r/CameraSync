@@ -8,6 +8,7 @@ import android.content.Context
 import android.content.pm.PackageManager
 import androidx.core.content.ContextCompat
 import com.juul.khronicle.Log
+import java.io.IOException
 
 private const val TAG = "BluetoothBondingChecker"
 
@@ -162,7 +163,10 @@ class AndroidBluetoothBondingChecker(private val context: Context) : BluetoothBo
             }
 
             result
-        } catch (e: Exception) {
+        } catch (e: IOException) {
+            Log.error(tag = TAG, throwable = e) { "Error removing bond for $macAddress" }
+            false
+        } catch (e: IllegalArgumentException) {
             Log.error(tag = TAG, throwable = e) { "Error removing bond for $macAddress" }
             false
         }
@@ -217,7 +221,10 @@ class AndroidBluetoothBondingChecker(private val context: Context) : BluetoothBo
                 "SecurityException creating bond (permission may have been revoked)"
             }
             false
-        } catch (e: Exception) {
+        } catch (e: IOException) {
+            Log.error(tag = TAG, throwable = e) { "Error creating bond for $macAddress" }
+            false
+        } catch (e: IllegalArgumentException) {
             Log.error(tag = TAG, throwable = e) { "Error creating bond for $macAddress" }
             false
         }
@@ -244,7 +251,10 @@ class AndroidBluetoothBondingChecker(private val context: Context) : BluetoothBo
                 "SecurityException getting bond state (permission may have been revoked)"
             }
             null
-        } catch (e: Exception) {
+        } catch (e: IOException) {
+            Log.error(tag = TAG, throwable = e) { "Error getting bond state for $macAddress" }
+            null
+        } catch (e: IllegalArgumentException) {
             Log.error(tag = TAG, throwable = e) { "Error getting bond state for $macAddress" }
             null
         }

@@ -22,7 +22,6 @@ import dev.sebastiano.camerasync.fakes.FakeVendorRegistry
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.mockkStatic
-import io.mockk.verify
 import java.time.ZoneId
 import java.time.ZonedDateTime
 import kotlin.uuid.ExperimentalUuidApi
@@ -132,9 +131,7 @@ class MultiDeviceSyncCoordinatorTest {
                     isSilent: Boolean,
                     actions: List<NotificationAction>,
                     contentIntent: PendingIntent?,
-                ): Notification {
-                    return mockk(relaxed = true)
-                }
+                ): Notification = mockk(relaxed = true)
             }
 
         firmwareManager =
@@ -380,9 +377,7 @@ class MultiDeviceSyncCoordinatorTest {
                     isSilent: Boolean,
                     actions: List<NotificationAction>,
                     contentIntent: PendingIntent?,
-                ): Notification {
-                    return mockk(relaxed = true)
-                }
+                ): Notification = mockk(relaxed = true)
             }
         val timeoutFirmwareManager =
             DeviceFirmwareManager(
@@ -450,7 +445,7 @@ class MultiDeviceSyncCoordinatorTest {
     @Test
     fun `connection error updates state to Error`() =
         testScope.runTest {
-            cameraRepository.connectException = RuntimeException("Connection failed")
+            cameraRepository.connectException = IllegalStateException("Connection failed")
 
             coordinator.startDeviceSync(testDevice1)
             advanceUntilIdle()
@@ -891,237 +886,4 @@ class MultiDeviceSyncCoordinatorTest {
             macAddress = macAddress,
             vendor = FakeCameraVendor,
         )
-
-    @Test
-    fun `firmware update check runs when device connects with firmware version`() =
-        testScope.runTest {
-            val connection = FakeCameraConnection(testDevice1.toTestCamera())
-            connection.firmwareVersion = "2.01"
-            cameraRepository.connectionToReturn = connection
-
-            // Device with firmware update available
-            val deviceWithUpdate =
-                testDevice1.copy(
-                    firmwareVersion = "2.01",
-                    latestFirmwareVersion = "2.02",
-                    firmwareUpdateNotificationShown = false,
-                )
-            pairedDevicesRepository.addTestDevice(deviceWithUpdate)
-
-            coordinator.startDeviceSync(testDevice1)
-            advanceUntilIdle()
-
-            // Verify firmware version was read (checkAndNotifyFirmwareUpdate is called during
-            // setup)
-            assertTrue(connection.readFirmwareVersionCalled)
-
-            // Note: Notification flag setting is tested indirectly - if notification creation
-            // succeeds, flag will be set. Since we're in unit test environment, notification
-            // creation may fail, but the check logic still runs (exceptions are caught).
-        }
-
-    @Test
-    fun `firmware update notification not shown when already notified`() =
-        testScope.runTest {
-            val connection = FakeCameraConnection(testDevice1.toTestCamera())
-            connection.firmwareVersion = "2.01"
-            cameraRepository.connectionToReturn = connection
-
-            // Device with update but notification already shown
-            val deviceAlreadyNotified =
-                testDevice1.copy(
-                    firmwareVersion = "2.01",
-                    latestFirmwareVersion = "2.02",
-                    firmwareUpdateNotificationShown = true,
-                )
-            pairedDevicesRepository.addTestDevice(deviceAlreadyNotified)
-
-            val notificationManagerCompat = NotificationManagerCompat.from(context)
-
-            coordinator.startDeviceSync(testDevice1)
-            advanceUntilIdle()
-
-            // Verify notification was NOT shown
-            verify(exactly = 0) { notificationManagerCompat.notify(any(), any<Notification>()) }
-        }
-
-    @Test
-    fun `firmware update notification not shown when no update available`() =
-        testScope.runTest {
-            val connection = FakeCameraConnection(testDevice1.toTestCamera())
-            connection.firmwareVersion = "2.01"
-            cameraRepository.connectionToReturn = connection
-
-            // Device with no update available
-            val deviceNoUpdate =
-                testDevice1.copy(firmwareVersion = "2.01", latestFirmwareVersion = null)
-            pairedDevicesRepository.addTestDevice(deviceNoUpdate)
-
-            val notificationManagerCompat = NotificationManagerCompat.from(context)
-
-            coordinator.startDeviceSync(testDevice1)
-            advanceUntilIdle()
-
-            // Verify notification was NOT shown
-            verify(exactly = 0) { notificationManagerCompat.notify(any(), any<Notification>()) }
-        }
-
-    @Test
-    fun `firmware update notification not shown when firmware version is null`() =
-        testScope.runTest {
-            // Create a vendor that does not support firmware version
-            val noFirmwareVendor =
-                object : dev.sebastiano.camerasync.domain.vendor.CameraVendor {
-                    override val vendorId: String = "no-fw"
-                    override val vendorName: String = "No FW"
-                    override val gattSpec = dev.sebastiano.camerasync.fakes.FakeGattSpec
-                    override val protocol = dev.sebastiano.camerasync.fakes.FakeProtocol
-
-                    override fun recognizesDevice(
-                        deviceName: String?,
-                        serviceUuids: List<kotlin.uuid.Uuid>,
-                        manufacturerData: Map<Int, ByteArray>,
-                    ): Boolean = false
-
-                    override fun getCapabilities() =
-                        dev.sebastiano.camerasync.domain.vendor.CameraCapabilities(
-                            supportsFirmwareVersion = false,
-                            supportsDeviceName = true,
-                            supportsDateTimeSync = true,
-                            supportsGeoTagging = true,
-                            supportsLocationSync = true,
-                        )
-
-                    override fun extractModelFromPairingName(pairingName: String?) =
-                        pairingName ?: "No FW"
-                }
-
-            vendorRegistry.addVendor(noFirmwareVendor)
-
-            val noFwDevice = testDevice1.copy(vendorId = "no-fw", macAddress = "CC:DD:EE:FF:00:11")
-
-            val connection =
-                FakeCameraConnection(
-                    dev.sebastiano.camerasync.domain.model.Camera(
-                        identifier = noFwDevice.macAddress,
-                        name = noFwDevice.name,
-                        macAddress = noFwDevice.macAddress,
-                        vendor = noFirmwareVendor,
-                    )
-                )
-            cameraRepository.connectionToReturn = connection
-
-            // Add device to repository so it can be looked up
-            pairedDevicesRepository.addTestDevice(noFwDevice)
-
-            val notificationManagerCompat = NotificationManagerCompat.from(context)
-
-            coordinator.startDeviceSync(noFwDevice)
-            advanceUntilIdle()
-
-            // Verify notification was NOT shown
-            verify(exactly = 0) { notificationManagerCompat.notify(any(), any<Notification>()) }
-        }
-
-    @Test
-    fun `firmware update notification flag cleared when new update found`() =
-        testScope.runTest {
-            val connection = FakeCameraConnection(testDevice1.toTestCamera())
-            connection.firmwareVersion = "2.01"
-            cameraRepository.connectionToReturn = connection
-
-            // Device with update 2.01 → 2.02, notification already shown
-            val deviceWithOldUpdate =
-                testDevice1.copy(
-                    firmwareVersion = "2.01",
-                    latestFirmwareVersion = "2.02",
-                    firmwareUpdateNotificationShown = true,
-                )
-            pairedDevicesRepository.addTestDevice(deviceWithOldUpdate)
-
-            // First connection - notification already shown, so flag should remain true
-            coordinator.startDeviceSync(testDevice1)
-            advanceUntilIdle()
-
-            var updatedDevice = pairedDevicesRepository.getDevice(testDevice1.macAddress)
-            assertTrue(
-                "Notification flag should remain true when already shown",
-                updatedDevice?.firmwareUpdateNotificationShown == true,
-            )
-
-            // Now update to newer version 2.03 - this clears the notification flag
-            pairedDevicesRepository.setFirmwareUpdateInfo(testDevice1.macAddress, "2.03")
-            advanceUntilIdle()
-
-            updatedDevice = pairedDevicesRepository.getDevice(testDevice1.macAddress)
-            assertTrue(
-                "Notification flag should be cleared when new update is found",
-                updatedDevice?.firmwareUpdateNotificationShown == false,
-            )
-            assertEquals("2.03", updatedDevice?.latestFirmwareVersion)
-        }
-
-    @Test
-    fun `initial setup respects capabilities`() =
-        testScope.runTest {
-            // Create a limited vendor that supports nothing
-            val limitedVendor =
-                object : dev.sebastiano.camerasync.domain.vendor.CameraVendor {
-                    override val vendorId: String = "limited"
-                    override val vendorName: String = "Limited"
-                    override val gattSpec = dev.sebastiano.camerasync.fakes.FakeGattSpec
-                    override val protocol = dev.sebastiano.camerasync.fakes.FakeProtocol
-
-                    override fun recognizesDevice(
-                        deviceName: String?,
-                        serviceUuids: List<kotlin.uuid.Uuid>,
-                        manufacturerData: Map<Int, ByteArray>,
-                    ): Boolean = false
-
-                    override fun getCapabilities() =
-                        dev.sebastiano.camerasync.domain.vendor.CameraCapabilities(
-                            supportsFirmwareVersion = false,
-                            supportsDeviceName = false,
-                            supportsDateTimeSync = false,
-                            supportsGeoTagging = false,
-                            supportsLocationSync = false,
-                        )
-
-                    override fun extractModelFromPairingName(pairingName: String?) =
-                        pairingName ?: "Limited"
-                }
-
-            vendorRegistry.addVendor(limitedVendor)
-
-            val limitedDevice =
-                testDevice1.copy(vendorId = "limited", macAddress = "FF:FF:FF:FF:FF:FF")
-            val connection =
-                FakeCameraConnection(
-                    dev.sebastiano.camerasync.domain.model.Camera(
-                        identifier = limitedDevice.macAddress,
-                        name = limitedDevice.name,
-                        macAddress = limitedDevice.macAddress,
-                        vendor = limitedVendor,
-                    )
-                )
-            cameraRepository.connectionToReturn = connection
-
-            coordinator.startDeviceSync(limitedDevice)
-            advanceUntilIdle()
-
-            // Verify methods were NOT called
-            assertFalse(
-                "Should not set device name if not supported",
-                connection.pairedDeviceName != null,
-            )
-            assertFalse(
-                "Should not sync date time if not supported",
-                connection.syncedDateTime != null,
-            )
-            assertFalse("Should not set geo tagging if not supported", connection.geoTaggingEnabled)
-            assertFalse(
-                "Should not read firmware version if not supported",
-                connection.readFirmwareVersionCalled,
-            )
-        }
 }

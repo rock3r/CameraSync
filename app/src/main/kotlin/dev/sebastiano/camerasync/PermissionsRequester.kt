@@ -13,8 +13,6 @@ import com.google.accompanist.permissions.isGranted
 import com.google.accompanist.permissions.rememberMultiplePermissionsState
 import com.google.accompanist.permissions.rememberPermissionState
 
-data class PermissionInfo(val name: String, val description: String, val isGranted: Boolean)
-
 @OptIn(ExperimentalPermissionsApi::class)
 @Composable
 fun PermissionsRequester(

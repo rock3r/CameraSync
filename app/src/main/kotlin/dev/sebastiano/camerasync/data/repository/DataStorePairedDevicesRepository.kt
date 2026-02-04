@@ -114,21 +114,16 @@ class DataStorePairedDevicesRepository(private val dataStore: DataStore<PairedDe
         }
     }
 
-    override suspend fun isDevicePaired(macAddress: String): Boolean {
-        return dataStore.data.first().devicesList.any { it.macAddress == macAddress }
-    }
+    override suspend fun isDevicePaired(macAddress: String): Boolean =
+        dataStore.data.first().devicesList.any { it.macAddress == macAddress }
 
-    override suspend fun getDevice(macAddress: String): PairedDevice? {
-        return dataStore.data.first().devicesList.find { it.macAddress == macAddress }?.toDomain()
-    }
+    override suspend fun getDevice(macAddress: String): PairedDevice? =
+        dataStore.data.first().devicesList.find { it.macAddress == macAddress }?.toDomain()
 
-    override suspend fun hasAnyDevices(): Boolean {
-        return dataStore.data.first().devicesList.isNotEmpty()
-    }
+    override suspend fun hasAnyDevices(): Boolean = dataStore.data.first().devicesList.isNotEmpty()
 
-    override suspend fun hasEnabledDevices(): Boolean {
-        return dataStore.data.first().devicesList.any { it.enabled }
-    }
+    override suspend fun hasEnabledDevices(): Boolean =
+        dataStore.data.first().devicesList.any { it.enabled }
 
     override suspend fun updateFirmwareVersion(macAddress: String, firmwareVersion: String?) {
         dataStore.updateData { currentData ->

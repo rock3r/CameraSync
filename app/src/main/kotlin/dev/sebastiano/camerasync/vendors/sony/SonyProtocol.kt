@@ -125,18 +125,12 @@ object SonyProtocol : CameraProtocol {
         return "Lat: $latitude, Lon: $longitude, Time: $dateTimeStr"
     }
 
-    override fun encodeGeoTaggingEnabled(enabled: Boolean): ByteArray {
-        // Sony doesn't have a separate geo-tagging toggle characteristic.
-        return byteArrayOf()
-    }
+    // Sony doesn't have a separate geo-tagging toggle characteristic.
+    override fun encodeGeoTaggingEnabled(enabled: Boolean): ByteArray = byteArrayOf()
 
-    override fun decodeGeoTaggingEnabled(bytes: ByteArray): Boolean {
-        return false
-    }
+    override fun decodeGeoTaggingEnabled(bytes: ByteArray): Boolean = false
 
-    override fun getPairingInitData(): ByteArray {
-        return createPairingInit()
-    }
+    override fun getPairingInitData(): ByteArray = createPairingInit()
 
     /**
      * Encodes a complete location packet for Sony cameras.
@@ -220,25 +214,19 @@ object SonyProtocol : CameraProtocol {
      *
      * Write this to DD01 to enable status notifications.
      */
-    fun createStatusNotifyEnable(): ByteArray {
-        return byteArrayOf(0x03, 0x01, 0x02, 0x01)
-    }
+    fun createStatusNotifyEnable(): ByteArray = byteArrayOf(0x03, 0x01, 0x02, 0x01)
 
     /**
      * Creates the status notification disable command.
      *
      * Write this to DD01 to disable status notifications.
      */
-    fun createStatusNotifyDisable(): ByteArray {
-        return byteArrayOf(0x03, 0x01, 0x02, 0x00)
-    }
+    fun createStatusNotifyDisable(): ByteArray = byteArrayOf(0x03, 0x01, 0x02, 0x00)
 
     /**
      * Creates the pairing initialization command.
      *
      * Write this to EE01 when the camera is in pairing mode.
      */
-    fun createPairingInit(): ByteArray {
-        return byteArrayOf(0x06, 0x08, 0x01, 0x00, 0x00, 0x00, 0x00)
-    }
+    fun createPairingInit(): ByteArray = byteArrayOf(0x06, 0x08, 0x01, 0x00, 0x00, 0x00, 0x00)
 }

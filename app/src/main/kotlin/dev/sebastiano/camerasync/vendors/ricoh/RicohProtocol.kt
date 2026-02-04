@@ -138,9 +138,8 @@ object RicohProtocol : CameraProtocol {
      *
      * Format: 1 byte (0x00 = disabled, 0x01 = enabled)
      */
-    override fun encodeGeoTaggingEnabled(enabled: Boolean): ByteArray {
-        return ByteArray(1) { if (enabled) 1 else 0 }
-    }
+    override fun encodeGeoTaggingEnabled(enabled: Boolean): ByteArray =
+        ByteArray(1) { if (enabled) 1 else 0 }
 
     /** Decodes the geo-tagging enabled/disabled state from Ricoh format. */
     override fun decodeGeoTaggingEnabled(bytes: ByteArray): Boolean {

@@ -21,6 +21,7 @@ import dev.sebastiano.camerasync.domain.repository.CameraConnection
 import dev.sebastiano.camerasync.domain.repository.CameraRepository
 import dev.sebastiano.camerasync.domain.vendor.CameraVendorRegistry
 import dev.sebastiano.camerasync.logging.KhronicleLogEngine
+import java.io.IOException
 import java.time.ZonedDateTime
 import kotlin.uuid.ExperimentalUuidApi
 import kotlinx.coroutines.TimeoutCancellationException
@@ -140,7 +141,9 @@ class KableCameraRepository(
             scanner.startScan(filters, settings, pendingIntent)
         } catch (e: SecurityException) {
             Log.error(tag = TAG, throwable = e) { "SecurityException starting passive scan" }
-        } catch (e: Exception) {
+        } catch (e: IOException) {
+            Log.error(tag = TAG, throwable = e) { "Error starting passive scan" }
+        } catch (e: IllegalStateException) {
             Log.error(tag = TAG, throwable = e) { "Error starting passive scan" }
         }
     }
@@ -156,7 +159,9 @@ class KableCameraRepository(
             scanner?.stopScan(pendingIntent)
         } catch (e: SecurityException) {
             Log.error(tag = TAG, throwable = e) { "SecurityException stopping passive scan" }
-        } catch (e: Exception) {
+        } catch (e: IOException) {
+            Log.error(tag = TAG, throwable = e) { "Error stopping passive scan" }
+        } catch (e: IllegalStateException) {
             Log.error(tag = TAG, throwable = e) { "Error stopping passive scan" }
         }
     }
@@ -391,7 +396,13 @@ internal class KableCameraConnection(
             peripheral.write(char, pairingData, WriteType.WithResponse)
             Log.info(tag = TAG) { "Pairing initialization successful" }
             true
-        } catch (e: Exception) {
+        } catch (e: IOException) {
+            Log.error(tag = TAG, throwable = e) { "Failed to initialize pairing" }
+            false
+        } catch (e: IllegalStateException) {
+            Log.error(tag = TAG, throwable = e) { "Failed to initialize pairing" }
+            false
+        } catch (e: IllegalArgumentException) {
             Log.error(tag = TAG, throwable = e) { "Failed to initialize pairing" }
             false
         }
@@ -446,13 +457,11 @@ internal class KableCameraConnection(
 
         val service =
             peripheral.services.value.orEmpty().firstOrNull { it.serviceUuid == serviceUuid }
-                ?: throw IllegalStateException("Hardware revision service not found: $serviceUuid")
+                ?: error("Hardware revision service not found: $serviceUuid")
 
         val char =
             service.characteristics.firstOrNull { it.characteristicUuid == charUuid }
-                ?: throw IllegalStateException(
-                    "Hardware revision characteristic not found: $charUuid"
-                )
+                ?: error("Hardware revision characteristic not found: $charUuid")
 
         val bytes = peripheral.read(char)
         val revision = bytes.decodeToString().trimEnd(Char(0))

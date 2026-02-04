@@ -3,6 +3,7 @@ package dev.sebastiano.camerasync.devicesync
 import com.juul.khronicle.Log
 import dev.sebastiano.camerasync.domain.repository.CameraConnection
 import dev.zacsweers.metro.Inject
+import java.io.IOException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.joinAll
 
@@ -60,7 +61,9 @@ class DeviceConnectionManager {
         connections.forEach {
             try {
                 it.disconnect()
-            } catch (e: Exception) {
+            } catch (e: IOException) {
+                Log.warn(tag = TAG, throwable = e) { "Error disconnecting during stopAll" }
+            } catch (e: IllegalStateException) {
                 Log.warn(tag = TAG, throwable = e) { "Error disconnecting during stopAll" }
             }
         }

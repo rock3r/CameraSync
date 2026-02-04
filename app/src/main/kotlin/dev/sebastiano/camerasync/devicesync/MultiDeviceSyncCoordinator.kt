@@ -21,6 +21,7 @@ import dev.sebastiano.camerasync.domain.vendor.CameraVendorRegistry
 import dev.zacsweers.metro.Assisted
 import dev.zacsweers.metro.AssistedFactory
 import dev.zacsweers.metro.AssistedInject
+import java.io.IOException
 import java.time.ZonedDateTime
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -313,12 +314,30 @@ constructor(
                 connection.isConnected.filter { !it }.first()
                 Log.info(tag = TAG) { "Device $macAddress disconnected" }
             } catch (e: TimeoutCancellationException) {
-                Log.warn(tag = TAG) { "Timeout connecting to $macAddress" }
+                Log.warn(tag = TAG, throwable = e) { "Timeout connecting to $macAddress" }
                 updateDeviceState(macAddress, DeviceConnectionState.Unreachable)
             } catch (e: CancellationException) {
-                Log.debug(tag = TAG) { "Cancelled connection to $macAddress" }
+                Log.debug(tag = TAG, throwable = e) { "Cancelled connection to $macAddress" }
                 updateDeviceState(macAddress, DeviceConnectionState.Disconnected)
-            } catch (e: Exception) {
+            } catch (e: IOException) {
+                Log.error(tag = TAG, throwable = e) { "Error connecting to $macAddress" }
+                updateDeviceState(
+                    macAddress,
+                    DeviceConnectionState.Error(e.message ?: "Unknown error", isRecoverable = true),
+                )
+            } catch (e: IllegalStateException) {
+                Log.error(tag = TAG, throwable = e) { "Error connecting to $macAddress" }
+                updateDeviceState(
+                    macAddress,
+                    DeviceConnectionState.Error(e.message ?: "Unknown error", isRecoverable = true),
+                )
+            } catch (e: IllegalArgumentException) {
+                Log.error(tag = TAG, throwable = e) { "Error connecting to $macAddress" }
+                updateDeviceState(
+                    macAddress,
+                    DeviceConnectionState.Error(e.message ?: "Unknown error", isRecoverable = true),
+                )
+            } catch (e: SecurityException) {
                 Log.error(tag = TAG, throwable = e) { "Error connecting to $macAddress" }
                 updateDeviceState(
                     macAddress,
@@ -397,15 +416,13 @@ constructor(
         return _deviceStates.value[upperMacAddress] ?: DeviceConnectionState.Disconnected
     }
 
-    fun getConnectedDeviceCount(): Int {
-        return _deviceStates.value.values.count { state ->
+    fun getConnectedDeviceCount(): Int =
+        _deviceStates.value.values.count { state ->
             state is DeviceConnectionState.Connected || state is DeviceConnectionState.Syncing
         }
-    }
 
-    fun isDeviceConnected(macAddress: String): Boolean {
-        return getDeviceState(macAddress) is DeviceConnectionState.Syncing
-    }
+    fun isDeviceConnected(macAddress: String): Boolean =
+        getDeviceState(macAddress) is DeviceConnectionState.Syncing
 
     private fun updateDeviceState(macAddress: String, state: DeviceConnectionState) {
         _deviceStates.update { currentStates ->
@@ -481,46 +498,50 @@ constructor(
     /** Syncs location to all connected devices that support location sync. */
     private suspend fun syncLocationToConnectedDevices(location: GpsLocation) {
         val connections = connectionManager.getConnections()
-
         connections.forEach { (macAddress, connection) ->
-            try {
-                if (connection.camera.vendor.getCapabilities().supportsLocationSync) {
-                    connection.syncLocation(location)
+            syncLocationToDevice(macAddress, connection, location)
+        }
+    }
 
-                    // Update persistent last sync timestamp
-                    val now = System.currentTimeMillis()
-                    pairedDevicesRepository.updateLastSyncedAt(macAddress, now)
-
-                    // Update state with sync info
-                    val currentState = getDeviceState(macAddress)
-                    val newState =
-                        when (currentState) {
-                            is DeviceConnectionState.Syncing ->
-                                currentState.copy(
-                                    lastSyncInfo =
-                                        LocationSyncInfo(
-                                            syncTime = ZonedDateTime.now(),
-                                            location = location,
-                                        )
-                                )
-                            is DeviceConnectionState.Connected ->
-                                DeviceConnectionState.Syncing(
-                                    firmwareVersion = currentState.firmwareVersion,
-                                    lastSyncInfo =
-                                        LocationSyncInfo(
-                                            syncTime = ZonedDateTime.now(),
-                                            location = location,
-                                        ),
-                                )
-                            else -> currentState
-                        }
-                    if (newState != currentState) {
-                        updateDeviceState(macAddress, newState)
-                    }
-                }
-            } catch (e: Exception) {
-                Log.error(tag = TAG, throwable = e) { "Failed to sync location to $macAddress" }
+    private suspend fun syncLocationToDevice(
+        macAddress: String,
+        connection: CameraConnection,
+        location: GpsLocation,
+    ) {
+        if (!connection.camera.vendor.getCapabilities().supportsLocationSync) return
+        try {
+            connection.syncLocation(location)
+            val now = System.currentTimeMillis()
+            pairedDevicesRepository.updateLastSyncedAt(macAddress, now)
+            val currentState = getDeviceState(macAddress)
+            val newState = newSyncingStateWithLocation(currentState, location)
+            if (newState != currentState) {
+                updateDeviceState(macAddress, newState)
             }
+        } catch (e: IOException) {
+            Log.error(tag = TAG, throwable = e) { "Failed to sync location to $macAddress" }
+        } catch (e: IllegalStateException) {
+            Log.error(tag = TAG, throwable = e) { "Failed to sync location to $macAddress" }
+        } catch (e: IllegalArgumentException) {
+            Log.error(tag = TAG, throwable = e) { "Failed to sync location to $macAddress" }
+        } catch (e: SecurityException) {
+            Log.error(tag = TAG, throwable = e) { "Failed to sync location to $macAddress" }
+        }
+    }
+
+    private fun newSyncingStateWithLocation(
+        currentState: DeviceConnectionState,
+        location: GpsLocation,
+    ): DeviceConnectionState {
+        val syncInfo = LocationSyncInfo(syncTime = ZonedDateTime.now(), location = location)
+        return when (currentState) {
+            is DeviceConnectionState.Syncing -> currentState.copy(lastSyncInfo = syncInfo)
+            is DeviceConnectionState.Connected ->
+                DeviceConnectionState.Syncing(
+                    firmwareVersion = currentState.firmwareVersion,
+                    lastSyncInfo = syncInfo,
+                )
+            else -> currentState
         }
     }
 }

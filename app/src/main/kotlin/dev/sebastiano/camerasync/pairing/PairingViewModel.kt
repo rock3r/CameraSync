@@ -20,6 +20,7 @@ import dev.sebastiano.camerasync.domain.repository.PairedDevicesRepository
 import dev.sebastiano.camerasync.domain.vendor.CameraVendorRegistry
 import dev.sebastiano.camerasync.feedback.IssueReporter
 import dev.zacsweers.metro.Inject
+import java.io.IOException
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 import kotlinx.coroutines.CoroutineDispatcher
@@ -116,7 +117,10 @@ class PairingViewModel(
                         BluetoothDevice::class.java,
                     )
                     ?.toCamera()
-        } catch (e: Exception) {
+        } catch (e: IllegalArgumentException) {
+            Log.warn(tag = TAG, throwable = e) { "Could not extract device from Intent" }
+            null
+        } catch (e: SecurityException) {
             Log.warn(tag = TAG, throwable = e) { "Could not extract device from Intent" }
             null
         }
@@ -271,7 +275,18 @@ class PairingViewModel(
         } catch (e: TimeoutCancellationException) {
             Log.error(tag = TAG, throwable = e) { "Pairing timed out for ${camera.macAddress}" }
             _state.value = PairingScreenState.Pairing(camera, error = PairingError.TIMEOUT)
-        } catch (e: Exception) {
+        } catch (e: IOException) {
+            Log.error(tag = TAG, throwable = e) { "Pairing failed" }
+            val error =
+                when {
+                    e.message?.contains("reject", ignoreCase = true) == true ->
+                        PairingError.REJECTED
+                    e.message?.contains("timeout", ignoreCase = true) == true ->
+                        PairingError.TIMEOUT
+                    else -> PairingError.UNKNOWN
+                }
+            _state.value = PairingScreenState.Pairing(camera, error = error)
+        } catch (e: IllegalStateException) {
             Log.error(tag = TAG, throwable = e) { "Pairing failed" }
             val error =
                 when {
@@ -285,7 +300,9 @@ class PairingViewModel(
         } finally {
             try {
                 connection?.disconnect()
-            } catch (e: Exception) {
+            } catch (e: IOException) {
+                Log.warn(tag = TAG, throwable = e) { "Error disconnecting after pairing" }
+            } catch (e: IllegalStateException) {
                 Log.warn(tag = TAG, throwable = e) { "Error disconnecting after pairing" }
             }
         }

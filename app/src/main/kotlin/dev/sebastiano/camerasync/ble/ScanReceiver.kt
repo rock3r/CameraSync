@@ -29,7 +29,9 @@ class ScanReceiver : BroadcastReceiver() {
             val serviceIntent = MultiDeviceSyncService.createDeviceFoundIntent(context)
             try {
                 context.startForegroundService(serviceIntent)
-            } catch (e: Exception) {
+            } catch (e: SecurityException) {
+                Log.error(tag = TAG, throwable = e) { "Failed to start service from ScanReceiver" }
+            } catch (e: IllegalStateException) {
                 Log.error(tag = TAG, throwable = e) { "Failed to start service from ScanReceiver" }
             }
         }

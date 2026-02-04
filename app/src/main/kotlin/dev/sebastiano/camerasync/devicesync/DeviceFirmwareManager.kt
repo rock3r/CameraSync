@@ -8,6 +8,7 @@ import com.juul.khronicle.Log
 import dev.sebastiano.camerasync.R
 import dev.sebastiano.camerasync.domain.repository.PairedDevicesRepository
 import dev.zacsweers.metro.Inject
+import java.io.IOException
 
 private const val TAG = "DeviceFirmwareManager"
 
@@ -81,7 +82,11 @@ class DeviceFirmwareManager(
             Log.info(tag = TAG) {
                 "Successfully showed firmware update notification for $macAddress"
             }
-        } catch (e: Exception) {
+        } catch (e: IOException) {
+            Log.error(tag = TAG, throwable = e) {
+                "Failed to show firmware update notification for $macAddress"
+            }
+        } catch (e: IllegalStateException) {
             Log.error(tag = TAG, throwable = e) {
                 "Failed to show firmware update notification for $macAddress"
             }

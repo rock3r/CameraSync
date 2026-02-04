@@ -10,7 +10,6 @@ class KableCameraRepositoryTest {
 
     private lateinit var vendorRegistry: CameraVendorRegistry
     private lateinit var context: Context
-    private lateinit var repository: KableCameraRepository
 
     @Before
     fun setUp() {

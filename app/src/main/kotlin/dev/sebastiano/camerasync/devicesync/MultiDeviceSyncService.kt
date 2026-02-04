@@ -177,10 +177,16 @@ class MultiDeviceSyncService(
                     connectedDeviceCount = 0,
                     enabledDeviceCount = 0,
                 )
-        } catch (e: Exception) {
-            if (e is ForegroundServiceStartNotAllowedException) {
-                Log.error(tag = TAG, throwable = e) { "Cannot start foreground service" }
-            }
+        } catch (e: ForegroundServiceStartNotAllowedException) {
+            Log.error(tag = TAG, throwable = e) { "Cannot start foreground service" }
+            val errorMessage = getString(R.string.error_service_start_failed, e.message ?: "")
+            _serviceState.value = MultiDeviceSyncServiceState.Error(errorMessage)
+            vibrator.vibrate()
+        } catch (e: SecurityException) {
+            val errorMessage = getString(R.string.error_service_start_failed, e.message ?: "")
+            _serviceState.value = MultiDeviceSyncServiceState.Error(errorMessage)
+            vibrator.vibrate()
+        } catch (e: IllegalStateException) {
             val errorMessage = getString(R.string.error_service_start_failed, e.message ?: "")
             _serviceState.value = MultiDeviceSyncServiceState.Error(errorMessage)
             vibrator.vibrate()
@@ -247,8 +253,12 @@ class MultiDeviceSyncService(
                         isSyncEnabled,
                     )
                 }
-                .collect {
-                    (connectedCount, enabledCount, _, isScanning, lastSyncTime, isSyncEnabled) ->
+                .collect { state ->
+                    val connectedCount = state.first
+                    val enabledCount = state.second
+                    val isScanning = state.fourth
+                    val lastSyncTime = state.fifth
+                    val isSyncEnabled = state.sixth
 
                     // Update the shared sync status repository
                     syncStatusRepository.updateConnectedDevicesCount(connectedCount)

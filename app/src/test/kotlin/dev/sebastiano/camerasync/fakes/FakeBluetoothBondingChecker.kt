@@ -22,16 +22,11 @@ class FakeBluetoothBondingChecker : BluetoothBondingChecker {
         }
     }
 
-    override fun isDeviceBonded(macAddress: String): Boolean {
-        return bondedDevices.contains(macAddress.uppercase())
-    }
+    override fun isDeviceBonded(macAddress: String): Boolean =
+        bondedDevices.contains(macAddress.uppercase())
 
-    override fun getBondedDevice(macAddress: String): BluetoothDevice? {
-        // Return null as we can't create a real BluetoothDevice in tests
-        // This is fine since tests don't need the actual device object
-        // The removeBond method will still work via isDeviceBonded check
-        return null
-    }
+    // Return null as we can't create a real BluetoothDevice in tests.
+    override fun getBondedDevice(macAddress: String): BluetoothDevice? = null
 
     override fun removeBond(macAddress: String): Boolean {
         val wasBonded = isDeviceBonded(macAddress)
