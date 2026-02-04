@@ -29,6 +29,8 @@ import java.time.ZoneId
 import java.time.ZonedDateTime
 import kotlin.uuid.ExperimentalUuidApi
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.TimeoutCancellationException
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -38,6 +40,7 @@ import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.withTimeout
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -45,6 +48,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 
+@Suppress("LargeClass")
 @OptIn(ExperimentalCoroutinesApi::class, ExperimentalUuidApi::class)
 class MultiDeviceSyncCoordinatorTest {
 
@@ -448,16 +452,39 @@ class MultiDeviceSyncCoordinatorTest {
     }
 
     @Test
+    fun `connection timeout from repository updates state to Unreachable`() =
+        testScope.runTest {
+            cameraRepository.connectException =
+                try {
+                    withTimeout(0) { delay(1) }
+                    null
+                } catch (e: TimeoutCancellationException) {
+                    e
+                }
+
+            coordinator.startDeviceSync(testDevice1)
+            advanceUntilIdle()
+
+            val state = coordinator.getDeviceState(testDevice1.macAddress)
+            assertTrue(
+                "Expected Unreachable but was $state",
+                state is DeviceConnectionState.Unreachable,
+            )
+        }
+
+    @Test
     fun `connection error updates state to Error`() =
         testScope.runTest {
-            cameraRepository.connectException = IllegalStateException("Connection failed")
+            cameraRepository.connectException = IllegalStateException("Something went wrong")
 
             coordinator.startDeviceSync(testDevice1)
             advanceUntilIdle()
 
             val state = coordinator.getDeviceState(testDevice1.macAddress)
             assertTrue(state is DeviceConnectionState.Error)
-            assertTrue((state as DeviceConnectionState.Error).message.contains("Connection failed"))
+            assertTrue(
+                (state as DeviceConnectionState.Error).message.contains("Something went wrong")
+            )
         }
 
     @Test
