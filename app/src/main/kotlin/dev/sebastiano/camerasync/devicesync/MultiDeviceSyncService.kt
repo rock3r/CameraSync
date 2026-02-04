@@ -327,13 +327,21 @@ class MultiDeviceSyncService(
         syncCoordinator.refreshConnections()
     }
 
-    /** Connects to a specific device. */
+    /**
+     * Connects to a specific [device].
+     *
+     * @param device The paired device to connect to.
+     */
     @RequiresPermission(Manifest.permission.POST_NOTIFICATIONS)
     fun connectDevice(device: PairedDevice) {
         launch { syncCoordinator.startDeviceSync(device) }
     }
 
-    /** Disconnects from a specific device without disabling it. */
+    /**
+     * Disconnects from a specific device without disabling it.
+     *
+     * @param macAddress The MAC address of the device to disconnect.
+     */
     fun disconnectDevice(macAddress: String) {
         launch { syncCoordinator.stopDeviceSync(macAddress) }
     }
@@ -455,7 +463,9 @@ class MultiDeviceSyncService(
         _isRunning.value = false
     }
 
+    /** Binder class for [MultiDeviceSyncService]. */
     inner class MultiDeviceSyncServiceBinder : Binder() {
+        /** Returns the [MultiDeviceSyncService] instance. */
         fun getService(): MultiDeviceSyncService = this@MultiDeviceSyncService
     }
 
@@ -464,32 +474,78 @@ class MultiDeviceSyncService(
         private const val ERROR_NOTIFICATION_ID = 124
 
         private val _isRunning = MutableStateFlow(false)
+
+        /** A flow that emits true when the service is currently running. */
         val isRunning: StateFlow<Boolean> = _isRunning.asStateFlow()
 
+        /** Action to stop all active synchronizations. */
         const val ACTION_STOP = "dev.sebastiano.camerasync.STOP_ALL_SYNC"
+
+        /** Action to manually refresh connections. */
         const val ACTION_REFRESH = "dev.sebastiano.camerasync.REFRESH_CONNECTIONS"
+
+        /** Action triggered when a device is found during background scanning. */
         const val ACTION_DEVICE_FOUND = "dev.sebastiano.camerasync.DEVICE_FOUND"
+
+        /** Extra containing the device's MAC address. */
         const val EXTRA_DEVICE_ADDRESS = "device_address"
+
+        /** Extra indicating whether to show the permissions screen. */
         const val EXTRA_SHOW_PERMISSIONS = "show_permissions"
 
+        /** Request code for the stop intent. */
         const val STOP_REQUEST_CODE = 667
+
+        /** Request code for the refresh intent. */
         const val REFRESH_REQUEST_CODE = 668
+
+        /** Request code for the main activity intent. */
         const val MAIN_ACTIVITY_REQUEST_CODE = 669
 
+        /**
+         * Extracts the [MultiDeviceSyncService] instance from a [Binder].
+         *
+         * @param binder The binder returned from [onBind].
+         * @return The service instance.
+         */
         fun getInstanceFrom(binder: Binder): MultiDeviceSyncService =
             (binder as MultiDeviceSyncServiceBinder).getService()
 
+        /**
+         * Creates an [Intent] to stop the service.
+         *
+         * @param context The context.
+         * @return The stop intent.
+         */
         fun createStopIntent(context: Context): Intent =
             Intent(context, MultiDeviceSyncService::class.java).apply { action = ACTION_STOP }
 
+        /**
+         * Creates an [Intent] to refresh connections.
+         *
+         * @param context The context.
+         * @return The refresh intent.
+         */
         fun createRefreshIntent(context: Context): Intent =
             Intent(context, MultiDeviceSyncService::class.java).apply { action = ACTION_REFRESH }
 
+        /**
+         * Creates an [Intent] to notify that a device was found.
+         *
+         * @param context The context.
+         * @return The device found intent.
+         */
         fun createDeviceFoundIntent(context: Context): Intent =
             Intent(context, MultiDeviceSyncService::class.java).apply {
                 action = ACTION_DEVICE_FOUND
             }
 
+        /**
+         * Creates an [Intent] to start the service.
+         *
+         * @param context The context.
+         * @return The start intent.
+         */
         fun createStartIntent(context: Context): Intent =
             Intent(context, MultiDeviceSyncService::class.java)
     }

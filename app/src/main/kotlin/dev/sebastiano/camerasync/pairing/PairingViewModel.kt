@@ -41,8 +41,14 @@ private const val BOND_CHECK_DELAY_MS = 500L
 /**
  * ViewModel for the pairing screen.
  *
- * Handles the companion device association flow and pairing process.
+ * Handles the companion device association flow and the subsequent camera pairing process.
  *
+ * @param pairedDevicesRepository Repository for managing paired devices.
+ * @param cameraRepository Repository for BLE camera communication.
+ * @param vendorRegistry Registry of supported camera vendors.
+ * @param bluetoothBondingChecker Utility for checking and managing Bluetooth bonding.
+ * @param companionDeviceManagerHelper Helper for Companion Device Manager association.
+ * @param issueReporter Utility for sending feedback reports.
  * @param ioDispatcher The dispatcher to use for IO operations. Can be overridden in tests to use a
  *   test dispatcher.
  */
@@ -58,16 +64,23 @@ class PairingViewModel(
 ) : ViewModel() {
 
     private val _state = mutableStateOf<PairingScreenState>(PairingScreenState.Idle)
+
+    /** The current UI state of the pairing screen. */
     val state: State<PairingScreenState> = _state
 
     private val _navigationEvents = Channel<PairingNavigationEvent>(Channel.BUFFERED)
+
+    /** A flow of navigation events, such as when pairing is successful. */
     val navigationEvents: Flow<PairingNavigationEvent> = _navigationEvents.receiveAsFlow()
 
     private val _associationRequest = Channel<IntentSender>(Channel.BUFFERED)
+
+    /** A flow of [IntentSender]s for launching the Companion Device Manager chooser. */
     val associationRequest: Flow<IntentSender> = _associationRequest.receiveAsFlow()
 
     private var pairingJob: Job? = null
 
+    /** Starts the Companion Device Manager association process. */
     fun requestCompanionPairing() {
         Log.info(tag = TAG) { "Requesting companion device pairing" }
         companionDeviceManagerHelper.requestAssociation(
@@ -85,6 +98,11 @@ class PairingViewModel(
         )
     }
 
+    /**
+     * Handles the result of a companion device association.
+     *
+     * @param data The [Intent] returned from the companion device chooser.
+     */
     @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
     @Suppress("DEPRECATION")
     fun onCompanionAssociationResult(data: Intent?) {
@@ -170,7 +188,15 @@ class PairingViewModel(
         return Camera(identifier = address, name = name, macAddress = address, vendor = vendor)
     }
 
-    /** Starts pairing with the selected camera. */
+    /**
+     * Initiates the pairing process with a specific [camera].
+     *
+     * This includes ensuring the device is bonded at the OS level and performing any
+     * vendor-specific pairing initialization.
+     *
+     * @param camera The camera to pair with.
+     * @param allowExistingBond Whether to allow pairing with a device that is already bonded.
+     */
     fun pairDevice(camera: Camera, allowExistingBond: Boolean = false) {
         pairingJob =
             viewModelScope.launch(ioDispatcher) {
@@ -316,7 +342,11 @@ class PairingViewModel(
         _navigationEvents.send(PairingNavigationEvent.DevicePaired)
     }
 
-    /** Removes the system-level bond and restarts the system pairing flow. */
+    /**
+     * Removes the system-level bond and restarts the pairing flow.
+     *
+     * @param camera The camera to unbond and retry pairing with.
+     */
     fun removeBondAndRetry(camera: Camera) {
         pairingJob =
             viewModelScope.launch(ioDispatcher) {
@@ -341,7 +371,7 @@ class PairingViewModel(
         _state.value = PairingScreenState.Idle
     }
 
-    /** Sends feedback report with current pairing context. */
+    /** Gathers diagnostic information and triggers the system intent to send a feedback report. */
     fun sendFeedback() {
         viewModelScope.launch(ioDispatcher) {
             val currentState = _state.value
@@ -367,15 +397,19 @@ class PairingViewModel(
 
 /** State of the pairing screen. */
 sealed interface PairingScreenState {
+    /** No pairing in progress. */
     data object Idle : PairingScreenState
 
+    /** Device is already bonded at the OS level but not paired in the app. */
     data class AlreadyBonded(val camera: Camera, val removeFailed: Boolean = false) :
         PairingScreenState
 
+    /** Pairing is actively in progress with a specific [camera]. */
     data class Pairing(val camera: Camera, val error: PairingError? = null) : PairingScreenState
 }
 
 /** Navigation events emitted by the PairingViewModel. */
 sealed interface PairingNavigationEvent {
+    /** Emitted when a device has been successfully paired. */
     data object DevicePaired : PairingNavigationEvent
 }

@@ -40,6 +40,14 @@ private const val TAG = "DevicesListViewModel"
  * Manages the list of paired devices and their connection states. Communicates with the
  * [MultiDeviceSyncService] to control device sync.
  *
+ * @param pairedDevicesRepository Repository for managing paired devices.
+ * @param locationRepository Repository for location updates.
+ * @param context Application context.
+ * @param vendorRegistry Registry of supported camera vendors.
+ * @param bluetoothBondingChecker Utility to check and manage Bluetooth bonding.
+ * @param issueReporter Utility for sending feedback reports.
+ * @param batteryOptimizationChecker Utility for checking battery optimization status.
+ * @param intentFactory Factory for creating intents.
  * @param ioDispatcher The dispatcher to use for IO operations. Can be overridden in tests to use a
  *   test dispatcher.
  */
@@ -57,6 +65,8 @@ class DevicesListViewModel(
 ) : ViewModel() {
 
     private val _state = mutableStateOf<DevicesListState>(DevicesListState.Loading)
+
+    /** The current UI state of the devices list. */
     val state: State<DevicesListState> = _state
 
     private var service: MultiDeviceSyncService? = null
@@ -265,7 +275,11 @@ class DevicesListViewModel(
             }
     }
 
-    /** Sets whether sync is globally enabled. */
+    /**
+     * Sets whether sync is globally enabled.
+     *
+     * @param enabled Whether global sync should be enabled.
+     */
     fun setSyncEnabled(enabled: Boolean) {
         viewModelScope.launch(ioDispatcher) {
             pairedDevicesRepository.setSyncEnabled(enabled)
@@ -290,14 +304,25 @@ class DevicesListViewModel(
         }
     }
 
-    /** Sets whether a device is enabled for sync. */
+    /**
+     * Sets whether a specific device is enabled for synchronization.
+     *
+     * @param macAddress The MAC address of the device.
+     * @param enabled Whether to enable or disable the device.
+     */
     fun setDeviceEnabled(macAddress: String, enabled: Boolean) {
         viewModelScope.launch(ioDispatcher) {
             pairedDevicesRepository.setDeviceEnabled(macAddress, enabled)
         }
     }
 
-    /** Unpairs (removes) a device. */
+    /**
+     * Unpairs (removes) a device from the application.
+     *
+     * Also attempts to remove the OS-level Bluetooth bond if possible.
+     *
+     * @param macAddress The MAC address of the device to unpair.
+     */
     fun unpairDevice(macAddress: String) {
         viewModelScope.launch(ioDispatcher) {
             // First disconnect if connected
@@ -316,7 +341,11 @@ class DevicesListViewModel(
         }
     }
 
-    /** Retries connection to a failed device. */
+    /**
+     * Retries the connection to a device that encountered an error.
+     *
+     * @param macAddress The MAC address of the device to retry.
+     */
     @RequiresPermission(Manifest.permission.POST_NOTIFICATIONS)
     fun retryConnection(macAddress: String) {
         viewModelScope.launch(ioDispatcher) {
@@ -325,7 +354,7 @@ class DevicesListViewModel(
         }
     }
 
-    /** Manually triggers a scan for all enabled but disconnected devices. */
+    /** Manually triggers a scan and reconnection pass for all enabled but disconnected devices. */
     fun refreshConnections() {
         viewModelScope.launch(ioDispatcher) {
             pairedDevicesRepository.setSyncEnabled(true)
@@ -335,7 +364,7 @@ class DevicesListViewModel(
         }
     }
 
-    /** Sends a feedback report. */
+    /** Gathers diagnostic information and triggers the system intent to send a feedback report. */
     fun sendFeedback() {
         viewModelScope.launch(ioDispatcher) {
             // For devices list, we might want to attach info about all devices or just general
@@ -403,7 +432,14 @@ class DevicesListViewModel(
     }
 }
 
-/** Display information for a device in the UI. */
+/**
+ * Display information for a device in the UI.
+ *
+ * @property make The camera manufacturer.
+ * @property model The camera model.
+ * @property pairingName The name used during pairing (often user-customizable).
+ * @property showPairingName Whether to show the pairing name in the UI (e.g., for disambiguation).
+ */
 data class DeviceDisplayInfo(
     val make: String,
     val model: String,
@@ -428,7 +464,17 @@ sealed interface DevicesListState {
     /** No paired devices. */
     data class Empty(override val isSyncEnabled: Boolean = true) : DevicesListState
 
-    /** Has one or more paired devices. */
+    /**
+     * Has one or more paired devices.
+     *
+     * @property devices The list of devices with their current connection states.
+     * @property displayInfoMap Map of MAC address to display information.
+     * @property isScanning Whether a scan/discovery pass is currently active.
+     * @property isSyncEnabled Whether global sync is enabled.
+     * @property currentLocation The last known GPS location, if available.
+     * @property isIgnoringBatteryOptimizations Whether the app is exempt from battery
+     *   optimizations.
+     */
     data class HasDevices(
         val devices: List<PairedDeviceWithState>,
         val displayInfoMap: Map<String, DeviceDisplayInfo>,

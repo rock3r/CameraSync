@@ -74,8 +74,15 @@ constructor(
     @Assisted private val coroutineScope: CoroutineScope,
 ) {
 
+    /** Factory for creating [MultiDeviceSyncCoordinator] with assisted injection. */
     @AssistedFactory
     interface Factory {
+        /**
+         * Creates a [MultiDeviceSyncCoordinator].
+         *
+         * @param locationCollector The coordinator for centralized location collection.
+         * @param coroutineScope The scope in which to run synchronization jobs.
+         */
         fun create(
             @Assisted locationCollector: LocationCollectionCoordinator,
             @Assisted coroutineScope: CoroutineScope,
@@ -83,9 +90,16 @@ constructor(
     }
 
     private val _deviceStates = MutableStateFlow<Map<String, DeviceConnectionState>>(emptyMap())
+
+    /** A flow of the current connection states for all devices, keyed by MAC address. */
     val deviceStates: StateFlow<Map<String, DeviceConnectionState>> = _deviceStates.asStateFlow()
 
     private val _isScanning = MutableStateFlow(false)
+
+    /**
+     * A flow that emits true when the coordinator is actively scanning for or connecting to
+     * devices.
+     */
     val isScanning: StateFlow<Boolean> =
         combine(_isScanning, _deviceStates) { scanning, states ->
                 scanning ||
@@ -97,6 +111,8 @@ constructor(
             .stateIn(coroutineScope, SharingStarted.Eagerly, false)
 
     private val _presentDevices = MutableStateFlow<Set<String>>(emptySet())
+
+    /** A flow of MAC addresses of devices that have been recently seen or are connected. */
     val presentDevices: StateFlow<Set<String>> = _presentDevices.asStateFlow()
 
     private val scanMutex = Mutex()
@@ -107,6 +123,14 @@ constructor(
     private var locationSyncJob: Job? = null
     private val enabledDevicesFlow = MutableStateFlow<List<PairedDevice>>(emptyList())
 
+    /**
+     * Starts monitoring the provided [enabledDevices] flow.
+     *
+     * This will automatically attempt to connect to devices as they are enabled and seen, and will
+     * disconnect from devices that are disabled.
+     *
+     * @param enabledDevices A flow of currently enabled paired devices.
+     */
     @RequiresPermission(Manifest.permission.POST_NOTIFICATIONS)
     fun startBackgroundMonitoring(enabledDevices: Flow<List<PairedDevice>>) {
         if (backgroundMonitoringJob != null) return
@@ -169,6 +193,12 @@ constructor(
         periodicCheckJob = null
     }
 
+    /**
+     * Manually triggers a refresh of all enabled device connections.
+     *
+     * This will proactively attempt to reconnect to all enabled devices, ignoring their current
+     * presence status.
+     */
     @RequiresPermission(Manifest.permission.POST_NOTIFICATIONS)
     fun refreshConnections() {
         Log.info(tag = TAG) { "Manual refresh requested" }
@@ -259,6 +289,18 @@ constructor(
         }
     }
 
+    /**
+     * Initiates synchronization for a specific [device].
+     *
+     * This includes:
+     * - Scanning for the device if not already found
+     * - Connecting to the device
+     * - Performing initial setup (date/time, device name, geo-tagging)
+     * - Reading firmware version
+     * - Registering for location updates
+     *
+     * @param device The paired device to sync with.
+     */
     @RequiresPermission(Manifest.permission.POST_NOTIFICATIONS)
     fun startDeviceSync(device: PairedDevice) {
         coroutineScope.launch {
@@ -422,6 +464,11 @@ constructor(
         return firmwareVersion
     }
 
+    /**
+     * Stops synchronization for a specific device.
+     *
+     * @param macAddress The MAC address of the device to stop syncing.
+     */
     suspend fun stopDeviceSync(macAddress: String) {
         val upperMacAddress = macAddress.uppercase()
 
@@ -436,6 +483,7 @@ constructor(
         updateDeviceState(upperMacAddress, DeviceConnectionState.Disconnected)
     }
 
+    /** Stops synchronization for all devices and cancels all background jobs. */
     suspend fun stopAllDevices() {
         backgroundMonitoringJob?.cancel()
         backgroundMonitoringJob = null
@@ -449,16 +497,33 @@ constructor(
         _presentDevices.value = emptySet()
     }
 
+    /**
+     * Returns the current connection state for a specific device.
+     *
+     * @param macAddress The MAC address of the device.
+     * @return The current [DeviceConnectionState].
+     */
     fun getDeviceState(macAddress: String): DeviceConnectionState {
         val upperMacAddress = macAddress.uppercase()
         return _deviceStates.value[upperMacAddress] ?: DeviceConnectionState.Disconnected
     }
 
+    /**
+     * Returns the number of devices currently connected and syncing.
+     *
+     * @return The count of connected/syncing devices.
+     */
     fun getConnectedDeviceCount(): Int =
         _deviceStates.value.values.count { state ->
             state is DeviceConnectionState.Connected || state is DeviceConnectionState.Syncing
         }
 
+    /**
+     * Returns true if the device with the given [macAddress] is currently connected or syncing.
+     *
+     * @param macAddress The MAC address of the device.
+     * @return true if connected or syncing.
+     */
     fun isDeviceConnected(macAddress: String): Boolean {
         val state = getDeviceState(macAddress)
         return state is DeviceConnectionState.Connected || state is DeviceConnectionState.Syncing
@@ -470,12 +535,19 @@ constructor(
         }
     }
 
+    /**
+     * Starts a passive BLE scan to discover cameras in the background.
+     *
+     * When a camera is discovered, the [ScanReceiver] will be triggered, which in turn starts the
+     * synchronization process.
+     */
     fun startPassiveScan() {
         Log.info(tag = TAG) { "Starting passive scan" }
         val pendingIntent = createScanPendingIntent()
         cameraRepository.startPassiveScan(pendingIntent)
     }
 
+    /** Stops the background passive BLE scan. */
     fun stopPassiveScan() {
         Log.info(tag = TAG) { "Stopping passive scan" }
         val pendingIntent = createScanPendingIntent()

@@ -16,7 +16,22 @@ import java.time.ZonedDateTime
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
+/**
+ * Android implementation of [IssueReporter] that collects system and Bluetooth information to help
+ * diagnose issues.
+ */
 class AndroidIssueReporter(private val context: Context) : IssueReporter {
+
+    /**
+     * Builds and sends an issue report via email.
+     *
+     * The report includes system information, Bluetooth adapter state, and if a [connection] is
+     * provided, detailed information about the camera connection (bonding state, firmware, etc.).
+     * It also attaches a recent logcat dump.
+     *
+     * @param connection The active camera connection, if any, to include in the report.
+     * @param extraInfo Optional additional information from the user.
+     */
     @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
     override suspend fun sendIssueReport(connection: CameraConnection?, extraInfo: String?) =
         withContext(Dispatchers.IO) {
@@ -119,6 +134,11 @@ class AndroidIssueReporter(private val context: Context) : IssueReporter {
             context.startActivity(chooser)
         }
 
+    /**
+     * Dumps the current logcat to a temporary file in the cache directory.
+     *
+     * @return The [File] containing the logcat output.
+     */
     private fun collectLogcat(): File {
         val logDir = File(context.cacheDir, "logs")
         if (!logDir.exists()) logDir.mkdirs()

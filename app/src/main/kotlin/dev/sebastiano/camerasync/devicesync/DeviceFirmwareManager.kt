@@ -12,6 +12,12 @@ import java.io.IOException
 
 private const val TAG = "DeviceFirmwareManager"
 
+/**
+ * Manages firmware update checks and notifications for camera devices.
+ *
+ * This manager is responsible for checking if a newer firmware version is available for a device
+ * and showing a system notification to the user if an update is found and hasn't been notified yet.
+ */
 @Inject
 class DeviceFirmwareManager(
     private val context: Context,
@@ -21,6 +27,16 @@ class DeviceFirmwareManager(
     private val notificationBuilder: NotificationBuilder,
 ) {
 
+    /**
+     * Checks for firmware updates for the given device and shows a notification if available.
+     *
+     * The check compares the current [firmwareVersion] with the latest version known to the
+     * [pairedDevicesRepository]. If a newer version is found and no notification has been shown yet
+     * for this update, a system notification is displayed.
+     *
+     * @param macAddress The MAC address of the device to check.
+     * @param firmwareVersion The current firmware version reported by the device.
+     */
     @RequiresPermission(Manifest.permission.POST_NOTIFICATIONS)
     suspend fun checkAndNotifyFirmwareUpdate(macAddress: String, firmwareVersion: String?) {
         if (firmwareVersion == null) {
