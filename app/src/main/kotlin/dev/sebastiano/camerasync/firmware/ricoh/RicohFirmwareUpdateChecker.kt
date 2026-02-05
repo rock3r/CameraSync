@@ -19,8 +19,9 @@ private const val TAG = "RicohFirmwareUpdateChecker"
 private val json = Json { ignoreUnknownKeys = true }
 
 // Hosted on GitHub Pages via the workflow
+// Using raw.githubusercontent.com for reliability (avoids custom domain redirect issues)
 private const val SCRAPED_JSON_URL =
-    "https://rock3r.github.io/RicohSync/firmware/ricoh_firmware.json"
+    "https://raw.githubusercontent.com/rock3r/CameraSync/gh-pages/firmware/ricoh_firmware.json"
 private const val JSON_CACHE_FILE = "ricoh_firmware_cache.json"
 private const val JSON_CACHE_VALIDITY_MS = 24 * 60 * 60 * 1000L // 24 hours
 

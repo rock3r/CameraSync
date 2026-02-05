@@ -31,15 +31,25 @@ jobs:
           python scrape_ricoh_firmware.py
           cd ..
 
+      - name: Checkout gh-pages branch to preserve CNAME
+        uses: actions/checkout@v4
+        with:
+          ref: gh-pages
+          path: gh-pages
+          fetch-depth: 0
+
       - name: Prepare deployment directory
         run: |
-          mkdir -p deploy
-          cp scripts/ricoh_firmware.json deploy/
+          mkdir -p deploy/firmware
+          cp scripts/ricoh_firmware.json deploy/firmware/
+          # Preserve CNAME file at root (required for custom domain)
+          if [ -f gh-pages/CNAME ]; then
+            cp gh-pages/CNAME deploy/
+          fi
 
       - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v3
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_dir: ./deploy
-          destination_dir: firmware
           keep_files: false
