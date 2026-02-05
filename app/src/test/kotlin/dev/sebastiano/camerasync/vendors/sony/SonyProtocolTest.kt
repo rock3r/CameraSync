@@ -506,6 +506,22 @@ class SonyProtocolTest {
     // ==================== Round-trip Tests ====================
 
     @Test
+    fun `encodeDateTime handles fractional timezone offset near zero`() {
+        // UTC-0:30 = 0 hours, -30 minutes
+        // This follows Sony's buggy behavior: offsetHours becomes 0, losing the negative sign.
+        val dateTime =
+            ZonedDateTime.of(2024, 12, 25, 14, 30, 45, 0, ZoneOffset.ofHoursMinutes(0, -30))
+        val encoded = SonyProtocol.encodeDateTime(dateTime)
+        val decoded = SonyProtocol.decodeDateTime(encoded)
+
+        // It incorrectly decodes as +00:30 because the sign was lost in encoding
+        assertTrue(
+            "Decoded string should contain UTC+00:30 due to Sony's bug, but was: $decoded",
+            decoded.contains("+00:30"),
+        )
+    }
+
+    @Test
     fun `CC13 encode-decode round trip preserves data`() {
         val dateTime = ZonedDateTime.of(2024, 6, 15, 10, 25, 30, 0, ZoneOffset.ofHours(-5))
         val encoded = SonyProtocol.encodeDateTime(dateTime)

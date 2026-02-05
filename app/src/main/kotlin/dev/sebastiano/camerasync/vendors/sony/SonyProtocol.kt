@@ -7,6 +7,7 @@ import java.nio.ByteOrder
 import java.time.ZoneOffset
 import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter
+import kotlin.math.abs
 
 /**
  * Protocol implementation for Sony Alpha cameras.
@@ -117,6 +118,9 @@ object SonyProtocol : CameraProtocol {
         // Timezone offset in split format:
         // Byte 11: Signed hours (int8)
         // Byte 12: Minutes (uint8)
+        // NOTE: Sony's implementation (BluetoothGattUtil.serializeTimeAreaData) has a bug where
+        // offsets between -01:00 and 00:00 (e.g., UTC-00:30) lose their sign because the hours
+        // byte becomes 0. We preserve this behavior for parity with the official app.
         val totalOffsetSeconds = dateTime.offset.totalSeconds
         val offsetHours = totalOffsetSeconds / 3600
         val offsetMinutes = kotlin.math.abs((totalOffsetSeconds % 3600) / 60)
@@ -153,6 +157,9 @@ object SonyProtocol : CameraProtocol {
         val tzHours = buffer.get().toInt() // signed
         val tzMinutes = buffer.get().toInt() and 0xFF
 
+        // Sony's encoding loses the sign for offsets between -01:00 and 00:00 (e.g., UTC-00:30
+        // becomes hours=0, mins=30). The decoding logic follows this, incorrectly treating
+        // such offsets as positive.
         val offsetSeconds = tzHours * 3600 + (if (tzHours >= 0) tzMinutes else -tzMinutes) * 60
         val offset = ZoneOffset.ofTotalSeconds(offsetSeconds)
         val dateTime = ZonedDateTime.of(year, month, day, hour, minute, second, 0, offset)
