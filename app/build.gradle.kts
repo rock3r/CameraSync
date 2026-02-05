@@ -6,6 +6,7 @@ plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
+    alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.metro)
     alias(libs.plugins.protobuf)
     alias(libs.plugins.ktfmt)
@@ -115,6 +116,7 @@ dependencies {
     implementation(libs.maplibre.core)
     implementation(libs.maplibre.material3)
     implementation(libs.maplibre.spatialk)
+    implementation(libs.kotlinx.serialization.json)
     implementation(libs.protobuf.kotlin.lite)
 
     debugImplementation(libs.androidx.ui.test.manifest)
@@ -123,6 +125,7 @@ dependencies {
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)
     testImplementation(libs.mockk)
+    testImplementation(libs.mockwebserver)
 
     androidTestImplementation(libs.androidx.espresso.core)
     androidTestImplementation(libs.androidx.junit)

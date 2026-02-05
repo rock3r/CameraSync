@@ -16,10 +16,12 @@ kable = "0.42.0"
 khronicle = "0.6.0"
 ktfmt = "0.25.0"
 kotlin = "2.3.0"
+kotlinxSerialization = "1.10.0"
 lifecycle = "2.10.0"
 maplibre = "0.12.1"
 maplibre-spatialk = "0.6.1"
 mockk = "1.14.9"
+mockwebserver = "4.12.0"
 metro = "0.10.2"
 navigation3 = "1.0.0"
 protobufPlugin = "0.9.6"
@@ -58,7 +60,9 @@ junit = { group = "junit", name = "junit", version.ref = "junit" }
 kable = { module = "com.juul.kable:kable-core", version.ref = "kable" }
 khronicle-core = { group = "com.juul.khronicle", name = "khronicle-core", version.ref = "khronicle" }
 kotlinx-coroutines-test = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-test", version.ref = "coroutinesTest" }
+kotlinx-serialization-json = { group = "org.jetbrains.kotlinx", name = "kotlinx-serialization-json", version.ref = "kotlinxSerialization" }
 mockk = { group = "io.mockk", name = "mockk", version.ref = "mockk" }
+mockwebserver = { group = "com.squareup.okhttp3", name = "mockwebserver", version.ref = "mockwebserver" }
 play-services-location = { group = "com.google.android.gms", name = "play-services-location", version.ref = "playServicesLocation" }
 maplibre-core = { module = "org.maplibre.compose:maplibre-compose-android", version.ref = "maplibre" }
 maplibre-material3 = { module = "org.maplibre.compose:maplibre-compose-material3-android", version.ref = "maplibre" }
@@ -71,6 +75,7 @@ android-application = { id = "com.android.application", version.ref = "agp" }
 detekt = { id = "io.gitlab.arturbosch.detekt", version.ref = "detekt" }
 kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
 kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
+kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }
 metro = { id = "dev.zacsweers.metro", version.ref = "metro" }
 protobuf = { id = "com.google.protobuf", version.ref = "protobufPlugin" }
 ktfmt = { id = "com.ncorti.ktfmt.gradle", version.ref = "ktfmt" }
