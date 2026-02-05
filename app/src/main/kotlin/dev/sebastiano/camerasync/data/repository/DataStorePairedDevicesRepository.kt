@@ -147,7 +147,11 @@ class DataStorePairedDevicesRepository(private val dataStore: DataStore<PairedDe
         }
     }
 
-    override suspend fun setFirmwareUpdateInfo(macAddress: String, latestVersion: String?) {
+    override suspend fun setFirmwareUpdateInfo(
+        macAddress: String,
+        latestVersion: String?,
+        lastCheckedAt: Long,
+    ) {
         dataStore.updateData { currentData ->
             val deviceIndex = currentData.devicesList.indexOfFirst { it.macAddress == macAddress }
 
@@ -157,6 +161,7 @@ class DataStorePairedDevicesRepository(private val dataStore: DataStore<PairedDe
                 currentData.devicesList[deviceIndex]
                     .toBuilder()
                     .apply {
+                        setLastFirmwareCheckedAt(lastCheckedAt)
                         if (latestVersion != null) {
                             setLatestFirmwareVersion(latestVersion)
                             // Clear notification shown flag when new update is found
@@ -200,6 +205,7 @@ private fun PairedDeviceProto.toDomain(): PairedDevice =
         firmwareVersion = if (hasFirmwareVersion()) firmwareVersion else null,
         latestFirmwareVersion = if (hasLatestFirmwareVersion()) latestFirmwareVersion else null,
         firmwareUpdateNotificationShown = firmwareUpdateNotificationShown,
+        lastFirmwareCheckedAt = if (hasLastFirmwareCheckedAt()) lastFirmwareCheckedAt else null,
     )
 
 /** Serializer for [PairedDevicesProto] used by DataStore. */

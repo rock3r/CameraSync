@@ -3,7 +3,9 @@ package dev.sebastiano.camerasync.firmware
 import android.content.Context
 import androidx.work.Constraints
 import androidx.work.ExistingPeriodicWorkPolicy
+import androidx.work.ExistingWorkPolicy
 import androidx.work.NetworkType
+import androidx.work.OneTimeWorkRequest
 import androidx.work.PeriodicWorkRequest
 import androidx.work.WorkManager
 import com.juul.khronicle.Log
@@ -11,6 +13,7 @@ import java.util.concurrent.TimeUnit
 
 private const val TAG = "FirmwareUpdateScheduler"
 private const val WORK_NAME = "firmware_update_check"
+private const val ONE_TIME_WORK_NAME = "${WORK_NAME}_one_time"
 
 /**
  * Schedules periodic firmware update checks using WorkManager.
@@ -49,6 +52,28 @@ object FirmwareUpdateScheduler {
         }
     }
 
+    /** Triggers a one-time firmware update check immediately. */
+    fun triggerOneTimeCheck(context: Context) {
+        try {
+            val constraints =
+                Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build()
+
+            val workRequest =
+                OneTimeWorkRequest.Builder(FirmwareUpdateCheckWorker::class.java)
+                    .setConstraints(constraints)
+                    .build()
+
+            WorkManager.getInstance(context)
+                .enqueueUniqueWork(ONE_TIME_WORK_NAME, ExistingWorkPolicy.REPLACE, workRequest)
+
+            Log.info(tag = TAG) { "Triggered one-time firmware update check" }
+        } catch (e: IllegalStateException) {
+            Log.error(tag = TAG, throwable = e) {
+                "Failed to trigger one-time firmware update check: WorkManager not initialized"
+            }
+        }
+    }
+
     /**
      * Cancels the scheduled firmware update check.
      *
@@ -56,7 +81,9 @@ object FirmwareUpdateScheduler {
      */
     fun cancelCheck(context: Context) {
         try {
-            WorkManager.getInstance(context).cancelUniqueWork(WORK_NAME)
+            val workManager = WorkManager.getInstance(context)
+            workManager.cancelUniqueWork(WORK_NAME)
+            workManager.cancelUniqueWork(ONE_TIME_WORK_NAME)
             Log.info(tag = TAG) { "Cancelled firmware update check" }
         } catch (e: IllegalStateException) {
             Log.warn(tag = TAG, throwable = e) {

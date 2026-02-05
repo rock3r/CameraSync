@@ -94,8 +94,13 @@ interface PairedDevicesRepository {
      * @param latestVersion The latest firmware version available, or null to clear (no update
      *   available). When an update is found, this clears the notification shown flag so the user
      *   can be notified.
+     * @param lastCheckedAt The timestamp when the check was performed (millis since epoch).
      */
-    suspend fun setFirmwareUpdateInfo(macAddress: String, latestVersion: String?)
+    suspend fun setFirmwareUpdateInfo(
+        macAddress: String,
+        latestVersion: String?,
+        lastCheckedAt: Long,
+    )
 
     /**
      * Marks that the firmware update notification has been shown to the user.
