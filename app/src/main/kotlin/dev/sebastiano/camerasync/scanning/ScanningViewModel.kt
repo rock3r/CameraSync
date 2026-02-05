@@ -16,6 +16,7 @@ import dev.sebastiano.camerasync.ble.buildManufacturerDataMap
 import dev.sebastiano.camerasync.domain.model.Camera
 import dev.sebastiano.camerasync.domain.vendor.CameraVendorRegistry
 import dev.sebastiano.camerasync.logging.KhronicleLogEngine
+import dev.sebastiano.camerasync.vendors.sony.SonyCameraVendor
 import kotlin.uuid.ExperimentalUuidApi
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -125,12 +126,21 @@ internal class ScanningViewModel(private val vendorRegistry: CameraVendorRegistr
             return null
         }
 
+        // Parse BLE protocol version for Sony cameras
+        val protocolVersion =
+            if (vendor.vendorId == "sony") {
+                SonyCameraVendor.parseProtocolVersion(mfrData)
+            } else {
+                null
+            }
+
         Log.info(tag = TAG) { "Discovered ${vendor.vendorName} camera: ${peripheralName ?: name}" }
         return Camera(
             identifier = identifier,
             name = peripheralName ?: name,
             macAddress = identifier,
             vendor = vendor,
+            bleProtocolVersion = protocolVersion,
         )
     }
 }

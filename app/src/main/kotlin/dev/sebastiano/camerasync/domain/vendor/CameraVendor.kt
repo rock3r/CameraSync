@@ -168,9 +168,13 @@ interface CameraProtocol {
     /**
      * Encodes a GPS location to the vendor's binary format.
      *
+     * @param location The GPS location to encode.
+     * @param includeTimezone Whether to include timezone/DST data in the packet. For Sony cameras,
+     *   this should be determined by reading the DD21 capability characteristic. Default is true
+     *   for backward compatibility.
      * @return Encoded byte array ready to be written to the camera.
      */
-    fun encodeLocation(location: GpsLocation): ByteArray
+    fun encodeLocation(location: GpsLocation, includeTimezone: Boolean = true): ByteArray
 
     /**
      * Decodes a GPS location from the vendor's binary format.

@@ -114,3 +114,5 @@ deploy/
 
 # Python virtual environment
 scripts/.venv/
+
+/dumps/

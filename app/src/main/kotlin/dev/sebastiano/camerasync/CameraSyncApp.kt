@@ -35,6 +35,10 @@ class CameraSyncApp : Application() {
         // Initialize Khronicle logging early in application lifecycle
         initializeLogging()
 
+        Log.info(javaClass.simpleName) {
+            "-------------------- CAMERASYNC STARTED --------------------"
+        }
+
         // Register notification channels early so they're available before any service tries to use
         // them
         registerNotificationChannel(this)

@@ -19,6 +19,7 @@ import dev.sebastiano.camerasync.domain.repository.CameraRepository
 import dev.sebastiano.camerasync.domain.repository.PairedDevicesRepository
 import dev.sebastiano.camerasync.domain.vendor.CameraVendorRegistry
 import dev.sebastiano.camerasync.feedback.IssueReporter
+import dev.sebastiano.camerasync.vendors.sony.SonyCameraVendor
 import dev.zacsweers.metro.Inject
 import java.io.IOException
 import kotlin.uuid.ExperimentalUuidApi
@@ -166,11 +167,20 @@ class PairingViewModel(
                 manufacturerData = mfrMap,
             ) ?: return null
 
+        // Parse BLE protocol version for Sony cameras
+        val protocolVersion =
+            if (vendor.vendorId == "sony") {
+                SonyCameraVendor.parseProtocolVersion(mfrMap)
+            } else {
+                null
+            }
+
         return Camera(
             identifier = device.address,
             name = name,
             macAddress = device.address,
             vendor = vendor,
+            bleProtocolVersion = protocolVersion,
         )
     }
 

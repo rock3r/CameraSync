@@ -105,7 +105,8 @@ object FakeProtocol : CameraProtocol {
 
     override fun decodeDateTime(bytes: ByteArray): String = "decoded-datetime"
 
-    override fun encodeLocation(location: GpsLocation): ByteArray = byteArrayOf()
+    override fun encodeLocation(location: GpsLocation, includeTimezone: Boolean): ByteArray =
+        byteArrayOf()
 
     override fun decodeLocation(bytes: ByteArray): String = "decoded-location"
 

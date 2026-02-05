@@ -23,6 +23,7 @@ import dev.zacsweers.metro.AssistedFactory
 import dev.zacsweers.metro.AssistedInject
 import java.io.IOException
 import java.time.ZonedDateTime
+import kotlin.uuid.ExperimentalUuidApi
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -49,6 +50,7 @@ private const val TAG = "MultiDeviceSyncCoordinator"
 private const val PERIODIC_CHECK_INTERVAL_MS = 30_000L
 private const val CONNECTION_TIMEOUT_MS = 90_000L
 private const val PASSIVE_SCAN_REQUEST_CODE = 999
+private const val LOCATION_KEEP_ALIVE_INTERVAL_MS = 30_000L
 
 /**
  * Coordinates synchronization with multiple camera devices simultaneously.
@@ -121,6 +123,9 @@ constructor(
     private var backgroundMonitoringJob: Job? = null
     private var periodicCheckJob: Job? = null
     private var locationSyncJob: Job? = null
+    private var locationKeepAliveJob: Job? = null
+    private var lastSyncedLocation: GpsLocation? = null
+    private var lastSyncTimeMs: Long = 0
     private val enabledDevicesFlow = MutableStateFlow<List<PairedDevice>>(emptyList())
 
     /**
@@ -414,6 +419,7 @@ constructor(
         }
     }
 
+    @OptIn(ExperimentalUuidApi::class)
     @Suppress("TooGenericExceptionCaught")
     private suspend fun performInitialSetup(
         connection: CameraConnection,
@@ -436,7 +442,20 @@ constructor(
             }
         }
 
-        if (capabilities.supportsDateTimeSync) {
+        // Check if this camera uses combined time+location packets (same characteristic for both).
+        // Some cameras may write both date/time and location to the same characteristic.
+        // In that case, sending a date/time-only packet could interfere with location sync.
+        // For such cameras, skip the initial date/time sync and let the first location sync
+        // handle both time and location together.
+        //
+        // Note: Sony cameras now properly use separate characteristics:
+        // - CC13 for date/time (13-byte Time Area Setting packet)
+        // - DD11 for location (91/95-byte GPS + timestamp packet)
+        val gattSpec = connection.camera.vendor.gattSpec
+        val usesUnifiedPacket =
+            gattSpec.dateTimeCharacteristicUuid == gattSpec.locationCharacteristicUuid
+        val shouldSyncDateTime = capabilities.supportsDateTimeSync && !usesUnifiedPacket
+        if (shouldSyncDateTime) {
             try {
                 connection.syncDateTime(ZonedDateTime.now())
             } catch (e: CancellationException) {
@@ -445,6 +464,11 @@ constructor(
                 Log.warn(tag = TAG, throwable = e) {
                     "Failed to sync date time for ${device.macAddress}"
                 }
+            }
+        } else if (capabilities.supportsDateTimeSync && usesUnifiedPacket) {
+            Log.debug(tag = TAG) {
+                "Skipping initial date/time sync for ${device.macAddress} - " +
+                    "camera uses unified time+location packets, will sync with first location update"
             }
         }
 
@@ -504,6 +528,9 @@ constructor(
         periodicCheckJob = null
         locationSyncJob?.cancel()
         locationSyncJob = null
+        locationKeepAliveJob?.cancel()
+        locationKeepAliveJob = null
+        lastSyncedLocation = null
 
         val connections = connectionManager.getConnections()
         connections.keys.forEach { macAddress -> stopDeviceSync(macAddress) }
@@ -580,6 +607,10 @@ constructor(
     /**
      * Ensures location sync is running for all connected devices. Starts a coroutine that collects
      * location updates and syncs them to all connected devices.
+     *
+     * Also starts a keep-alive job that re-sends the last known location every 30 seconds if no new
+     * location has been received. This prevents Sony cameras from showing the 🚫 icon due to
+     * location timeout.
      */
     private fun ensureLocationSyncRunning() {
         if (locationSyncJob != null) return
@@ -587,16 +618,64 @@ constructor(
         locationSyncJob =
             coroutineScope.launch {
                 locationCollector.locationUpdates.filterNotNull().collect { location ->
-                    syncLocationToConnectedDevices(location)
+                    syncLocationToConnectedDevices(location, isKeepAlive = false)
+                }
+            }
+
+        // Start keep-alive job that re-sends location every 30 seconds if no fresh GPS update
+        locationKeepAliveJob =
+            coroutineScope.launch {
+                while (true) {
+                    delay(LOCATION_KEEP_ALIVE_INTERVAL_MS)
+                    val lastLocation = lastSyncedLocation
+                    val timeSinceLastSync = System.currentTimeMillis() - lastSyncTimeMs
+                    if (
+                        lastLocation != null && timeSinceLastSync >= LOCATION_KEEP_ALIVE_INTERVAL_MS
+                    ) {
+                        Log.debug(tag = TAG) {
+                            "Sending location keep-alive (last sync ${timeSinceLastSync}ms ago)"
+                        }
+                        syncLocationToConnectedDevices(lastLocation, isKeepAlive = true)
+                    }
                 }
             }
     }
 
-    /** Syncs location to all connected devices that support location sync. */
-    private suspend fun syncLocationToConnectedDevices(location: GpsLocation) {
+    /**
+     * Syncs location to all connected devices that support location sync.
+     *
+     * Per Sony protocol specification, location data should only be sent if it is fresh (< 10
+     * seconds old). For keep-alive messages, we create a fresh timestamp.
+     *
+     * @param location The location to sync.
+     * @param isKeepAlive If true, this is a keep-alive message and will use a fresh timestamp.
+     */
+    private suspend fun syncLocationToConnectedDevices(
+        location: GpsLocation,
+        isKeepAlive: Boolean,
+    ) {
+        val locationToSend =
+            if (isKeepAlive) {
+                // For keep-alive, create a fresh timestamp with the same coordinates
+                location.withFreshTimestamp()
+            } else {
+                // Per spec: only send location data if it is fresh (< 10 seconds old)
+                if (!location.isFresh()) {
+                    Log.debug(tag = TAG) {
+                        "Discarding stale location data (age: ${location.ageInSeconds()} seconds)"
+                    }
+                    return
+                }
+                location
+            }
+
+        // Track last synced location for keep-alive
+        lastSyncedLocation = location
+        lastSyncTimeMs = System.currentTimeMillis()
+
         val connections = connectionManager.getConnections()
         connections.forEach { (macAddress, connection) ->
-            syncLocationToDevice(macAddress, connection, location)
+            syncLocationToDevice(macAddress, connection, locationToSend)
         }
     }
 
