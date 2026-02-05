@@ -3,7 +3,7 @@
 A simple Android application that synchronizes GPS data and date/time from your Android phone to
 your camera via Bluetooth Low Energy (BLE).
 
-The app supports a multi-vendor architecture, allowing it to work with cameras from various
+The app supports a multivendor architecture, allowing it to work with cameras from various
 manufacturers (Ricoh, Sony, etc.).
 
 The app uses Android's system pairing flow to select your camera on first start. Once paired, it
