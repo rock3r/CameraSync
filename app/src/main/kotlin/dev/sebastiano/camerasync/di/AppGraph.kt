@@ -27,6 +27,8 @@ import dev.sebastiano.camerasync.domain.vendor.DefaultCameraVendorRegistry
 import dev.sebastiano.camerasync.feedback.AndroidIssueReporter
 import dev.sebastiano.camerasync.feedback.IssueReporter
 import dev.sebastiano.camerasync.firmware.FirmwareUpdateChecker
+import dev.sebastiano.camerasync.firmware.ricoh.RicohFirmwareUpdateChecker
+import dev.sebastiano.camerasync.firmware.sony.SonyFirmwareUpdateChecker
 import dev.sebastiano.camerasync.logging.LogRepository
 import dev.sebastiano.camerasync.logging.LogViewerViewModel
 import dev.sebastiano.camerasync.logging.LogcatLogRepository
@@ -198,7 +200,7 @@ interface AppGraph {
     @Provides
     @SingleIn(AppGraph::class)
     fun provideFirmwareUpdateCheckers(context: Context): List<FirmwareUpdateChecker> =
-        listOf(dev.sebastiano.camerasync.firmware.sony.SonyFirmwareUpdateChecker(context))
+        listOf(SonyFirmwareUpdateChecker(context), RicohFirmwareUpdateChecker(context))
 
     @DependencyGraph.Factory
     interface Factory {

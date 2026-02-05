@@ -107,3 +107,7 @@ keystore.properties
 
 # VSC-forks shit
 /.vscode/tasks.json
+
+# Generated firmware data
+scripts/ricoh_firmware.json
+deploy/
