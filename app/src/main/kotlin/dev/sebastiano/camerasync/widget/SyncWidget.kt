@@ -72,8 +72,6 @@ internal class SyncWidget : GlanceAppWidget() {
 
     override suspend fun providePreview(context: Context, widgetCategory: Int) {
         provideContent {
-            val size = DpSize(LocalSize.current.width, LocalSize.current.height)
-            Log.info("!!!!!") { "Updating lockscreen widget preview... size: $size dp" }
             GlanceTheme {
                 WidgetContent(isSyncEnabled = true, connectedCount = 1, isSearching = false)
             }
@@ -91,7 +89,6 @@ private fun WidgetContent(isSyncEnabled: Boolean, connectedCount: Int, isSearchi
             val rowHeight = if (showSecondRow) (height - 8.dp) / 2 else height
             val unitWidth = min(rowHeight, (width - 8.dp) / 3)
             val cornerRadius = max(unitWidth, rowHeight)
-            Log.info("!!!!!") { "New size: $width x $height dp" }
 
             FirstRow(unitWidth, cornerRadius, isSyncEnabled, connectedCount)
 

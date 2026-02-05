@@ -25,7 +25,6 @@ import dev.sebastiano.camerasync.fakes.FakeVendorRegistry
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.mockkStatic
-import java.time.ZoneId
 import java.time.ZonedDateTime
 import kotlin.uuid.ExperimentalUuidApi
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -83,12 +82,16 @@ class MultiDeviceSyncCoordinatorTest {
             lastSyncedAt = 1L,
         )
 
-    private val testLocation =
+    /**
+     * Creates a fresh test location with the current timestamp. Per Sony protocol spec, location
+     * data must be < 10 seconds old to be synced.
+     */
+    private fun createFreshTestLocation() =
         GpsLocation(
             latitude = 37.7749,
             longitude = -122.4194,
             altitude = 10.0,
-            timestamp = ZonedDateTime.of(2024, 12, 25, 14, 30, 0, 0, ZoneId.of("UTC")),
+            timestamp = ZonedDateTime.now(),
         )
 
     @Before
@@ -298,13 +301,14 @@ class MultiDeviceSyncCoordinatorTest {
             coordinator.startDeviceSync(testDevice2)
             advanceUntilIdle()
 
-            // Emit a location
-            locationCollector.emitLocation(testLocation)
+            // Emit a fresh location (must be < 10 seconds old per Sony protocol spec)
+            val freshLocation = createFreshTestLocation()
+            locationCollector.emitLocation(freshLocation)
             advanceUntilIdle()
 
             // Both devices should have received the location
-            assertEquals(testLocation, connection1.lastSyncedLocation)
-            assertEquals(testLocation, connection2.lastSyncedLocation)
+            assertEquals(freshLocation, connection1.lastSyncedLocation)
+            assertEquals(freshLocation, connection2.lastSyncedLocation)
         }
 
     @Test

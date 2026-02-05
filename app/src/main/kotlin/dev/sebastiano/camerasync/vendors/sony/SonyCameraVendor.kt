@@ -69,7 +69,7 @@ object SonyCameraVendor : CameraVendor {
     /**
      * Checks if the manufacturer data indicates a Sony camera.
      *
-     * According to PROTOCOL_EN.md, Sony camera manufacturer data format:
+     * According to the Sony BLE protocol documentation, manufacturer data format:
      * - Bytes 0-1: Device Type ID (0x0003 = Camera, little-endian in raw BLE data)
      *
      * Note: The manufacturer ID (0x012D) is the key in the map, already parsed by the BLE stack.
@@ -84,6 +84,34 @@ object SonyCameraVendor : CameraVendor {
         val deviceType = ((sonyData[1].toInt() and 0xFF) shl 8) or (sonyData[0].toInt() and 0xFF)
         return deviceType.toShort() == DEVICE_TYPE_CAMERA
     }
+
+    /**
+     * Parses the BLE protocol version from Sony manufacturer data.
+     *
+     * According to the Sony BLE protocol documentation, manufacturer data format:
+     * - Bytes 0-1: Device Type ID (0x0003 = Camera)
+     * - Bytes 2-3: Protocol Version (e.g., 0x64 = 100, 0x65 = 101)
+     * - Bytes 4-5: Model Code (ASCII, e.g., "E1" for e-mount)
+     *
+     * Protocol version >= 65 indicates the camera requires the DD30/DD31 unlock sequence for
+     * location sync to work.
+     *
+     * @return The protocol version, or null if not available.
+     */
+    fun parseProtocolVersion(manufacturerData: Map<Int, ByteArray>): Int? {
+        val sonyData = manufacturerData[SONY_MANUFACTURER_ID] ?: return null
+
+        // Need at least 4 bytes for device type + protocol version
+        if (sonyData.size < 4) return null
+
+        // Protocol version is at bytes 2-3
+        // Based on the documentation example "64 00" = 0x0064 = 100
+        // The byte at index 2 appears to be the version directly
+        return sonyData[2].toInt() and 0xFF
+    }
+
+    /** Minimum protocol version that requires DD30/DD31 unlock sequence. */
+    const val PROTOCOL_VERSION_REQUIRES_UNLOCK = 65
 
     override fun getCapabilities(): CameraCapabilities {
         return CameraCapabilities(

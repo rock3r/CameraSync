@@ -13,4 +13,12 @@ data class Camera(
     val name: String?,
     val macAddress: String,
     val vendor: CameraVendor,
+    /**
+     * BLE protocol version from the advertisement data. For Sony cameras, this determines which
+     * features are available:
+     * - Protocol >= 65: Requires DD30/DD31 unlock sequence for location sync
+     * - Protocol < 65: Uses legacy protocol without DD30/DD31 Null for non-Sony cameras or if not
+     *   available in the advertisement.
+     */
+    val bleProtocolVersion: Int? = null,
 )
