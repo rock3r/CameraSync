@@ -14,9 +14,11 @@ import java.net.URL
 import java.util.Locale
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import org.json.JSONArray
-import org.json.JSONException
-import org.json.JSONObject
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.SerializationException
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
 
 private const val TAG = "SonyFirmwareUpdateChecker"
 private const val FIRMWARE_LIST_API_URL =
@@ -32,6 +34,9 @@ private val SONY_MODEL_PREFIXES = listOf("ILCE-", "DSC-", "ZV-", "FX")
  */
 class SonyFirmwareUpdateChecker(private val appContext: android.content.Context) :
     FirmwareUpdateChecker {
+
+    // Json configuration for ignoring unknown keys in the response
+    private val json = Json { ignoreUnknownKeys = true }
 
     override fun supportsVendor(vendorId: String): Boolean = vendorId == "sony"
 
@@ -103,10 +108,7 @@ class SonyFirmwareUpdateChecker(private val appContext: android.content.Context)
      *
      * @return The latest firmware version string, or null if not found or error occurred.
      */
-    private suspend fun fetchLatestFirmwareVersion(
-        modelName: String,
-        currentVersion: String,
-    ): String? {
+    private fun fetchLatestFirmwareVersion(modelName: String, currentVersion: String): String? {
         val connection = URL(FIRMWARE_LIST_API_URL).openConnection() as HttpURLConnection
         return try {
             configureConnection(connection, modelName, currentVersion)
@@ -147,26 +149,25 @@ class SonyFirmwareUpdateChecker(private val appContext: android.content.Context)
 
         val requestBody = buildRequestBody(modelName, currentVersion)
         connection.outputStream.use { output ->
-            output.write(requestBody.toString().toByteArray(Charsets.UTF_8))
+            output.write(requestBody.toByteArray(Charsets.UTF_8))
         }
     }
 
-    private fun buildRequestBody(modelName: String, currentVersion: String): JSONObject =
-        JSONObject().apply {
-            put("locale", "pmm")
-            put("language", getCurrentLocale())
-            put(
-                "modelList",
-                JSONArray().apply {
-                    put(
-                        JSONObject().apply {
-                            put("modelName", modelName)
-                            put("currentVersion", currentVersion)
-                        }
-                    )
-                },
+    private fun buildRequestBody(modelName: String, currentVersion: String): String {
+        val request =
+            FirmwareListRequest(
+                locale = "pmm",
+                language = getCurrentLocale(),
+                modelList =
+                    listOf(
+                        FirmwareListRequestModel(
+                            modelName = modelName,
+                            currentVersion = currentVersion,
+                        )
+                    ),
             )
-        }
+        return json.encodeToString(request)
+    }
 
     private fun readResponse(connection: HttpURLConnection): String =
         connection.inputStream.use { input ->
@@ -181,16 +182,12 @@ class SonyFirmwareUpdateChecker(private val appContext: android.content.Context)
      */
     private fun parseFirmwareVersionFromResponse(responseBody: String, modelName: String): String? {
         return try {
-            val json = JSONObject(responseBody)
-            val firmwareList = json.optJSONArray("firmwareList") ?: return null
-
-            (0 until firmwareList.length())
-                .asSequence()
-                .map { firmwareList.getJSONObject(it) }
-                .firstOrNull { it.optString("modelName", "").equals(modelName, ignoreCase = true) }
-                ?.optString("firmwareVersion", null)
+            val response = json.decodeFromString<FirmwareListResponse>(responseBody)
+            response.firmwareList
+                ?.firstOrNull { it.modelName?.equals(modelName, ignoreCase = true) == true }
+                ?.firmwareVersion
                 ?.takeIf { it.isNotEmpty() }
-        } catch (e: JSONException) {
+        } catch (e: SerializationException) {
             Log.warn(tag = TAG, throwable = e) { "Error parsing firmware API response" }
             null
         } catch (e: IllegalArgumentException) {
@@ -253,4 +250,25 @@ class SonyFirmwareUpdateChecker(private val appContext: android.content.Context)
             language
         }
     }
+
+    @Serializable
+    private data class FirmwareListRequest(
+        val locale: String,
+        val language: String,
+        @SerialName("ModelList") val modelList: List<FirmwareListRequestModel>,
+    )
+
+    @Serializable
+    private data class FirmwareListRequestModel(val modelName: String, val currentVersion: String)
+
+    @Serializable
+    private data class FirmwareListResponse(
+        val firmwareList: List<FirmwareListResponseItem>? = null
+    )
+
+    @Serializable
+    private data class FirmwareListResponseItem(
+        val modelName: String? = null,
+        val firmwareVersion: String? = null,
+    )
 }

@@ -238,10 +238,7 @@ private fun DeviceDetailRow(label: String, value: String) {
 
 @Composable
 private fun DeviceDetailRowWithBadge(label: String, value: String, latestVersion: String?) {
-    Row(
-        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
+    Row(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
         Text(
             text = label,
             style = MaterialTheme.typography.labelMedium,
@@ -256,6 +253,7 @@ private fun DeviceDetailRowWithBadge(label: String, value: String, latestVersion
                 text = value,
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier.alignByBaseline(),
             )
             if (latestVersion != null) {
                 Badge(
