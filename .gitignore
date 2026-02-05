@@ -111,3 +111,6 @@ keystore.properties
 # Generated firmware data
 scripts/ricoh_firmware.json
 deploy/
+
+# Python virtual environment
+scripts/.venv/

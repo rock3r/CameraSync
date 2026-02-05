@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Scrapes Ricoh Imaging website to extract latest firmware versions for Ricoh cameras.
+Scrapes Ricoh Imaging website to extract latest firmware versions for supported GR cameras.
 
 This script fetches firmware information from:
 https://www.ricoh-imaging.co.jp/english/support/download_digital.html
@@ -9,7 +9,26 @@ It extracts firmware versions from tables under:
 - Firmware Update (Digital SL Cameras)
 - Firmware Update (Digital Compact Cameras)
 
+Only includes supported GR models:
+- GR II, GR III, GR IIIx, GR IV (current)
+- GR V, GR VI, GR VII, etc. (future models, automatically supported)
+- All variants (e.g., GR III HDF, GR IIIx HDF)
+
+Excludes:
+- 1st gen GR cameras
+- All non-GR cameras
+
 Outputs a JSON file with camera model names and their latest firmware versions.
+
+Usage:
+    Local run:
+        python scripts/scrape_ricoh_firmware.py
+        # or use the convenience script:
+        ./scripts/update_firmware_data.sh
+
+    GitHub Actions (deploys to GitHub Pages):
+        - Via GitHub UI: Actions tab -> "Update Firmware Data" -> "Run workflow"
+        - Via GitHub CLI: gh workflow run update_firmware_data.yml
 """
 
 import json
@@ -40,9 +59,37 @@ def normalize_model_name(model_name: str) -> str:
     return model_name
 
 
+def is_supported_gr_model(model_name: str) -> bool:
+    """
+    Check if a camera model is a supported GR model.
+    
+    Supported models:
+    - GR II, GR III, GR IIIx, GR IV (current)
+    - GR V, GR VI, GR VII, etc. (future models)
+    - All variants (e.g., GR III HDF, GR IIIx HDF)
+    
+    Excluded:
+    - 1st gen GR (just "GR" without any number)
+    - All non-GR cameras
+    
+    Uses a flexible pattern to support future GR models automatically.
+    """
+    normalized = model_name.strip().upper()
+    
+    # Match GR followed by space and a model identifier (Roman numerals II+ or digits 2+)
+    # Pattern matches: GR II, GR III, GR IIIx, GR IV, GR V, GR VI, GR 5, etc.
+    # Excludes: GR (1st gen - no number), GR I (1st gen), GR Digital (non-numeric identifier), etc.
+    # Uses [IVX]{2,} to match 2+ Roman numeral chars (II, III, IV, VI, VII, VIII, IX, XI, etc.)
+    # or single V/X (V=5, X=10), or \d+ for Arabic numbers (2, 3, 4, 5, etc.)
+    # optionally followed by 'x' for variants, then word boundary
+    pattern = r'^GR\s+([IVX]{2,}|V|X|\d+)[Xx]?\b'
+    return bool(re.match(pattern, normalized))
+
+
 def extract_firmware_from_table(table) -> Dict[str, str]:
     """
     Extract camera model names and firmware versions from a firmware table.
+    Only includes supported GR models (GR II, GR III, GR IIIx, GR IV, and future models).
     
     Args:
         table: BeautifulSoup table element
@@ -63,8 +110,10 @@ def extract_firmware_from_table(table) -> Dict[str, str]:
             version = cells[2].get_text(strip=True)
             
             if model_name and version:
-                normalized_name = normalize_model_name(model_name)
-                cameras[normalized_name] = version
+                # Only include supported GR models
+                if is_supported_gr_model(model_name):
+                    normalized_name = normalize_model_name(model_name)
+                    cameras[normalized_name] = version
     
     return cameras
 
@@ -135,14 +184,13 @@ def main():
     with open(output_file, "w", encoding="utf-8") as f:
         json.dump(output, f, indent=2, ensure_ascii=False)
 
-    print(f"\nFound {len(cameras)} camera models with firmware versions")
+    print(f"\nFound {len(cameras)} supported GR camera models with firmware versions")
     print(f"Output written to {output_file}")
 
-    # Print summary of GR models (most relevant for this app)
-    gr_models = {k: v for k, v in cameras.items() if "GR" in k.upper()}
-    if gr_models:
-        print("\nGR Series firmware versions:")
-        for model, version in sorted(gr_models.items()):
+    # Print summary of included models
+    if cameras:
+        print("\nSupported GR Series firmware versions:")
+        for model, version in sorted(cameras.items()):
             print(f"  {model}: {version}")
 
 

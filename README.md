@@ -108,6 +108,23 @@ This project uses Gradle with Kotlin DSL.
 - `./gradlew connectedAndroidTest`: Run instrumented tests on a device.
 - `./gradlew ktfmtFormat`: Format the code using ktfmt.
 
+### Firmware Data Updater
+
+The firmware data for Ricoh cameras is automatically updated daily via GitHub Actions, but you can
+also run it manually:
+
+**Local run** (for testing):
+```bash
+./scripts/update_firmware_data.sh
+```
+
+**Deploy to GitHub Pages** (requires GitHub CLI):
+```bash
+gh workflow run update_firmware_data.yml
+```
+
+Or via GitHub UI: Actions tab → "Update Firmware Data" → "Run workflow"
+
 ### Environment Variables
 
 No specific environment variables are required for a standard build. Ensure `JAVA_HOME` is set to a
