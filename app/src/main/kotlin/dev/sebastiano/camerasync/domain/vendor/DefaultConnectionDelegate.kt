@@ -29,22 +29,20 @@ open class DefaultConnectionDelegate : VendorConnectionDelegate {
 
         val serviceUuid =
             gattSpec.locationServiceUuid
-                ?: throw IllegalStateException(
-                    "Location service UUID not configured for ${camera.vendor.vendorName}"
-                )
+                ?: error("Location service UUID not configured for ${camera.vendor.vendorName}")
         val charUuid =
             gattSpec.locationCharacteristicUuid
-                ?: throw IllegalStateException(
+                ?: error(
                     "Location characteristic UUID not configured for ${camera.vendor.vendorName}"
                 )
 
         val service =
             peripheral.services.value.orEmpty().firstOrNull { it.serviceUuid == serviceUuid }
-                ?: throw IllegalStateException("Location service not found: $serviceUuid")
+                ?: error("Location service not found: $serviceUuid")
 
         val char =
             service.characteristics.firstOrNull { it.characteristicUuid == charUuid }
-                ?: throw IllegalStateException("Location characteristic not found: $charUuid")
+                ?: error("Location characteristic not found: $charUuid")
 
         val data = protocol.encodeLocation(location)
 
@@ -61,22 +59,20 @@ open class DefaultConnectionDelegate : VendorConnectionDelegate {
 
         val serviceUuid =
             gattSpec.dateTimeServiceUuid
-                ?: throw IllegalStateException(
-                    "Date/time service UUID not configured for ${camera.vendor.vendorName}"
-                )
+                ?: error("Date/time service UUID not configured for ${camera.vendor.vendorName}")
         val charUuid =
             gattSpec.dateTimeCharacteristicUuid
-                ?: throw IllegalStateException(
+                ?: error(
                     "Date/time characteristic UUID not configured for ${camera.vendor.vendorName}"
                 )
 
         val service =
             peripheral.services.value.orEmpty().firstOrNull { it.serviceUuid == serviceUuid }
-                ?: throw IllegalStateException("Date/time service not found: $serviceUuid")
+                ?: error("Date/time service not found: $serviceUuid")
 
         val char =
             service.characteristics.firstOrNull { it.characteristicUuid == charUuid }
-                ?: throw IllegalStateException("Date/time characteristic not found: $charUuid")
+                ?: error("Date/time characteristic not found: $charUuid")
 
         val data = protocol.encodeDateTime(dateTime)
 

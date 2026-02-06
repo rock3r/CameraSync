@@ -377,6 +377,7 @@ internal class KableCameraConnection(
             return false
         }
 
+        @Suppress("TooGenericExceptionCaught")
         return try {
             val service =
                 peripheral.services.value.orEmpty().firstOrNull {
@@ -410,11 +411,11 @@ internal class KableCameraConnection(
         val service =
             peripheral.services.value.orEmpty().firstOrNull {
                 it.serviceUuid == gattSpec.firmwareServiceUuid
-            } ?: throw IllegalStateException("Firmware service not found")
+            } ?: error("Firmware service not found")
         val char =
             service.characteristics.firstOrNull {
                 it.characteristicUuid == gattSpec.firmwareVersionCharacteristicUuid
-            } ?: throw IllegalStateException("Firmware characteristic not found")
+            } ?: error("Firmware characteristic not found")
 
         val firmwareBytes = peripheral.read(char)
         val version = firmwareBytes.decodeToString().trimEnd(Char(0))

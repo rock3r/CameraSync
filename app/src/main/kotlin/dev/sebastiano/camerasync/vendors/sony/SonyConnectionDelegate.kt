@@ -12,7 +12,6 @@ import kotlin.uuid.ExperimentalUuidApi
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
@@ -81,7 +80,7 @@ class SonyConnectionDelegate : DefaultConnectionDelegate() {
         val serviceUuid = SonyGattSpec.LOCATION_SERVICE_UUID
         val service =
             peripheral.services.value.orEmpty().firstOrNull { it.serviceUuid == serviceUuid }
-                ?: throw IllegalStateException("Location service not found: $serviceUuid")
+                ?: error("Location service not found: $serviceUuid")
 
         // 1. Ensure service is enabled/locked (Prepare)
         // For Sony cameras, re-enable location service before EVERY write.
@@ -114,7 +113,7 @@ class SonyConnectionDelegate : DefaultConnectionDelegate() {
         val charUuid = SonyGattSpec.LOCATION_DATA_WRITE_CHARACTERISTIC_UUID
         val char =
             service.characteristics.firstOrNull { it.characteristicUuid == charUuid }
-                ?: throw IllegalStateException("Location characteristic not found: $charUuid")
+                ?: error("Location characteristic not found: $charUuid")
 
         var lastException: Exception? = null
         repeat(LOCATION_WRITE_MAX_RETRIES) { attempt ->
@@ -215,16 +214,15 @@ class SonyConnectionDelegate : DefaultConnectionDelegate() {
                 @Suppress("TooGenericExceptionCaught")
                 try {
                     sonyNotificationObservationJob?.cancel()
-                    val supervisorJob = SupervisorJob(currentCoroutineContext()[Job])
-                    val observeScope = CoroutineScope(currentCoroutineContext() + supervisorJob)
-                    sonyNotificationObservationJob = supervisorJob
-                    observeScope.launch {
-                        peripheral.observe(notifyChar).collect { data ->
-                            Log.info(tag = TAG) {
-                                "DD01 notification received: ${data.toHexString()}"
+                    val observeScope = CoroutineScope(currentCoroutineContext())
+                    sonyNotificationObservationJob =
+                        observeScope.launch {
+                            peripheral.observe(notifyChar).collect { data ->
+                                Log.info(tag = TAG) {
+                                    "DD01 notification received: ${data.toHexString()}"
+                                }
                             }
                         }
-                    }
                     delay(100)
                 } catch (e: Exception) {
                     Log.warn(tag = TAG, throwable = e) { "Failed to subscribe to DD01" }
