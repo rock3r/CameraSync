@@ -49,6 +49,22 @@ interface CameraVendor {
     ): Boolean
 
     /**
+     * Parses vendor-specific metadata from BLE advertisement data.
+     *
+     * @param manufacturerData Map of manufacturer ID to data bytes from the advertisement.
+     * @return A map of metadata keys to values (e.g., protocol version).
+     */
+    fun parseAdvertisementMetadata(manufacturerData: Map<Int, ByteArray>): Map<String, Any> =
+        emptyMap()
+
+    /**
+     * Creates a connection delegate for this vendor.
+     *
+     * @return A new instance of [VendorConnectionDelegate].
+     */
+    fun createConnectionDelegate(): VendorConnectionDelegate
+
+    /**
      * Returns the device capabilities for this vendor.
      *
      * Different vendors may support different features (e.g., geo-tagging, time sync, firmware
@@ -169,12 +185,9 @@ interface CameraProtocol {
      * Encodes a GPS location to the vendor's binary format.
      *
      * @param location The GPS location to encode.
-     * @param includeTimezone Whether to include timezone/DST data in the packet. For Sony cameras,
-     *   this should be determined by reading the DD21 capability characteristic. Default is true
-     *   for backward compatibility.
      * @return Encoded byte array ready to be written to the camera.
      */
-    fun encodeLocation(location: GpsLocation, includeTimezone: Boolean = true): ByteArray
+    fun encodeLocation(location: GpsLocation): ByteArray
 
     /**
      * Decodes a GPS location from the vendor's binary format.

@@ -90,6 +90,70 @@ class RicohProtocolTest {
     }
 
     @Test
+    fun `encodeLocation handles extreme coordinates`() {
+        // North Pole
+        val northPole =
+            GpsLocation(
+                latitude = 90.0,
+                longitude = 0.0,
+                altitude = 0.0,
+                timestamp = ZonedDateTime.of(2024, 1, 1, 0, 0, 0, 0, ZoneId.of("UTC")),
+            )
+        val decodedNorth = RicohProtocol.decodeLocation(RicohProtocol.encodeLocation(northPole))
+        assertTrue(decodedNorth.contains("90.0"))
+
+        // South Pole
+        val southPole =
+            GpsLocation(
+                latitude = -90.0,
+                longitude = 0.0,
+                altitude = 0.0,
+                timestamp = ZonedDateTime.of(2024, 1, 1, 0, 0, 0, 0, ZoneId.of("UTC")),
+            )
+        val decodedSouth = RicohProtocol.decodeLocation(RicohProtocol.encodeLocation(southPole))
+        assertTrue(decodedSouth.contains("-90.0"))
+
+        // International Date Line
+        val dateLine =
+            GpsLocation(
+                latitude = 0.0,
+                longitude = 180.0,
+                altitude = 0.0,
+                timestamp = ZonedDateTime.of(2024, 1, 1, 0, 0, 0, 0, ZoneId.of("UTC")),
+            )
+        val decodedDateLine = RicohProtocol.decodeLocation(RicohProtocol.encodeLocation(dateLine))
+        assertTrue(decodedDateLine.contains("180.0"))
+    }
+
+    @Test
+    fun `encodeLocation handles negative altitude`() {
+        // Dead Sea - below sea level
+        val deadSea =
+            GpsLocation(
+                latitude = 31.5,
+                longitude = 35.5,
+                altitude = -430.0,
+                timestamp = ZonedDateTime.of(2024, 1, 1, 0, 0, 0, 0, ZoneId.of("UTC")),
+            )
+        val decoded = RicohProtocol.decodeLocation(RicohProtocol.encodeLocation(deadSea))
+        assertTrue(decoded.contains("-430.0"))
+    }
+
+    @Test
+    fun `encodeLocation handles high altitude`() {
+        // Mount Everest
+        val everest =
+            GpsLocation(
+                latitude = 27.9881,
+                longitude = 86.9250,
+                altitude = 8848.86,
+                timestamp = ZonedDateTime.of(2024, 1, 1, 0, 0, 0, 0, ZoneId.of("UTC")),
+            )
+        val decoded = RicohProtocol.decodeLocation(RicohProtocol.encodeLocation(everest))
+        assertTrue(decoded.contains("8848.86"))
+    }
+
+    @Test
     fun `decodeLocation throws on insufficient data`() {
         val tooShort = ByteArray(30)
         assertThrows(IllegalArgumentException::class.java) {
@@ -121,5 +185,54 @@ class RicohProtocolTest {
 
         // Should have 10 underscore-separated segments
         assertEquals(10, hex.split("_").size)
+    }
+
+    @Test
+    fun `DecodedDateTime toString formats correctly`() {
+        val dateTime = ZonedDateTime.of(2024, 1, 5, 9, 3, 7, 0, ZoneId.of("UTC"))
+        val encoded = RicohProtocol.encodeDateTime(dateTime)
+        val decoded = RicohProtocol.decodeDateTime(encoded)
+        assertEquals("2024-01-05 09:03:07", decoded)
+    }
+
+    @Test
+    fun `DecodedLocation toString formats correctly`() {
+        val location =
+            GpsLocation(
+                latitude = 37.7749,
+                longitude = -122.4194,
+                altitude = 10.5,
+                timestamp = ZonedDateTime.of(2024, 12, 25, 14, 30, 45, 0, ZoneId.of("UTC")),
+            )
+        val encoded = RicohProtocol.encodeLocation(location)
+        val str = RicohProtocol.decodeLocation(encoded)
+        assertTrue(str.contains("37.7749"))
+        assertTrue(str.contains("-122.4194"))
+        assertTrue(str.contains("10.5"))
+        assertTrue(str.contains("2024-12-25 14:30:45"))
+    }
+
+    @Test
+    fun `encodeGeoTaggingEnabled encodes correctly`() {
+        val enabled = RicohProtocol.encodeGeoTaggingEnabled(true)
+        assertEquals(1, enabled.size)
+        assertEquals(1.toByte(), enabled[0])
+
+        val disabled = RicohProtocol.encodeGeoTaggingEnabled(false)
+        assertEquals(1, disabled.size)
+        assertEquals(0.toByte(), disabled[0])
+    }
+
+    @Test
+    fun `decodeGeoTaggingEnabled decodes correctly`() {
+        assertTrue(RicohProtocol.decodeGeoTaggingEnabled(byteArrayOf(1)))
+        assertTrue(!RicohProtocol.decodeGeoTaggingEnabled(byteArrayOf(0)))
+    }
+
+    @Test
+    fun `decodeGeoTaggingEnabled throws on empty data`() {
+        assertThrows(IllegalArgumentException::class.java) {
+            RicohProtocol.decodeGeoTaggingEnabled(byteArrayOf())
+        }
     }
 }

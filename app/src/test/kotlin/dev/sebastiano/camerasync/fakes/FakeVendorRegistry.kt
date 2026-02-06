@@ -6,6 +6,8 @@ import dev.sebastiano.camerasync.domain.vendor.CameraGattSpec
 import dev.sebastiano.camerasync.domain.vendor.CameraProtocol
 import dev.sebastiano.camerasync.domain.vendor.CameraVendor
 import dev.sebastiano.camerasync.domain.vendor.CameraVendorRegistry
+import dev.sebastiano.camerasync.domain.vendor.DefaultConnectionDelegate
+import dev.sebastiano.camerasync.domain.vendor.VendorConnectionDelegate
 import java.time.ZonedDateTime
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
@@ -63,6 +65,8 @@ object FakeCameraVendor : CameraVendor {
             serviceUuids.any { it == FakeGattSpec.scanFilterServiceUuids.first() }
     }
 
+    override fun createConnectionDelegate(): VendorConnectionDelegate = DefaultConnectionDelegate()
+
     override fun getCapabilities(): CameraCapabilities =
         CameraCapabilities(
             supportsFirmwareVersion = true,
@@ -105,8 +109,7 @@ object FakeProtocol : CameraProtocol {
 
     override fun decodeDateTime(bytes: ByteArray): String = "decoded-datetime"
 
-    override fun encodeLocation(location: GpsLocation, includeTimezone: Boolean): ByteArray =
-        byteArrayOf()
+    override fun encodeLocation(location: GpsLocation): ByteArray = byteArrayOf()
 
     override fun decodeLocation(bytes: ByteArray): String = "decoded-location"
 

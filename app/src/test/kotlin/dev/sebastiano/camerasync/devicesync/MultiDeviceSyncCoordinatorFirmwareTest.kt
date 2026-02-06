@@ -7,6 +7,8 @@ import android.content.Context
 import androidx.core.app.NotificationManagerCompat
 import dev.sebastiano.camerasync.CameraSyncApp
 import dev.sebastiano.camerasync.domain.model.PairedDevice
+import dev.sebastiano.camerasync.domain.vendor.DefaultConnectionDelegate
+import dev.sebastiano.camerasync.domain.vendor.VendorConnectionDelegate
 import dev.sebastiano.camerasync.fakes.FakeCameraConnection
 import dev.sebastiano.camerasync.fakes.FakeCameraRepository
 import dev.sebastiano.camerasync.fakes.FakeCameraVendor
@@ -217,6 +219,9 @@ class MultiDeviceSyncCoordinatorFirmwareTest {
                         manufacturerData: Map<Int, ByteArray>,
                     ): Boolean = false
 
+                    override fun createConnectionDelegate(): VendorConnectionDelegate =
+                        DefaultConnectionDelegate()
+
                     override fun getCapabilities() =
                         dev.sebastiano.camerasync.domain.vendor.CameraCapabilities(
                             supportsFirmwareVersion = false,
@@ -309,6 +314,9 @@ class MultiDeviceSyncCoordinatorFirmwareTest {
                         serviceUuids: List<kotlin.uuid.Uuid>,
                         manufacturerData: Map<Int, ByteArray>,
                     ): Boolean = false
+
+                    override fun createConnectionDelegate(): VendorConnectionDelegate =
+                        DefaultConnectionDelegate()
 
                     override fun getCapabilities() =
                         dev.sebastiano.camerasync.domain.vendor.CameraCapabilities(

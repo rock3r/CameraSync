@@ -40,6 +40,8 @@ This is an Android project built with:
 - `DeviceConnectionState`: Sealed interface for device connection states
 - `Camera`: Discovered camera model with vendor information
 - `CameraVendor`: Strategy interface for vendor-specific protocols
+- `VendorConnectionDelegate`: **NEW** Abstraction for handling vendor-specific connection/sync lifecycles
+- `DefaultConnectionDelegate`: Standard implementation of the delegate
 - `CameraVendorRegistry`: Registry managing all supported camera vendors
 
 ### Service Layer
@@ -71,20 +73,26 @@ CameraSync uses a **Strategy Pattern** to support cameras from multiple manufact
    - Each vendor implements device identification logic based on service UUIDs, device names, or manufacturer data
    - Vendors declare their capabilities (firmware version support, geo-tagging, etc.)
 
-2. **CameraVendorRegistry** (`domain/vendor/CameraVendorRegistry.kt`)
+2. **VendorConnectionDelegate** (`domain/vendor/VendorConnectionDelegate.kt`)
+   - **New**: Encapsulates the entire connection and sync lifecycle
+   - Allows vendors to implement complex handshakes (like Sony's DD30/DD31 locking) in isolation
+   - `KableCameraRepository` delegates sync operations to this interface
+
+3. **CameraVendorRegistry** (`domain/vendor/CameraVendorRegistry.kt`)
    - Central registry managing all supported vendors
    - Identifies which vendor a discovered BLE device belongs to
    - Aggregates scan filter UUIDs and device name prefixes from all vendors for efficient BLE scanning
 
-3. **Vendor Implementations** (`vendors/` package)
+4. **Vendor Implementations** (`vendors/` package)
    - **Ricoh**: `vendors/ricoh/` - Supports GR IIIx, GR III, and other Ricoh cameras
    - **Sony**: `vendors/sony/` - Supports Alpha series cameras (ILCE-7M4, etc.)
    - Each vendor package contains:
      - `[Vendor]GattSpec`: BLE service and characteristic UUIDs
      - `[Vendor]Protocol`: Encoding/decoding logic for date/time and GPS data
      - `[Vendor]CameraVendor`: Device recognition and capabilities
+     - `[Vendor]ConnectionDelegate`: Connection lifecycle implementation
 
-4. **Vendor-Agnostic Core**
+5. **Vendor-Agnostic Core**
    - `Camera` domain model (replaces legacy `RicohCamera`) contains a `vendor` property
    - `CameraRepository` and `CameraConnection` work with any vendor through the abstraction layer
    - Sync logic in `MultiDeviceSyncCoordinator` is completely vendor-agnostic
@@ -96,8 +104,9 @@ To add support for a new camera brand (e.g., Canon, Nikon):
 1. Create vendor package: `app/src/main/kotlin/dev/sebastiano/camerasync/vendors/[vendor-name]/`
 2. Implement `CameraGattSpec` with BLE UUIDs
 3. Implement `CameraProtocol` with encoding/decoding logic
-4. Implement `CameraVendor` with device recognition logic
-5. Register vendor in `AppGraph.kt`'s `provideVendorRegistry()` method
+4. Implement `VendorConnectionDelegate` (or use `DefaultConnectionDelegate`)
+5. Implement `CameraVendor` with device recognition logic and delegate creation
+6. Register vendor in `AppGraph.kt`'s `provideVendorRegistry()` method
 
 **Important**: Registering a new vendor automatically updates global BLE scan filters. The `KableCameraRepository` queries the registry for all vendor UUIDs at startup.
 

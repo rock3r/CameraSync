@@ -118,4 +118,28 @@ class SonyCameraVendorTest {
     fun `protocol is SonyProtocol`() {
         assertEquals(SonyProtocol, SonyCameraVendor.protocol)
     }
+
+    // Connection delegate tests
+
+    @Test
+    fun `createConnectionDelegate returns SonyConnectionDelegate`() {
+        val delegate = SonyCameraVendor.createConnectionDelegate()
+        assertTrue(
+            "Sony should use SonyConnectionDelegate, got ${delegate::class.simpleName}",
+            delegate is SonyConnectionDelegate,
+        )
+    }
+
+    @Test
+    fun `createConnectionDelegate returns a new instance each time`() {
+        val delegate1 = SonyCameraVendor.createConnectionDelegate()
+        val delegate2 = SonyCameraVendor.createConnectionDelegate()
+        assertTrue("Each call should return a new instance", delegate1 !== delegate2)
+    }
+
+    @Test
+    fun `createConnectionDelegate returns delegate with Sony MTU`() {
+        val delegate = SonyCameraVendor.createConnectionDelegate()
+        assertEquals("Sony delegate should request MTU of 158", 158, delegate.mtu)
+    }
 }

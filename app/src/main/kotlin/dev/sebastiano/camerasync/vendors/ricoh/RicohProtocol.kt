@@ -82,8 +82,7 @@ object RicohProtocol : CameraProtocol {
      * - Byte 30: Second (0-59)
      * - Byte 31: Padding (0)
      */
-    @Suppress("UNUSED_PARAMETER") // Ricoh cameras don't use timezone parameter
-    override fun encodeLocation(location: GpsLocation, includeTimezone: Boolean): ByteArray =
+    override fun encodeLocation(location: GpsLocation): ByteArray =
         Buffer()
             .writeLong(location.latitude.toRawBits())
             .writeLong(location.longitude.toRawBits())
