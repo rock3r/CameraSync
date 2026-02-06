@@ -24,6 +24,7 @@ import dev.sebastiano.camerasync.domain.model.DeviceConnectionState
 import dev.sebastiano.camerasync.domain.model.PairedDevice
 import dev.sebastiano.camerasync.domain.repository.PairedDevicesRepository
 import dev.sebastiano.camerasync.domain.repository.SyncStatusRepository
+import dev.sebastiano.camerasync.firmware.FirmwareUpdateScheduler
 import dev.zacsweers.metro.Inject
 import kotlin.coroutines.CoroutineContext
 import kotlinx.coroutines.CoroutineName
@@ -132,6 +133,7 @@ class MultiDeviceSyncService(
                 startForegroundService()
                 startDeviceMonitoring()
                 launch { refreshConnections() }
+                FirmwareUpdateScheduler.triggerOneTimeCheck(this)
             }
             ACTION_DEVICE_FOUND -> {
                 Log.info(tag = TAG) {

@@ -50,6 +50,7 @@ class FirmwareUpdateCheckWorker(
                 checkedCount++
 
                 val result = checker.checkForUpdate(device, device.firmwareVersion)
+                val now = System.currentTimeMillis()
 
                 when (result) {
                     is FirmwareUpdateCheckResult.UpdateAvailable -> {
@@ -60,6 +61,7 @@ class FirmwareUpdateCheckWorker(
                         pairedDevicesRepository.setFirmwareUpdateInfo(
                             device.macAddress,
                             result.latestVersion,
+                            lastCheckedAt = now,
                         )
                         updateFoundCount++
                     }
@@ -68,7 +70,11 @@ class FirmwareUpdateCheckWorker(
                             "No firmware update available for ${device.macAddress}"
                         }
                         // Clear update info if it was previously set
-                        pairedDevicesRepository.setFirmwareUpdateInfo(device.macAddress, null)
+                        pairedDevicesRepository.setFirmwareUpdateInfo(
+                            device.macAddress,
+                            null,
+                            lastCheckedAt = now,
+                        )
                     }
                     is FirmwareUpdateCheckResult.CheckFailed -> {
                         Log.warn(tag = TAG) {

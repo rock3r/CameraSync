@@ -20,6 +20,8 @@ import dev.sebastiano.camerasync.domain.vendor.CameraVendor
  *   "2.02"), or null if no update is available or unknown.
  * @param firmwareUpdateNotificationShown Whether the user has already been notified about the
  *   firmware update. This prevents showing the notification multiple times.
+ * @param lastFirmwareCheckedAt The timestamp of the last time we checked for firmware updates
+ *   (millis since epoch), or null if never checked.
  */
 data class PairedDevice(
     val macAddress: String,
@@ -30,6 +32,7 @@ data class PairedDevice(
     val firmwareVersion: String? = null,
     val latestFirmwareVersion: String? = null,
     val firmwareUpdateNotificationShown: Boolean = false,
+    val lastFirmwareCheckedAt: Long? = null,
 )
 
 /** Represents the current connection state of a paired device. */

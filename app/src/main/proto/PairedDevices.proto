@@ -28,6 +28,9 @@ message PairedDeviceProto {
 
   // Whether the user has already been notified about the firmware update
   bool firmware_update_notification_shown = 8;
+
+  // The timestamp of the last time we checked for firmware updates (millis since epoch)
+  optional int64 last_firmware_checked_at = 9;
 }
 
 // Collection of all paired devices
@@ -39,4 +42,3 @@ message PairedDevicesProto {
   // If false, the service won't start automatically.
   optional bool sync_enabled = 2;
 }
-

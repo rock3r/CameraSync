@@ -4,7 +4,7 @@ import android.app.Application
 import android.os.Build
 import androidx.glance.appwidget.GlanceAppWidgetManager
 import androidx.work.Configuration
-import androidx.work.WorkManager
+import androidx.work.Configuration.Provider
 import com.juul.khronicle.ConsoleLogger
 import com.juul.khronicle.Log
 import com.juul.khronicle.Logger
@@ -21,7 +21,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 
 /** Application-level configuration and dependency creation for CameraSync. */
-class CameraSyncApp : Application() {
+class CameraSyncApp : Application(), Provider {
     /**
      * Holder reference for the app graph for
      * [dev.sebastiano.camerasync.di.MetroAppComponentFactory].
@@ -30,6 +30,7 @@ class CameraSyncApp : Application() {
 
     private val applicationScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
 
+    @Suppress("TooGenericExceptionCaught")
     override fun onCreate() {
         super.onCreate()
         // Initialize Khronicle logging early in application lifecycle
@@ -43,31 +44,33 @@ class CameraSyncApp : Application() {
         // them
         registerNotificationChannel(this)
 
-        // Initialize WorkManager with custom factory for firmware update checks
-        try {
-            val firmwareUpdateCheckers = appGraph.provideFirmwareUpdateCheckers()
-            val workerFactory =
-                FirmwareUpdateCheckWorkerFactory(
-                    pairedDevicesRepository = appGraph.pairedDevicesRepository(),
-                    firmwareUpdateCheckers = firmwareUpdateCheckers,
-                )
-            WorkManager.initialize(
-                this,
-                Configuration.Builder().setWorkerFactory(workerFactory).build(),
-            )
-
-            // Schedule daily firmware update checks
-            FirmwareUpdateScheduler.scheduleDailyCheck(this)
-        } catch (e: IllegalStateException) {
-            // WorkManager already initialized (e.g., in tests) - just schedule the check
-            Log.warn("CameraSyncApp", throwable = e) {
-                "WorkManager already initialized, skipping custom factory setup"
+        // Heavy initialization and WorkManager scheduling are moved to the background to avoid
+        // main thread jank during startup.
+        applicationScope.launch(Dispatchers.IO) {
+            // Accessing appGraph for the first time builds it. Doing it here prevents
+            // the main thread from blocking.
+            try {
+                val widgetUpdateManager = appGraph.widgetUpdateManager()
+                // Pass applicationScope explicitly to maintain lifecycle semantics - the widget
+                // update manager launches a long-running coroutine that should be tied to the
+                // application scope, not the initialization coroutine.
+                widgetUpdateManager.start(applicationScope)
+            } catch (e: Exception) {
+                Log.error("CameraSyncApp", throwable = e) {
+                    "Failed to initialize widget update manager"
+                }
             }
-            FirmwareUpdateScheduler.scheduleDailyCheck(this)
-        }
 
-        // Start observing state for widget updates
-        appGraph.widgetUpdateManager().start(applicationScope)
+            try {
+                // Schedule daily firmware update checks
+                FirmwareUpdateScheduler.scheduleDailyCheck(this@CameraSyncApp)
+            } catch (e: Exception) {
+                // Catch all exceptions to ensure app doesn't crash during background initialization
+                Log.error("CameraSyncApp", throwable = e) {
+                    "Failed to schedule daily firmware update checks"
+                }
+            }
+        }
 
         // Generate widget preview
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.VANILLA_ICE_CREAM) {
@@ -78,6 +81,34 @@ class CameraSyncApp : Application() {
             }
         }
     }
+
+    /**
+     * Provides WorkManager configuration with custom factory for firmware update checks.
+     *
+     * This property is accessed automatically by WorkManager when it needs to initialize, avoiding
+     * initialization conflicts and ensuring our custom factory is always used. Uses a lazy getter
+     * to ensure appGraph is initialized before accessing it.
+     */
+    @Suppress("TooGenericExceptionCaught")
+    override val workManagerConfiguration: Configuration
+        get() =
+            try {
+                val firmwareUpdateCheckers = appGraph.provideFirmwareUpdateCheckers()
+                val workerFactory =
+                    FirmwareUpdateCheckWorkerFactory(
+                        pairedDevicesRepository = appGraph.pairedDevicesRepository(),
+                        firmwareUpdateCheckers = firmwareUpdateCheckers,
+                    )
+                Configuration.Builder().setWorkerFactory(workerFactory).build()
+            } catch (e: Exception) {
+                // Fallback to default configuration if graph initialization fails, ensuring
+                // WorkManager
+                // doesn't crash the app during on-demand initialization.
+                Log.error("CameraSyncApp", throwable = e) {
+                    "Failed to initialize custom WorkManager configuration"
+                }
+                Configuration.Builder().build()
+            }
 
     companion object {
         /**

@@ -17,6 +17,7 @@ import dev.sebastiano.camerasync.domain.repository.CameraConnection
 import dev.sebastiano.camerasync.domain.repository.CameraRepository
 import dev.sebastiano.camerasync.domain.repository.PairedDevicesRepository
 import dev.sebastiano.camerasync.domain.vendor.CameraVendorRegistry
+import dev.sebastiano.camerasync.firmware.FirmwareUpdateScheduler
 import dev.sebastiano.camerasync.util.DeviceNameProvider
 import dev.zacsweers.metro.Assisted
 import dev.zacsweers.metro.AssistedFactory
@@ -51,6 +52,7 @@ private const val PERIODIC_CHECK_INTERVAL_MS = 30_000L
 private const val CONNECTION_TIMEOUT_MS = 90_000L
 private const val PASSIVE_SCAN_REQUEST_CODE = 999
 private const val LOCATION_KEEP_ALIVE_INTERVAL_MS = 30_000L
+private const val FIRMWARE_CHECK_INTERVAL_MS = 24 * 60 * 60 * 1000L
 
 /**
  * Coordinates synchronization with multiple camera devices simultaneously.
@@ -365,6 +367,13 @@ constructor(
 
                 firmwareManager.checkAndNotifyFirmwareUpdate(macAddress, firmwareVersion)
 
+                // Proactively trigger a firmware update check if we haven't checked in 24 hours
+                // or if we're missing update information entirely.
+                val latestDevice = pairedDevicesRepository.getDevice(macAddress) ?: device
+                if (shouldTriggerFirmwareUpdateCheck(latestDevice)) {
+                    FirmwareUpdateScheduler.triggerOneTimeCheck(context)
+                }
+
                 connection.isConnected.filter { !it }.first()
                 Log.info(tag = TAG) { "Device $macAddress disconnected" }
             } catch (e: TimeoutCancellationException) {
@@ -417,6 +426,12 @@ constructor(
                 }
             }
         }
+    }
+
+    private fun shouldTriggerFirmwareUpdateCheck(device: PairedDevice): Boolean {
+        val lastChecked = device.lastFirmwareCheckedAt ?: return true
+        val twentyFourHoursAgo = System.currentTimeMillis() - FIRMWARE_CHECK_INTERVAL_MS
+        return lastChecked < twentyFourHoursAgo
     }
 
     @OptIn(ExperimentalUuidApi::class)

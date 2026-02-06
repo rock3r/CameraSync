@@ -142,12 +142,17 @@ class FakePairedDevicesRepository : PairedDevicesRepository {
         }
     }
 
-    override suspend fun setFirmwareUpdateInfo(macAddress: String, latestVersion: String?) {
+    override suspend fun setFirmwareUpdateInfo(
+        macAddress: String,
+        latestVersion: String?,
+        lastCheckedAt: Long,
+    ) {
         _devices.update { devices ->
             devices.map { device ->
                 if (device.macAddress == macAddress) {
                     device.copy(
                         latestFirmwareVersion = latestVersion,
+                        lastFirmwareCheckedAt = lastCheckedAt,
                         firmwareUpdateNotificationShown =
                             false, // Clear flag when update info changes
                     )

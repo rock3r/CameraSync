@@ -100,6 +100,7 @@ message PairedDeviceProto {
   optional string firmware_version = 6;
   optional string latest_firmware_version = 7;
   bool firmware_update_notification_shown = 8;
+  optional int64 last_firmware_checked_at = 9;
 }
 
 message PairedDevicesProto {
@@ -163,7 +164,9 @@ fun stopPassiveScan()
 3. Performs initial setup (firmware read, device name, date/time, geo-tagging) with connection state
    checks
 4. Registers device for location updates
-5. Monitors connection state and cleans up on disconnection
+5. **Proactive Firmware Check**: Triggers a one-time firmware update check if data is missing or
+   stale (>24h).
+6. Monitors connection state and cleans up on disconnection
 
 **Background Monitoring:**
 
@@ -197,7 +200,8 @@ Android Foreground Service managing the sync lifecycle.
 - Starts/stops device connections based on enabled state
 - Updates notification with connection count and sync status
 - Handles notification actions:
-    - **Refresh**: Sets global `sync_enabled` to true, restarts service, and retries all connections
+    - **Refresh**: Sets global `sync_enabled` to true, restarts service, retries all connections,
+      and **triggers a one-time firmware update check**.
     - **Stop All**: Disconnects all devices, sets global `sync_enabled` to false, removes
       notification, and stops service
 - **Manages Passive Scan Lifecycle**: Stops passive scan when active, and starts it when the service
@@ -232,7 +236,8 @@ A homescreen widget built with Jetpack Compose Glance.
 A `CoroutineWorker` managed by `WorkManager` that runs periodic background checks (daily) for
 firmware updates. It queries vendor-specific update endpoints and updates the
 `PairedDevicesRepository` with the results, which are then shown to the user via notifications or
-in-app badges.
+in-app badges. The app also proactively triggers a check when a device connects if the firmware data
+is missing or older than 24 hours.
 
 ## Data Flow
 
@@ -290,7 +295,7 @@ PairedDevicesRepository.setSyncEnabled(true)
 context.startService(ACTION_REFRESH)
         │
         ▼
-Service starts/resumes → startForegroundService() → refreshConnections()
+Service starts/resumes → startForegroundService() → refreshConnections() → trigger firmware check
 ```
 
 ### Location Sync
@@ -354,7 +359,7 @@ All key interfaces have fake implementations for testing:
 | `CameraVendorRegistry`          | `FakeVendorRegistry`          |
 | `NotificationBuilder`           | `FakeNotificationBuilder`     |
 | `IntentFactory`                 | `FakeIntentFactory`           |
-| `PendingIntentFactory`          | `FakePendingIntentFactory`    |
+| `PendingIntentFactory`    | `FakePendingIntentFactory`    |
 | `WidgetUpdateHelper`            | `FakeWidgetUpdateHelper`      |
 
 **Dependency Injection**: The project uses Metro for compile-time DI. Tests use `TestGraphFactory`
@@ -381,6 +386,7 @@ app/src/test/kotlin/dev/sebastiano/camerasync/
 │   └── TestModule.kt (Metro test dependency graph)
 ├── devicesync/
 │   ├── MultiDeviceSyncCoordinatorTest.kt
+│   ├── MultiDeviceSyncCoordinatorFirmwareTest.kt
 │   ├── DefaultLocationCollectorTest.kt
 │   ├── SyncCoordinatorTest.kt
 │   └── NotificationsTest.kt

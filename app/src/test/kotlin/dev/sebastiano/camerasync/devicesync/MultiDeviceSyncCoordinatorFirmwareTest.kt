@@ -17,9 +17,12 @@ import dev.sebastiano.camerasync.fakes.FakeLocationCollector
 import dev.sebastiano.camerasync.fakes.FakePairedDevicesRepository
 import dev.sebastiano.camerasync.fakes.FakePendingIntentFactory
 import dev.sebastiano.camerasync.fakes.FakeVendorRegistry
+import dev.sebastiano.camerasync.firmware.FirmwareUpdateScheduler
 import io.mockk.every
 import io.mockk.mockk
+import io.mockk.mockkObject
 import io.mockk.mockkStatic
+import io.mockk.unmockkObject
 import io.mockk.verify
 import kotlin.uuid.ExperimentalUuidApi
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -276,7 +279,11 @@ class MultiDeviceSyncCoordinatorFirmwareTest {
                 updatedDevice?.firmwareUpdateNotificationShown == true,
             )
 
-            pairedDevicesRepository.setFirmwareUpdateInfo(testDevice1.macAddress, "2.03")
+            pairedDevicesRepository.setFirmwareUpdateInfo(
+                testDevice1.macAddress,
+                "2.03",
+                System.currentTimeMillis(),
+            )
             advanceUntilIdle()
 
             updatedDevice = pairedDevicesRepository.getDevice(testDevice1.macAddress)
@@ -347,5 +354,58 @@ class MultiDeviceSyncCoordinatorFirmwareTest {
                 "Should not read firmware version if not supported",
                 connection.readFirmwareVersionCalled,
             )
+        }
+
+    @Test
+    fun `firmware update check is triggered on connect when last check was long ago`() =
+        testScope.runTest {
+            mockkObject(FirmwareUpdateScheduler)
+            val connection = FakeCameraConnection(testDevice1.toTestCamera())
+            cameraRepository.connectionToReturn = connection
+
+            val oldCheckTime = System.currentTimeMillis() - (25 * 60 * 60 * 1000L) // 25 hours ago
+            val deviceWithOldCheck = testDevice1.copy(lastFirmwareCheckedAt = oldCheckTime)
+            pairedDevicesRepository.addTestDevice(deviceWithOldCheck)
+
+            coordinator.startDeviceSync(testDevice1)
+            advanceUntilIdle()
+
+            verify { FirmwareUpdateScheduler.triggerOneTimeCheck(any()) }
+            unmockkObject(FirmwareUpdateScheduler)
+        }
+
+    @Test
+    fun `firmware update check is triggered on connect when last check is missing`() =
+        testScope.runTest {
+            mockkObject(FirmwareUpdateScheduler)
+            val connection = FakeCameraConnection(testDevice1.toTestCamera())
+            cameraRepository.connectionToReturn = connection
+
+            val deviceWithNoCheck = testDevice1.copy(lastFirmwareCheckedAt = null)
+            pairedDevicesRepository.addTestDevice(deviceWithNoCheck)
+
+            coordinator.startDeviceSync(testDevice1)
+            advanceUntilIdle()
+
+            verify { FirmwareUpdateScheduler.triggerOneTimeCheck(any()) }
+            unmockkObject(FirmwareUpdateScheduler)
+        }
+
+    @Test
+    fun `firmware update check is NOT triggered on connect when last check was recent`() =
+        testScope.runTest {
+            mockkObject(FirmwareUpdateScheduler)
+            val connection = FakeCameraConnection(testDevice1.toTestCamera())
+            cameraRepository.connectionToReturn = connection
+
+            val recentCheckTime = System.currentTimeMillis() - (1 * 60 * 60 * 1000L) // 1 hour ago
+            val deviceWithRecentCheck = testDevice1.copy(lastFirmwareCheckedAt = recentCheckTime)
+            pairedDevicesRepository.addTestDevice(deviceWithRecentCheck)
+
+            coordinator.startDeviceSync(testDevice1)
+            advanceUntilIdle()
+
+            verify(exactly = 0) { FirmwareUpdateScheduler.triggerOneTimeCheck(any()) }
+            unmockkObject(FirmwareUpdateScheduler)
         }
 }
