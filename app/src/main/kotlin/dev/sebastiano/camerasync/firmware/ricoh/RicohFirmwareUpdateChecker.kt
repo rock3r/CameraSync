@@ -214,7 +214,7 @@ class RicohFirmwareUpdateChecker(
             connection.setRequestProperty("x-api-key", AWS_API_KEY)
             connection.setRequestProperty("x-secret-key", AWS_SECRET_KEY)
 
-            // Body (RICOH_PROTOCOL.md: minimal required fields + model)
+            // Body (docs/ricoh/CLOUD_SERVICES.md: minimal required fields + model)
             val request =
                 RicohFirmwareApiRequest(
                     phoneModel = android.os.Build.MODEL ?: "unknown",
