@@ -11,10 +11,12 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Badge
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Switch
@@ -48,12 +50,21 @@ internal fun DeviceCard(
     onEnabledChange: (Boolean) -> Unit,
     onUnpairClick: () -> Unit,
     onRetryClick: () -> Unit,
+    onRemoteControlClick: () -> Unit,
 ) {
     var isExpanded by remember { mutableStateOf(false) }
     val device = deviceWithState.device
     val connectionState = deviceWithState.connectionState
     val unknownString = stringResource(R.string.label_unknown)
-    val info = displayInfo ?: DeviceDisplayInfo(unknownString, unknownString, device.name, false)
+    val info =
+        displayInfo
+            ?: DeviceDisplayInfo(
+                unknownString,
+                unknownString,
+                device.name,
+                supportsRemoteControl = false,
+                showPairingName = false,
+            )
 
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -208,12 +219,36 @@ internal fun DeviceCard(
 
                     Spacer(Modifier.height(12.dp))
 
-                    // Unpair action
-                    TextButton(onClick = onUnpairClick, modifier = Modifier.align(Alignment.End)) {
-                        Text(
-                            stringResource(R.string.unpair_device),
-                            color = MaterialTheme.colorScheme.error,
-                        )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                    ) {
+                        // Remote Control action - visible only when connected
+                        if (
+                            info.supportsRemoteControl &&
+                                (connectionState is DeviceConnectionState.Connected ||
+                                    connectionState is DeviceConnectionState.Syncing)
+                        ) {
+                            FilledTonalButton(onClick = onRemoteControlClick) {
+                                Icon(
+                                    painterResource(R.drawable.ic_photo_camera_24dp),
+                                    contentDescription = null,
+                                    modifier = Modifier.size(18.dp),
+                                )
+                                Spacer(Modifier.width(8.dp))
+                                Text(stringResource(R.string.remote_shooting_title))
+                            }
+                        } else {
+                            Spacer(Modifier.weight(1f))
+                        }
+
+                        // Unpair action
+                        TextButton(onClick = onUnpairClick) {
+                            Text(
+                                stringResource(R.string.unpair_device),
+                                color = MaterialTheme.colorScheme.error,
+                            )
+                        }
                     }
                 }
             }
@@ -290,10 +325,18 @@ private fun DeviceCardDisconnectedPreview() {
                         ),
                     connectionState = DeviceConnectionState.Disconnected,
                 ),
-            displayInfo = DeviceDisplayInfo("Ricoh", "GR IIIx", "My Camera", true),
+            displayInfo =
+                DeviceDisplayInfo(
+                    "Ricoh",
+                    "GR IIIx",
+                    "My Camera",
+                    supportsRemoteControl = true,
+                    showPairingName = true,
+                ),
             onEnabledChange = {},
             onUnpairClick = {},
             onRetryClick = {},
+            onRemoteControlClick = {},
         )
     }
 }
@@ -317,10 +360,18 @@ private fun DeviceCardSyncingPreview() {
                         ),
                     connectionState = DeviceConnectionState.Syncing(firmwareVersion = "1.10"),
                 ),
-            displayInfo = DeviceDisplayInfo("Ricoh", "GR IIIx", null, false),
+            displayInfo =
+                DeviceDisplayInfo(
+                    "Ricoh",
+                    "GR IIIx",
+                    null,
+                    supportsRemoteControl = true,
+                    showPairingName = false,
+                ),
             onEnabledChange = {},
             onUnpairClick = {},
             onRetryClick = {},
+            onRemoteControlClick = {},
         )
     }
 }
@@ -341,10 +392,18 @@ private fun DeviceCardUnreachablePreview() {
                         ),
                     connectionState = DeviceConnectionState.Unreachable,
                 ),
-            displayInfo = DeviceDisplayInfo("Sony", "Alpha 7 IV", "Studio A", true),
+            displayInfo =
+                DeviceDisplayInfo(
+                    "Sony",
+                    "Alpha 7 IV",
+                    "Studio A",
+                    supportsRemoteControl = true,
+                    showPairingName = true,
+                ),
             onEnabledChange = {},
             onUnpairClick = {},
             onRetryClick = {},
+            onRemoteControlClick = {},
         )
     }
 }
@@ -369,10 +428,18 @@ private fun DeviceCardErrorPreview() {
                             isRecoverable = true,
                         ),
                 ),
-            displayInfo = DeviceDisplayInfo("Ricoh", "GR IIIx", null, false),
+            displayInfo =
+                DeviceDisplayInfo(
+                    "Ricoh",
+                    "GR IIIx",
+                    null,
+                    supportsRemoteControl = true,
+                    showPairingName = false,
+                ),
             onEnabledChange = {},
             onUnpairClick = {},
             onRetryClick = {},
+            onRemoteControlClick = {},
         )
     }
 }
@@ -393,10 +460,18 @@ private fun DeviceCardDisabledPreview() {
                         ),
                     connectionState = DeviceConnectionState.Disabled,
                 ),
-            displayInfo = DeviceDisplayInfo("Ricoh", "GR IIIx", null, false),
+            displayInfo =
+                DeviceDisplayInfo(
+                    "Ricoh",
+                    "GR IIIx",
+                    null,
+                    supportsRemoteControl = true,
+                    showPairingName = false,
+                ),
             onEnabledChange = {},
             onUnpairClick = {},
             onRetryClick = {},
+            onRemoteControlClick = {},
         )
     }
 }

@@ -23,17 +23,76 @@ class RicohCameraVendorTest {
     }
 
     @Test
-    fun `recognizes device with Ricoh service UUID`() {
-        val serviceUuids = listOf(RicohGattSpec.SCAN_FILTER_SERVICE_UUID)
-        assertTrue(RicohCameraVendor.recognizesDevice("GR IIIx", serviceUuids, emptyMap()))
+    fun `recognizes device with Ricoh manufacturer data`() {
+        val manufacturerData =
+            mapOf(RicohGattSpec.RICOH_MANUFACTURER_ID to byteArrayOf(0xDA.toByte()))
+        assertTrue(RicohCameraVendor.recognizesDevice("GR IIIx", emptyList(), manufacturerData))
     }
 
     @Test
-    fun `recognizes device with Ricoh service UUID regardless of device name`() {
-        val serviceUuids = listOf(RicohGattSpec.SCAN_FILTER_SERVICE_UUID)
-        assertTrue(RicohCameraVendor.recognizesDevice(null, serviceUuids, emptyMap()))
-        assertTrue(RicohCameraVendor.recognizesDevice("", serviceUuids, emptyMap()))
-        assertTrue(RicohCameraVendor.recognizesDevice("Unknown Camera", serviceUuids, emptyMap()))
+    fun `recognizes device with Ricoh manufacturer data regardless of device name`() {
+        val manufacturerData =
+            mapOf(RicohGattSpec.RICOH_MANUFACTURER_ID to byteArrayOf(0xDA.toByte()))
+        assertTrue(RicohCameraVendor.recognizesDevice(null, emptyList(), manufacturerData))
+        assertTrue(RicohCameraVendor.recognizesDevice("", emptyList(), manufacturerData))
+        assertTrue(
+            RicohCameraVendor.recognizesDevice("Unknown Camera", emptyList(), manufacturerData)
+        )
+    }
+
+    @Test
+    fun `parseAdvertisementMetadata extracts model code, serial, and power`() {
+        val payload =
+            byteArrayOf(
+                0xDA.toByte(),
+                0x01,
+                0x01,
+                0x03, // model code
+                0x02,
+                0x04,
+                0x01,
+                0x02,
+                0x03,
+                0x04, // serial
+                0x03,
+                0x01,
+                0x01, // power on
+            )
+        val metadata =
+            RicohCameraVendor.parseAdvertisementMetadata(
+                mapOf(RicohGattSpec.RICOH_MANUFACTURER_ID to payload)
+            )
+        assertEquals(3, metadata["modelCode"])
+        assertEquals("01020304", metadata["serial"])
+        assertEquals(1, metadata["cameraPower"])
+    }
+
+    @Test
+    fun `parseAdvertisementMetadata handles unsigned bytes correctly`() {
+        // Serial bytes above 0x7F must not be sign-extended when formatting hex
+        val payload =
+            byteArrayOf(
+                0xDA.toByte(),
+                0x01,
+                0x01,
+                0xAB.toByte(), // model code (high byte)
+                0x02,
+                0x04,
+                0xDE.toByte(),
+                0xAD.toByte(),
+                0xBE.toByte(),
+                0xEF.toByte(), // serial (high bytes)
+                0x03,
+                0x01,
+                0xFF.toByte(), // power (high byte)
+            )
+        val metadata =
+            RicohCameraVendor.parseAdvertisementMetadata(
+                mapOf(RicohGattSpec.RICOH_MANUFACTURER_ID to payload)
+            )
+        assertEquals(0xAB, metadata["modelCode"])
+        assertEquals("deadbeef", metadata["serial"])
+        assertEquals(0xFF, metadata["cameraPower"])
     }
 
     @Test
@@ -56,6 +115,12 @@ class RicohCameraVendorTest {
     }
 
     @Test
+    fun `recognizes device by Ricoh service UUID even without name or manufacturer data`() {
+        val serviceUuids = listOf(RicohGattSpec.Firmware.SERVICE_UUID)
+        assertTrue(RicohCameraVendor.recognizesDevice(null, serviceUuids, emptyMap()))
+    }
+
+    @Test
     fun `does not recognize device without service UUID or recognized name`() {
         assertFalse(RicohCameraVendor.recognizesDevice("Unknown Camera", emptyList(), emptyMap()))
         assertFalse(RicohCameraVendor.recognizesDevice("Sony Camera", emptyList(), emptyMap()))
@@ -70,32 +135,32 @@ class RicohCameraVendorTest {
 
     @Test
     fun `capabilities indicate firmware version support`() {
-        assertTrue(RicohCameraVendor.getCapabilities().supportsFirmwareVersion)
+        assertTrue(RicohCameraVendor.getSyncCapabilities().supportsFirmwareVersion)
     }
 
     @Test
     fun `capabilities indicate device name support`() {
-        assertTrue(RicohCameraVendor.getCapabilities().supportsDeviceName)
+        assertTrue(RicohCameraVendor.getSyncCapabilities().supportsDeviceName)
     }
 
     @Test
     fun `capabilities indicate date time sync support`() {
-        assertTrue(RicohCameraVendor.getCapabilities().supportsDateTimeSync)
+        assertTrue(RicohCameraVendor.getSyncCapabilities().supportsDateTimeSync)
     }
 
     @Test
     fun `capabilities indicate geo tagging support`() {
-        assertTrue(RicohCameraVendor.getCapabilities().supportsGeoTagging)
+        assertTrue(RicohCameraVendor.getSyncCapabilities().supportsGeoTagging)
     }
 
     @Test
     fun `capabilities indicate location sync support`() {
-        assertTrue(RicohCameraVendor.getCapabilities().supportsLocationSync)
+        assertTrue(RicohCameraVendor.getSyncCapabilities().supportsLocationSync)
     }
 
     @Test
     fun `capabilities indicate hardware revision support`() {
-        assertTrue(RicohCameraVendor.getCapabilities().supportsHardwareRevision)
+        assertTrue(RicohCameraVendor.getSyncCapabilities().supportsHardwareRevision)
     }
 
     @Test

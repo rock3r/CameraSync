@@ -61,24 +61,27 @@ The following GPS fields are written to image EXIF (IFD GPS):
 **BLE Service:** `84A0DD62-E8AA-4D0F-91DB-819B6724C69E` (GeoTag Write Service)  
 **BLE Characteristic:** `28F59D60-8B8E-4FCD-A81F-61BDB46595A9` (GeoTag Write)
 
-**Write Data Format:**
+**Write Data Format (from dm-zharov):**
 
-The data is written as a serialized byte array containing:
+The payload is a fixed binary structure:
 
 ```dart
 GeoTagWriteData(
-  latitude: double,    // GPS latitude in degrees
-  longitude: double,   // GPS longitude in degrees
-  altitude: double,    // Altitude in meters
-  year: int,           // UTC year
-  month: int,          // UTC month (1-12)
-  day: int,            // UTC day (1-31)
-  hours: int,          // UTC hours (0-23)
-  minutes: int,        // UTC minutes (0-59)
-  seconds: int,        // UTC seconds (0-59)
-  datum: String        // Geodetic datum (e.g., "WGS-84")
+  latitude: float64,   // BIG_ENDIAN
+  longitude: float64,  // BIG_ENDIAN
+  altitude: float64,   // BIG_ENDIAN
+  year: int16,         // LITTLE_ENDIAN
+  month: int8,
+  day: int8,
+  hours: int8,
+  minutes: int8,
+  seconds: int8,
+  datum: int8          // Always 0 = WGS84
 )
 ```
+
+**Endianness:** All fields are BIG_ENDIAN **except** `year`, which is LITTLE_ENDIAN.
+The timestamp is the time the location was acquired (UTC), not necessarily the current wall clock time.
 
 **Write configuration:** Uses `writeCharacteristic` with `write_type` and `allow_long_write`
 parameters (the payload exceeds the default BLE MTU).

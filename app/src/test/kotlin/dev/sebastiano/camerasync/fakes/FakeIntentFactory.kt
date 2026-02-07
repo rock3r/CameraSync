@@ -10,6 +10,12 @@ class FakeIntentFactory : IntentFactory {
     var lastRefreshIntent: Intent? = null
         private set
 
+    var lastRefreshDeviceIntent: Intent? = null
+        private set
+
+    var lastRefreshDeviceMacAddress: String? = null
+        private set
+
     var lastStopIntent: Intent? = null
         private set
 
@@ -22,6 +28,8 @@ class FakeIntentFactory : IntentFactory {
     /** Reset the factory state between tests. */
     fun reset() {
         lastRefreshIntent = null
+        lastRefreshDeviceIntent = null
+        lastRefreshDeviceMacAddress = null
         lastStopIntent = null
         lastStartIntent = null
         lastMainActivityIntent = null
@@ -31,6 +39,14 @@ class FakeIntentFactory : IntentFactory {
         // Context is passed but not used in fake - just track the call
         val intent = mockk<Intent>(relaxed = true)
         lastRefreshIntent = intent
+        return intent
+    }
+
+    override fun createRefreshDeviceIntent(context: Context, macAddress: String): Intent {
+        // Context is passed but not used in fake - just track the call
+        val intent = mockk<Intent>(relaxed = true)
+        lastRefreshDeviceIntent = intent
+        lastRefreshDeviceMacAddress = macAddress
         return intent
     }
 

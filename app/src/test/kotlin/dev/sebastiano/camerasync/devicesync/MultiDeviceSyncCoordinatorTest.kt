@@ -7,6 +7,7 @@ import android.content.Context
 import androidx.core.app.NotificationManagerCompat
 import dev.sebastiano.camerasync.CameraSyncApp
 import dev.sebastiano.camerasync.R
+import dev.sebastiano.camerasync.domain.model.Camera
 import dev.sebastiano.camerasync.domain.model.DeviceConnectionState
 import dev.sebastiano.camerasync.domain.model.GpsLocation
 import dev.sebastiano.camerasync.domain.model.PairedDevice
@@ -932,6 +933,21 @@ class MultiDeviceSyncCoordinatorTest {
         }
 
     @Test
+    fun `stopDeviceSync removes device from present devices`() =
+        testScope.runTest {
+            val connection = FakeCameraConnection(testDevice1.toTestCamera())
+            cameraRepository.connectionToReturn = connection
+
+            coordinator.startDeviceSync(testDevice1)
+            advanceUntilIdle()
+
+            coordinator.stopDeviceSync(testDevice1.macAddress, awaitCompletion = true)
+            advanceUntilIdle()
+
+            assertFalse(coordinator.presentDevices.value.contains(testDevice1.macAddress))
+        }
+
+    @Test
     fun `initial setup failures do not abort connection if partial success`() =
         testScope.runTest {
             val connection = FakeCameraConnection(testDevice1.toTestCamera())
@@ -1005,10 +1021,11 @@ class MultiDeviceSyncCoordinatorTest {
     fun `connection is disconnected if performInitialSetup fails`() =
         testScope.runTest {
             // We need performInitialSetup to throw.
-            // One way is to make getCapabilities throw.
+            // One way is to make getSyncCapabilities throw.
             val throwingVendor = mockk<CameraVendor>()
             every { throwingVendor.vendorId } returns "throwing"
-            every { throwingVendor.getCapabilities() } throws IllegalStateException("Setup failed")
+            every { throwingVendor.getSyncCapabilities() } throws
+                IllegalStateException("Setup failed")
             vendorRegistry.addVendor(throwingVendor)
 
             val throwingDevice = testDevice1.copy(vendorId = "throwing")
@@ -1031,7 +1048,7 @@ class MultiDeviceSyncCoordinatorTest {
         }
 
     private fun PairedDevice.toTestCamera() =
-        dev.sebastiano.camerasync.domain.model.Camera(
+        Camera(
             identifier = macAddress,
             name = name,
             macAddress = macAddress,

@@ -13,6 +13,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.juul.khronicle.Log
 import dev.sebastiano.camerasync.R
+import dev.sebastiano.camerasync.devicesync.IntentFactory
 import dev.sebastiano.camerasync.devicesync.MultiDeviceSyncService
 import dev.sebastiano.camerasync.domain.model.DeviceConnectionState
 import dev.sebastiano.camerasync.domain.model.GpsLocation
@@ -60,7 +61,7 @@ class DevicesListViewModel(
     private val bluetoothBondingChecker: BluetoothBondingChecker,
     private val issueReporter: IssueReporter,
     private val batteryOptimizationChecker: BatteryOptimizationChecker,
-    private val intentFactory: dev.sebastiano.camerasync.devicesync.IntentFactory,
+    private val intentFactory: IntentFactory,
     private val ioDispatcher: CoroutineDispatcher,
 ) : ViewModel() {
 
@@ -404,11 +405,14 @@ class DevicesListViewModel(
                 val make = vendor?.vendorName ?: device.vendorId.replaceFirstChar { it.uppercase() }
                 val model =
                     vendor?.extractModelFromPairingName(device.name) ?: device.name ?: unknownString
+                val supportsRemoteControl =
+                    vendor?.getRemoteControlCapabilities()?.remoteCapture?.supported == true
                 device.macAddress to
                     DeviceDisplayInfo(
                         make = make,
                         model = model,
                         pairingName = device.name,
+                        supportsRemoteControl = supportsRemoteControl,
                         showPairingName = false, // Will be updated below
                     )
             }
@@ -444,6 +448,7 @@ data class DeviceDisplayInfo(
     val make: String,
     val model: String,
     val pairingName: String?,
+    val supportsRemoteControl: Boolean,
     val showPairingName: Boolean,
 )
 

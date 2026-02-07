@@ -128,6 +128,9 @@ For complete details on the multi-vendor architecture, see [`docs/MULTI_VENDOR_S
 - Use Android Architecture Components where applicable
 - Maintain compatibility with Android 12+ (backup rules configured)
 - All new interfaces should have corresponding fake implementations for testing
+- **MANDATORY:** Always run `./gradlew check` at the end of every task and address any failures before reporting completion.
+
+IMPORTANT: When applicable, and if the tool is available, prefer using android-studio-index MCP tools for code navigation and refactoring in the Android app and its dependencies.
 
 ### Key Features
 1. **Multi-Device Support**: Pair and sync multiple cameras simultaneously.
@@ -212,9 +215,9 @@ By injecting the dispatcher, tests can pass `UnconfinedTestDispatcher()` or `Sta
 ./gradlew build
 ```
 
-### Running Tests
+### Running Tests and static analysis
 ```bash
-./gradlew test
+./gradlew check
 ```
 
 ### Installing Debug Build

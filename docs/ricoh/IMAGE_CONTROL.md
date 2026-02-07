@@ -81,7 +81,8 @@ These parameters can be adjusted for each preset:
 **GR IV Firmware Requirement:**
 Image Control setting requires GR IV firmware version 1.04 or later.
 
-**BLE Service:** `9F00F387-8345-4BBC-8B92-B87B52E3091A` (Image Control Service). Error code: `ER_BL_004` on read failure.
+**BLE Note:** Public specs map `9F00F387-8345-4BBC-8B92-B87B52E3091A` to the **Shooting Service**, not
+Image Control. No public BLE characteristic has been identified for Image Control write operations.
 
 **Error Messages:**
 
@@ -89,8 +90,7 @@ Image Control setting requires GR IV firmware version 1.04 or later.
 - "The Image Control cannot be set when the camera is in the movie mode."
 - "The camera does not support the Image Control setting feature."
 
-> **Note:** The exact HTTP or BLE mechanism for the write operation could not be fully determined
-> from static binary analysis. The binary data is passed internally as `customImageControlData`
-> with a `customNum` (slot 1-3) parameter. The write likely uses the Wi-Fi HTTP connection since
-> it requires an active data session, but the specific endpoint/characteristic is not exposed as
-> a string literal in the binary.
+> **Note:** The exact write mechanism is still not documented publicly. The official app passes
+> `customImageControlData` with a `customNum` (slot 1-3) internally. Given the payload size and the
+> need for an active data session, this likely uses the Wi-Fi HTTP connection, but the endpoint is
+> not exposed as a string literal in the binary.

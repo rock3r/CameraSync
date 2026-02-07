@@ -43,6 +43,8 @@ import dev.sebastiano.camerasync.logging.LogViewerViewModel
 import dev.sebastiano.camerasync.pairing.PairingScreen
 import dev.sebastiano.camerasync.pairing.PairingViewModel
 import dev.sebastiano.camerasync.permissions.PermissionsScreen
+import dev.sebastiano.camerasync.ui.remote.RemoteShootingScreen
+import dev.sebastiano.camerasync.ui.remote.RemoteShootingViewModel
 import dev.sebastiano.camerasync.ui.theme.CameraSyncTheme
 import dev.zacsweers.metro.Inject
 
@@ -184,6 +186,9 @@ private fun RootComposable(
                             viewModel = devicesListViewModel,
                             onAddDeviceClick = { backStack.add(NavRoute.Pairing) },
                             onViewLogsClick = { backStack.add(NavRoute.LogViewer) },
+                            onRemoteControlClick = { macAddress ->
+                                backStack.add(NavRoute.RemoteControl(macAddress))
+                            },
                         )
                     }
 
@@ -224,6 +229,23 @@ private fun RootComposable(
                                     context,
                                     MultiDeviceSyncService.createRefreshIntent(context),
                                 )
+                            },
+                        )
+                    }
+
+                    is NavRoute.RemoteControl -> {
+                        val remoteShootingViewModel: RemoteShootingViewModel =
+                            viewModel(factory = viewModelFactory)
+                        val macAddress = key.macAddress
+
+                        LaunchedEffect(macAddress) {
+                            remoteShootingViewModel.loadDevice(macAddress)
+                        }
+
+                        RemoteShootingScreen(
+                            viewModel = remoteShootingViewModel,
+                            onBackClick = {
+                                if (backStack.size > 1) backStack.removeAt(backStack.lastIndex)
                             },
                         )
                     }

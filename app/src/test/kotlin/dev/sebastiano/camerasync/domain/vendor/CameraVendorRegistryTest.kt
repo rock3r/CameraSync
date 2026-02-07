@@ -43,12 +43,13 @@ class CameraVendorRegistryTest {
     // identifyVendor tests
 
     @Test
-    fun `identifyVendor returns Ricoh for Ricoh service UUID`() {
+    fun `identifyVendor returns Ricoh for Ricoh manufacturer data`() {
         val vendor =
             registry.identifyVendor(
                 deviceName = null,
-                serviceUuids = listOf(RicohGattSpec.SCAN_FILTER_SERVICE_UUID),
-                manufacturerData = emptyMap(),
+                serviceUuids = emptyList(),
+                manufacturerData =
+                    mapOf(RicohGattSpec.RICOH_MANUFACTURER_ID to byteArrayOf(0xDA.toByte())),
             )
         assertEquals(RicohCameraVendor, vendor)
     }
@@ -171,9 +172,6 @@ class CameraVendorRegistryTest {
     fun `getAllScanFilterUuids returns UUIDs from all vendors`() {
         val uuids = registry.getAllScanFilterUuids()
 
-        // Should contain Ricoh UUIDs
-        assertTrue(uuids.contains(RicohGattSpec.SCAN_FILTER_SERVICE_UUID))
-
         // Should contain Sony UUIDs
         assertTrue(uuids.contains(SonyGattSpec.REMOTE_CONTROL_SERVICE_UUID))
         assertTrue(uuids.contains(SonyGattSpec.PAIRING_SERVICE_UUID))
@@ -243,8 +241,9 @@ class CameraVendorRegistryTest {
         val vendor =
             emptyRegistry.identifyVendor(
                 deviceName = "GR IIIx",
-                serviceUuids = listOf(RicohGattSpec.SCAN_FILTER_SERVICE_UUID),
-                manufacturerData = emptyMap(),
+                serviceUuids = emptyList(),
+                manufacturerData =
+                    mapOf(RicohGattSpec.RICOH_MANUFACTURER_ID to byteArrayOf(0xDA.toByte())),
             )
         assertNull(vendor)
     }

@@ -19,6 +19,13 @@ object SonyGattSpec : CameraGattSpec {
     /** Remote Control Service UUID - used for scanning and filtering Sony camera advertisements. */
     val REMOTE_CONTROL_SERVICE_UUID: Uuid = Uuid.parse("8000FF00-FF00-FFFF-FFFF-FFFFFFFFFFFF")
 
+    /** Remote Control Command Characteristic (FF01) - write remote control codes. */
+    val REMOTE_COMMAND_CHARACTERISTIC_UUID: Uuid =
+        Uuid.parse("0000FF01-0000-1000-8000-00805f9b34fb")
+
+    /** Remote Control Status Characteristic (FF02) - notify for status updates. */
+    val REMOTE_STATUS_CHARACTERISTIC_UUID: Uuid = Uuid.parse("0000FF02-0000-1000-8000-00805f9b34fb")
+
     // ==================== Location Service (DD) ====================
     /** Location Service UUID - used for GPS synchronization. */
     val LOCATION_SERVICE_UUID: Uuid = Uuid.parse("8000DD00-DD00-FFFF-FFFF-FFFFFFFFFFFF")
@@ -71,7 +78,17 @@ object SonyGattSpec : CameraGattSpec {
     /** Camera Control Service UUID - used for date/time, firmware version, and model name. */
     val CAMERA_CONTROL_SERVICE_UUID: Uuid = Uuid.parse("8000CC00-CC00-FFFF-FFFF-FFFFFFFFFFFF")
 
-    /** Completion Status Characteristic (CC09) - read to check if time setting is done. */
+    /**
+     * Camera Status / Time Completion Characteristic (CC09) - dual-purpose; Read, Notify.
+     * 1. Time setting completion: tag 0x0005 (1=Done, 0=Not Done). Used by date/time sync to check
+     *    if time setting is done.
+     * 2. Camera status TLV: tag 0x0008 = Movie Recording state (1=Recording, 0=Not Recording). This
+     *    is recording start/stop, not camera mode. Only value 1 implies MOVIE; value 0 cannot
+     *    distinguish still vs movie idle.
+     *
+     * Remote control derives MOVIE mode only when 0x0008=1. Payloads that are only time-completion
+     * (e.g. after a sync) do not contain 0x0008 and must be ignored for mode observation.
+     */
     val TIME_COMPLETION_STATUS_CHARACTERISTIC_UUID: Uuid =
         Uuid.parse("0000CC09-0000-1000-8000-00805f9b34fb")
 
@@ -95,6 +112,12 @@ object SonyGattSpec : CameraGattSpec {
      */
     val TIME_AREA_SETTING_CHARACTERISTIC_UUID: Uuid =
         Uuid.parse("0000CC13-0000-1000-8000-00805f9b34fb")
+
+    /** Battery Info Characteristic (CC10) - Notify/Read. */
+    val BATTERY_INFO_CHARACTERISTIC_UUID: Uuid = Uuid.parse("0000CC10-0000-1000-8000-00805f9b34fb")
+
+    /** Storage Info Characteristic (CC0F) - Notify/Read. */
+    val STORAGE_INFO_CHARACTERISTIC_UUID: Uuid = Uuid.parse("0000CC0F-0000-1000-8000-00805f9b34fb")
 
     // ==================== Overrides ====================
     override val scanFilterServiceUuids: List<Uuid> =

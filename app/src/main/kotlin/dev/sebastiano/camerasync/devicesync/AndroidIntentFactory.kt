@@ -9,6 +9,12 @@ class AndroidIntentFactory(private val serviceClass: Class<*>) : IntentFactory {
     override fun createRefreshIntent(context: Context): Intent =
         Intent(context, serviceClass).apply { action = MultiDeviceSyncService.ACTION_REFRESH }
 
+    override fun createRefreshDeviceIntent(context: Context, macAddress: String): Intent =
+        Intent(context, serviceClass).apply {
+            action = MultiDeviceSyncService.ACTION_REFRESH_DEVICE
+            putExtra(MultiDeviceSyncService.EXTRA_DEVICE_ADDRESS, macAddress)
+        }
+
     override fun createStopIntent(context: Context): Intent =
         Intent(context, serviceClass).apply { action = MultiDeviceSyncService.ACTION_STOP }
 
