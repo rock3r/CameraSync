@@ -30,72 +30,122 @@ traffic goes to the camera and not 4G/5G.
 
 ### 2.1. BLE UUIDs
 
-#### 2.1.1. Primary Service UUID (Discovery Filter)
+The camera exposes **5 BLE services** (1 for discovery, 4 for post-connection operations), each
+containing multiple characteristics. This is significantly more complex than a single-service design.
 
-Only one Service UUID matters for discovery:
+#### 2.1.1. Service UUIDs
 
-* **Service:** `ef437870-180a-44ae-affd-99dbd85ade43` (The "Ricoh Service")
+| UUID                                   | Name                          | Purpose                                                        |
+|:---------------------------------------|:------------------------------|:---------------------------------------------------------------|
+| `ef437870-180a-44ae-affd-99dbd85ade43` | Discovery Service             | BLE scan filter — used only for discovering Ricoh cameras      |
+| `9A5ED1C5-74CC-4C50-B5B6-66A48E7CCFF1` | Main Camera Service           | Primary post-connection service (`bleServiceProvider`)         |
+| `4B445988-CAA0-4DD3-941D-37B4F52ACA86` | Camera State Notification     | Multiplexed notifications for 11 camera state types: CameraPower (`YNa`), BatteryLevel (`XNa`), GeoTag (`cOa`), StorageInformation (`eOa`), CaptureMode (`sPa`), CaptureStatus (`tPa`), ShootingMode (`uPa`), DriveMode (`ZNa`), FileTransferList (`aOa`), PowerOffDuringFileTransfer (`dOa`), FirmwareUpdateResult (`bOa`). Error: `ER_BL_006` "NotifyError" on subscription failure |
+| `84A0DD62-E8AA-4D0F-91DB-819B6724C69E` | GeoTag Write Service          | GPS coordinate transmission to camera                          |
+| `9F00F387-8345-4BBC-8B92-B87B52E3091A` | Image Control Service         | Reading/writing Image Control presets (custom1/2/3 slots). Error code: `ER_BL_004` on read failure |
 
-#### 2.1.2. Core Characteristics
+#### 2.1.2. Core Characteristics (Well-Understood)
 
-| UUID                                   | Name             | Operations      | Purpose                                      |
-|:---------------------------------------|:-----------------|:----------------|:---------------------------------------------|
-| `0F291746-0C80-4726-87A7-3C501FD3B4B6` | Handshake/Notify | Subscribe, Read | "Step 4" liveness check - critical handshake |
-| `5f0a7ba9-ae46-4645-abac-58ab2a1f4fe4` | Wi-Fi Config     | Read            | SSID/Password credential exchange            |
-| `A3C51525-DE3E-4777-A1C2-699E28736FCF` | Command/Status   | Write, Notify   | Camera control commands, WLAN on/off         |
-| `FE3A32F8-A189-42DE-A391-BC81AE4DAA76` | Battery/Info     | Read, Notify    | Battery level, camera info                   |
+| UUID                                   | Name                   | Operations      | Purpose                                      |
+|:---------------------------------------|:-----------------------|:----------------|:---------------------------------------------|
+| `0F291746-0C80-4726-87A7-3C501FD3B4B6` | Handshake/Notify       | Subscribe, Read | "Step 4" liveness check — critical handshake |
+| `5f0a7ba9-ae46-4645-abac-58ab2a1f4fe4` | Wi-Fi Config           | Read            | SSID/Password credential exchange            |
+| `A3C51525-DE3E-4777-A1C2-699E28736FCF` | Drive Mode / Command   | Write, Notify   | Drive mode notifications (`QOa` enum); also used for WLAN on/off commands |
+| `FE3A32F8-A189-42DE-A391-BC81AE4DAA76` | Battery/Info           | Read, Notify    | Battery level, camera info                   |
+| `28F59D60-8B8E-4FCD-A81F-61BDB46595A9` | GeoTag Write           | Write           | GPS coordinate data written to camera        |
 
-#### 2.1.3. Extended Characteristics (Full List)
+#### 2.1.3. Camera Information Service Characteristics
 
-These UUIDs appear in the protocol and may be used for specific features:
+These 6 UUIDs map 1:1 to the fields of `CameraInformationServiceModel`:
 
-| UUID                                   | Suspected Purpose                       |
-|:---------------------------------------|:----------------------------------------|
-| `84A0DD62-E8AA-4D0F-91DB-819B6724C69E` | Unknown (pairing related)               |
-| `28F59D60-8B8E-4FCD-A81F-61BDB46595A9` | Unknown (pairing related)               |
-| `A0C10148-8865-4470-9631-8F36D79A41A5` | Unknown                                 |
-| `A36AFDCF-6B67-4046-9BE7-28FB67DBC071` | Unknown                                 |
-| `e450ed9b-dd61-43f2-bdfb-6af500c910c3` | Unknown                                 |
-| `B58CE84C-0666-4DE9-BEC8-2D27B27B3211` | Unknown                                 |
-| `BD6725FC-5D16-496A-A48A-F784594C8ECB` | Unknown                                 |
-| `D9AE1C06-447D-4DEA-8B7D-FC8B19C2CDAE` | Unknown                                 |
-| `1452335A-EC7F-4877-B8AB-0F72E18BB295` | Unknown                                 |
-| `875FC41D-4980-434C-A653-FD4A4D4410C4` | Unknown                                 |
-| `FA46BBDD-8A8F-4796-8CF3-AA58949B130A` | Unknown                                 |
-| `430B80A3-CC2E-4EC2-AACD-08610281FF38` | Unknown                                 |
-| `39879aac-0af6-44b5-afbb-ca50053fa575` | Unknown                                 |
-| `B4EB8905-7411-40A6-A367-2834C2157EA7` | Unknown                                 |
-| `97E34DA2-2E1A-405B-B80D-F8F0AA9CC51C` | Unknown                                 |
-| `35FE6272-6AA5-44D9-88E1-F09427F51A71` | Unknown                                 |
-| `F5666A48-6A74-40AE-A817-3C9B3EFB59A6` | Unknown                                 |
-| `6FE9D605-3122-4FCE-A0AE-FD9BC08FF879` | Unknown                                 |
-| `0D2FC4D5-5CB3-4CDE-B519-445E599957D8` | Unknown                                 |
-| `460828AC-94EB-4EDF-9BB0-D31E75F2B165` | Unknown                                 |
-| `C4B7DFC0-80FD-4223-B132-B7D25A59CF85` | Unknown                                 |
-| `0F38279C-FE9E-461B-8596-81287E8C9A81` | Unknown                                 |
-| `9111CDD0-9F01-45C4-A2D4-E09E8FB0424D` | Unknown                                 |
-| `90638E5A-E77D-409D-B550-78F7E1CA5AB4` | Unknown                                 |
-| `63BC8463-228F-4698-B30D-FAF8E3D7BD88` | Unknown                                 |
-| `3e0673e0-1c7b-4f97-8ca6-5c2c8bc56680` | Unknown                                 |
-| `78009238-AC3D-4370-9B6F-C9CE2F4E3CA8` | Unknown                                 |
-| `e799198f-cf3f-4650-9373-b15dda1b618c` | Unknown                                 |
-| `30adb439-1bc0-4b8e-9c8b-2bd1892ad6b0` | Unknown                                 |
-| `559644B8-E0BC-4011-929B-5CF9199851E7` | Unknown                                 |
-| `cd879e7a-ab9f-4c58-90ed-689bae67ef8e` | Unknown                                 |
-| `B5589C08-B5FD-46F5-BE7D-AB1B8C074CAA` | Unknown                                 |
-| `df77dd09-0a48-44aa-9664-2116d03b6fd7` | Unknown                                 |
-| `B29E6DE3-1AEC-48C1-9D05-02CEA57CE664` | Unknown                                 |
-| `0936b04c-7269-4cef-9f34-07217d40cc55` | Unknown                                 |
-| `009A8E70-B306-4451-B943-7F54392EB971` | Unknown                                 |
-| `F37F568F-9071-445D-A938-5441F2E82399` | Unknown                                 |
-| `9A5ED1C5-74CC-4C50-B5B6-66A48E7CCFF1` | Unknown (appears twice, different case) |
-| `9F00F387-8345-4BBC-8B92-B87B52E3091A` | Unknown                                 |
-| `4B445988-CAA0-4DD3-941D-37B4F52ACA86` | Unknown                                 |
+| UUID                                   | Field                      | Purpose                          |
+|:---------------------------------------|:---------------------------|:---------------------------------|
+| `B4EB8905-7411-40A6-A367-2834C2157EA7` | `manufacturerNameString`   | Manufacturer name (e.g., "RICOH")|
+| `97E34DA2-2E1A-405B-B80D-F8F0AA9CC51C` | `bluetoothDeviceName`      | BLE name (e.g., "RICOH GR IIIx")|
+| `35FE6272-6AA5-44D9-88E1-F09427F51A71` | `bluetoothMacAddressString`| Bluetooth MAC address            |
+| `F5666A48-6A74-40AE-A817-3C9B3EFB59A6` | `firmwareRevisionString`   | Firmware version                 |
+| `6FE9D605-3122-4FCE-A0AE-FD9BC08FF879` | `modelNumberString`        | Model number                     |
+| `0D2FC4D5-5CB3-4CDE-B519-445E599957D8` | `serialNumberString`       | Serial number                    |
 
-**Standard BLE Descriptor:**
+#### 2.1.4. Camera Mode & Shooting Characteristics
+
+| UUID                                   | Purpose                                         | Enum/Type Values                                     |
+|:---------------------------------------|:------------------------------------------------|:-----------------------------------------------------|
+| `BD6725FC-5D16-496A-A48A-F784594C8ECB` | Operation mode list (available modes)            | `capture`, `playback`, `bleStartup`, `other`, `powerOffTransfer` |
+| `D9AE1C06-447D-4DEA-8B7D-FC8B19C2CDAE` | Current operation mode                           | Same enum as above                                   |
+| `63BC8463-228F-4698-B30D-FAF8E3D7BD88` | User mode / Shooting mode / Drive mode           | UserMode, ShootingMode, DriveMode enums              |
+| `3e0673e0-1c7b-4f97-8ca6-5c2c8bc56680` | Capture type (still vs. video)                   | `image`, `video`                                     |
+| `009A8E70-B306-4451-B943-7F54392EB971` | Capture mode                                     | CaptureMode enum (single, continuous, interval, etc.)|
+| `B5589C08-B5FD-46F5-BE7D-AB1B8C074CAA` | Exposure mode (primary)                          | `P`, `Av`, `Tv`, `M`, `B`, `BT`, `T`, `SFP`        |
+| `df77dd09-0a48-44aa-9664-2116d03b6fd7` | Exposure mode (companion)                        | Same enum as above                                   |
+
+#### 2.1.5. WLAN Configuration Characteristics
+
+These 5 UUIDs appear together in the WLAN configuration builder block, directly after the
+`WLANControlCommandModel(networkType, passphrase, wlanFreq)` definition.
+
+| UUID                                   | Purpose                                         | Details                                              |
+|:---------------------------------------|:------------------------------------------------|:-----------------------------------------------------|
+| `460828AC-94EB-4EDF-9BB0-D31E75F2B165` | WLAN control command                             | Reads `WLANControlCommandModel` (networkType, passphrase, wlanFreq). Associated with `CLa` enum (`read`/`write`) |
+| `C4B7DFC0-80FD-4223-B132-B7D25A59CF85` | WLAN passphrase or frequency                     | Individual WLAN config field — likely passphrase or network type (adjacent to WLAN control in builder) |
+| `0F38279C-FE9E-461B-8596-81287E8C9A81` | WLAN passphrase or frequency                     | Individual WLAN config field — the remaining field not covered by C4B7DFC0 |
+| `9111CDD0-9F01-45C4-A2D4-E09E8FB0424D` | WLAN security type (primary)                     | `TPa` enum: `wpa2` (0), `wpa3` (1), `transition` (2) |
+| `90638E5A-E77D-409D-B550-78F7E1CA5AB4` | WLAN security type (companion)                   | Same `TPa` enum. Paired with `9111CDD0` — likely one is read, one is notify |
+
+#### 2.1.6. Camera Service Model Characteristics
+
+These characteristics populate the `CameraServiceModel` which has 9 fields: `cameraPower`,
+`operationModeList`, `operationMode`, `geoTag`, `storageInformation`, `fileTransferList`,
+`powerOffDuringTransfer`, `gradNd`, `cameraName`.
+
+The builder registers 13 UUIDs total. Two are known service-level UUIDs (`5f0a7ba9` Wi-Fi Config,
+`ef437870` Discovery) referenced for cross-service data. The remaining 11 map to the 9 fields:
+
+| UUID                                   | Field / Purpose                                 | Confidence |
+|:---------------------------------------|:------------------------------------------------|:-----------|
+| `A0C10148-8865-4470-9631-8F36D79A41A5` | **fileTransferList** — `FileTransferListModel(isNotEmpty)` | High (immediately follows `FileTransferListModel` definition in pool) |
+| `BD6725FC-5D16-496A-A48A-F784594C8ECB` | **operationModeList** — Available operation modes | High (`YLa` type confirmed: `capture`, `playback`, `bleStartup`, `other`, `powerOffTransfer`) |
+| `D9AE1C06-447D-4DEA-8B7D-FC8B19C2CDAE` | **operationMode** — Current operation mode      | High (paired with `BD6725FC`, same `YLa` enum) |
+| `A36AFDCF-6B67-4046-9BE7-28FB67DBC071` | One of: cameraPower, geoTag, storageInformation, gradNd, cameraName | Medium (single UUID, no associated type in pool — likely a simple value field) |
+| `e450ed9b-dd61-43f2-bdfb-6af500c910c3` | One of: cameraPower, geoTag, storageInformation, gradNd, cameraName | Medium (same pattern as `A36AFDCF`) |
+| `B58CE84C-0666-4DE9-BEC8-2D27B27B3211` | One of: cameraPower, geoTag, storageInformation, gradNd, cameraName | Medium (same pattern as above) |
+| `1452335A-EC7F-4877-B8AB-0F72E18BB295` | Likely **powerOffDuringTransfer** or **storageInformation** (primary) | Medium (paired with `875FC41D` — the dual-field nature fits `PowerOffDuringFileTransferModel(behavior, autoResize)`) |
+| `875FC41D-4980-434C-A653-FD4A4D4410C4` | Likely **powerOffDuringTransfer** or **storageInformation** (companion) | Medium (paired with `1452335A`) |
+| `FA46BBDD-8A8F-4796-8CF3-AA58949B130A` | CameraServiceModel construction — possibly the camera state service UUID | Medium (trio terminates with `_cMa` CameraServiceModel type) |
+| `430B80A3-CC2E-4EC2-AACD-08610281FF38` | CameraServiceModel construction — read or notify characteristic | Medium (part of trio) |
+| `39879aac-0af6-44b5-afbb-ca50053fa575` | CameraServiceModel construction — the third in the trio | Medium (last UUID before `_cMa` type in pool) |
+
+#### 2.1.7. Other Characteristics
+
+These characteristics appear in the camera state/notification registration builder but do not
+belong to a specific named service model:
+
+| UUID                                   | Purpose                                         | Confidence |
+|:---------------------------------------|:------------------------------------------------|:-----------|
+| `B29E6DE3-1AEC-48C1-9D05-02CEA57CE664` | **Firmware update cancel** (primary) — `xPa` enum with value `cancel` (0) | High |
+| `0936b04c-7269-4cef-9f34-07217d40cc55` | **Firmware update cancel** (companion) — paired with `B29E6DE3` | High |
+| `F37F568F-9071-445D-A938-5441F2E82399` | **Device Information bridge** — reads standard GATT short UUIDs (`2A26` Firmware Rev, `2A24` Model Number, `2A28` Software Rev, `2A29` Manufacturer, `2A25` Serial Number) | High |
+| `e799198f-cf3f-4650-9373-b15dda1b618c` | **Storage information list** (primary) — `List<ka>` type, returns list of `StorageInformationModel` entries | High |
+| `30adb439-1bc0-4b8e-9c8b-2bd1892ad6b0` | **Storage information list** (companion) — paired with `e799198f`, likely one read / one notify | High |
+| `78009238-AC3D-4370-9B6F-C9CE2F4E3CA8` | **Camera power or GeoTag status** — positioned between capture type and storage list in builder. One of the remaining notification-readable states (cameraPower, geoTag, batteryLevel) | Medium |
+| `559644B8-E0BC-4011-929B-5CF9199851E7` | **Camera power or battery level** (primary) — positioned between storage list and exposure mode. Paired with `cd879e7a` | Medium |
+| `cd879e7a-ab9f-4c58-90ed-689bae67ef8e` | **Camera power or battery level** (companion) — paired with `559644B8` | Medium |
+
+#### 2.1.8. Standard BLE
+
+**Descriptor:**
 
 * `00002902-0000-1000-8000-00805f9b34fb` - Client Characteristic Configuration Descriptor (CCCD) for
   enabling notifications
+
+**Standard GATT Short UUIDs (Device Information Service):**
+
+| Short UUID | Name                  | Purpose                       |
+|:-----------|:----------------------|:------------------------------|
+| `2A24`     | Model Number String   | Camera model identifier       |
+| `2A25`     | Serial Number String  | Camera serial number          |
+| `2A26`     | Firmware Revision     | Current firmware version      |
+| `2A28`     | Software Revision     | Software version              |
+| `2A29`     | Manufacturer Name     | Manufacturer ("RICOH")        |
 
 ### 2.2. Camera Models
 
@@ -119,6 +169,20 @@ Identify the camera using the BLE Advertisement Name or the `/v1/props` HTTP end
 - Parse BLE advertisement name to identify camera family
 - HDF variants detected by "HDF" suffix
 - Monochrome detected by "Monochrome" suffix
+
+**Alternative Model ID Conventions:**
+
+The binary uses two naming conventions for GR IV models:
+
+| Primary ID | Alternative ID   | Firmware Suffix |
+|:-----------|:-----------------|:----------------|
+| `gr4`      | `grIV`           | *(none)*        |
+| `gr4Hdf`   | `grIVHDF`        | `_h`            |
+| `gr4Mono`  | `grIVMonochrome` | `_m`            |
+
+The primary IDs (`gr4`, `gr4Hdf`, `gr4Mono`) are used in cloud API requests (e.g., `fwDownload`).
+The alternative IDs appear in internal routing/navigation. Firmware suffixes are appended to the
+internal firmware name (e.g., `eg-1_h` for HDF).
 
 **Model-Specific Assets:** The app loads specific visual assets based on the model:
 
@@ -217,6 +281,9 @@ fails, the camera isn't actually listening.
 | `step0_c_network_error` | Network error |
 | `step0_o_no_internet` | No internet (for cloud features) |
 | `step0_o_unknown_error` | Unknown error |
+| `step0_s_429_too_many_requests` | Cloud API rate limited (step 0) |
+| `step0_s_500_internal_server_error` | Cloud API server error (step 0) |
+| `step0_s_503_service_unavailable` | Cloud API unavailable (step 0) |
 | `step1_s_429_too_many_requests` | Cloud API rate limited |
 | `step1_s_500_internal_server_error` | Cloud API server error |
 | `step1_s_503_service_unavailable` | Cloud API unavailable |
@@ -562,6 +629,43 @@ storage=in
 |:-------|:----------------------|:-----------------------------------|
 | `GET`  | `/imgctrl?storage=in` | Get Image Control data from camera |
 
+**Reading Image Control from a Photo:**
+
+The app extracts Image Control settings from photos stored on the camera. The raw binary data
+(`.BIN` format, same as the GR Gallery cloud downloads) is fetched via
+`GET http://192.168.0.1/imgctrl?storage=<storage>` and stored locally in the `image_control`
+database table as a `BLOB`.
+
+**Writing Image Control to Camera (Custom Slots):**
+
+The write mechanism sends the Image Control binary data to the camera's custom preset slots.
+The camera supports the following mode dial positions, each with 3 custom slots:
+
+| Mode Dial Position | Custom Slots Available |
+|:-------------------|:-----------------------|
+| P/Av/Tv/Sn/M      | Custom 1, 2, 3         |
+| USER1              | Custom 1, 2, 3         |
+| USER2              | Custom 1, 2, 3         |
+| USER3              | Custom 1, 2, 3         |
+
+**Prerequisites for Writing:**
+
+- Camera must be in still image mode (not movie mode)
+- Camera must support Image Control (GR IV firmware 1.04+)
+- Do not operate the camera's mode dial during the write process
+
+**Error Messages:**
+
+- "Image Control could not be set."
+- "The Image Control cannot be set when the camera is in the movie mode."
+- "The camera does not support the Image Control setting feature."
+
+> **Note:** The exact HTTP or BLE mechanism for the write operation could not be fully determined
+> from static binary analysis. The binary data is passed internally as `customImageControlData`
+> with a `customNum` (slot 1-3) parameter. The write likely uses the Wi-Fi HTTP connection since
+> it requires an active data session, but the specific endpoint/characteristic is not exposed as
+> a string literal in the binary.
+
 #### 5.1.5. Camera Logs (GR Log Feature)
 
 | Method | Endpoint                                            | Purpose                    |
@@ -612,6 +716,20 @@ FirmwareUpdateInfo(
   targetFirmwareVersion: String
 )
 ```
+
+**FirmwareUpdateResultModel:**
+
+```dart
+FirmwareUpdateResultModel(result: FirmwareUpdateResult)
+```
+
+**FirmwareUpdateResult enum (`FMa`):**
+
+| Value | Name      | Description                 |
+|:------|:----------|:----------------------------|
+| 0     | `invalid` | No result / not applicable  |
+| 1     | `success` | Update completed successfully |
+| 2     | `failure` | Update failed               |
 
 **FirmwareUpdateCheckData:**
 
@@ -825,34 +943,14 @@ These parameters can be adjusted for each preset:
 | Granular Strength        | `granular_strength.png`      | Grain intensity      |
 | HDR Tone                 | `hdrtone.png`                | HDR intensity        |
 
-### 6.3. Image Control Storage (Local Database)
-
-```sql
-CREATE TABLE image_control(
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  raw BLOB NOT NULL,              -- Raw binary data
-  name TEXT NOT NULL,
-  thumb_path TEXT NOT NULL,
-  view_path TEXT NOT NULL,
-  image_control_type INTEGER NOT NULL,
-  image_control_camera_type INTEGER NOT NULL,
-  custom_image_id INTEGER NOT NULL,
-  custom_image_version INTEGER NOT NULL,
-  is_favorite INTEGER NOT NULL,
-  is_gr_gallery INTEGER NOT NULL,
-  aspect_ratio TEXT DEFAULT "4:3",
-  orientation INTEGER DEFAULT 1,
-  created_at INTEGER NOT NULL,
-  updated_at INTEGER NOT NULL
-);
-```
-
-### 6.4. Applying Image Control to Camera
+### 6.3. Applying Image Control to Camera
 
 1. Camera must be in still image mode (not movie mode)
-2. Use the `/imageControlWrite` endpoint/flow
-3. Can write to Custom 1, Custom 2, or Custom 3 slots
-4. **Warning:** "Please do not operate the camera's mode dial while the Image Control is being set."
+2. Select target mode dial position (P/Av/Tv/Sn/M, USER1, USER2, USER3)
+3. Select Custom slot (Custom 1, Custom 2, or Custom 3)
+4. Binary Image Control data (`.BIN` format) is sent to the camera
+
+**Warning:** "Please do not operate the camera's mode dial while the Image Control is being set."
 
 **GR IV Firmware Requirement:**
 Image Control setting requires GR IV firmware version 1.04 or later.
@@ -916,17 +1014,44 @@ The following GPS fields are written to image EXIF (IFD GPS):
 Location data is transmitted via BLE to maintain low-latency updates even when Wi-Fi is not
 connected.
 
+**BLE Service:** `84A0DD62-E8AA-4D0F-91DB-819B6724C69E` (GeoTag Write Service)
+**BLE Characteristic:** `28F59D60-8B8E-4FCD-A81F-61BDB46595A9` (GeoTag Write)
+
+**Write Data Format:**
+
+The data is written as a serialized byte array containing:
+
+```dart
+GeoTagWriteData(
+  latitude: double,    // GPS latitude in degrees
+  longitude: double,   // GPS longitude in degrees
+  altitude: double,    // Altitude in meters
+  year: int,           // UTC year
+  month: int,          // UTC month (1-12)
+  day: int,            // UTC day (1-31)
+  hours: int,          // UTC hours (0-23)
+  minutes: int,        // UTC minutes (0-59)
+  seconds: int,        // UTC seconds (0-59)
+  datum: String        // Geodetic datum (e.g., "WGS-84")
+)
+```
+
+**Write configuration:** Uses `writeCharacteristic` with `write_type` and `allow_long_write`
+parameters (the payload exceeds the default BLE MTU).
+
 **Transmission Flow:**
 
 1. App acquires GPS fix from smartphone
-2. Coordinates serialized and written to BLE characteristic
-3. Camera stores location for next shot
-4. Location embedded in EXIF when photo taken
+2. Coordinates + UTC timestamp + datum serialized to byte array
+3. Written to GeoTag Write characteristic (`28F59D60`) with response
+4. Camera stores location for next shot
+5. Location embedded in EXIF when photo taken
 
 **Messages:**
 
 - "The app is acquiring location information."
 - "Location information transmission is complete."
+- Log: "parse: latitude: ..., longitude: ..., altitude: ..., year: ..., month: ..., day: ..., hours: ..., minutes: ..., seconds: ..., datum: ..."
 
 ### 7.5. Permissions Required
 
@@ -1304,10 +1429,18 @@ The app uses Riverpod-style state management with the following models and notif
 ```dart
 CameraServiceModel(
   cameraPower: CameraPowerModel,
-  storageInformation: StorageInformationModel,
-  powerOffDuringTransfer: PowerOffDuringFileTransferModel
+  operationModeList: List<OperationMode>,  // Available modes
+  operationMode: OperationMode,            // Current mode
+  geoTag: GeoTagModel,
+  storageInformation: List<StorageInformationModel>,
+  fileTransferList: FileTransferListModel,
+  powerOffDuringTransfer: PowerOffDuringFileTransferModel,
+  gradNd: bool?,                           // Grad ND filter state
+  cameraName: String                       // Camera display name
 )
 ```
+
+**OperationMode enum:** `capture`, `playback`, `bleStartup`, `other`, `powerOffTransfer`
 
 **CameraPowerModel:**
 
@@ -1325,8 +1458,14 @@ BatteryLevelModel(level: int)  // 0-100 percentage
 
 ```dart
 StorageInformationModel(
-  type: StorageType,  // internal, sd1
-  isLocationExisted: bool
+  type: StorageType,              // internal, sd1
+  isExistence: bool,              // Media physically present
+  isLocked: bool,                 // Write-protected
+  isAvailable: bool,              // Ready for use
+  isFormatted: bool,              // Has been formatted
+  remainingPictures: int,         // Estimated remaining shots
+  remainingVideoSeconds: int,     // Estimated remaining video time
+  fileType: String                // File type setting
 )
 ```
 
@@ -1357,8 +1496,52 @@ CaptureModeModel(mode: String)  // "single", "continuous", etc.
 
 ```dart
 DriveModeModel(driveMode: DriveMode)
-// DriveMode: single, continuous, auto_bkt, multi_exp, interval, multi_exp_interval
 ```
+
+**DriveMode BLE enum (`QOa`)** — 16 values encoding drive mode + self-timer combinations:
+
+| Value | Name                                  | Description                       |
+|:------|:--------------------------------------|:----------------------------------|
+| 0     | `oneFrame`                            | Single shot (no timer)            |
+| 1     | `tenSecondFrame`                      | Single + 10s self-timer           |
+| 2     | `twoSecondFrame`                      | Single + 2s self-timer            |
+| 3     | `continuousShootingFrame`             | Continuous shooting               |
+| 4     | `bracketFrame`                        | Auto bracket (no timer)           |
+| 5     | `bracketTenSecondFrame`               | Auto bracket + 10s timer          |
+| 6     | `bracketTwoSecondFrame`               | Auto bracket + 2s timer           |
+| 7     | `multipleExposureFrame`               | Multiple exposure (no timer)      |
+| 8     | `multipleExposureTenSecondFrame`      | Multiple exposure + 10s timer     |
+| 9     | `multipleExposureTwoSecondFrame`      | Multiple exposure + 2s timer      |
+| 10    | `intervalFrame`                       | Interval shooting                 |
+| 11    | `intervalTenSecondFrame`              | Interval + 10s timer              |
+| 12    | `intervalTwoSecondFrame`              | Interval + 2s timer               |
+| 13    | `intervalCompositionFrame`            | Interval composition              |
+| 14    | `intervalCompositionTenSecondFrame`   | Interval composition + 10s timer  |
+| 15    | `intervalCompositionTwoSecondFrame`   | Interval composition + 2s timer   |
+
+**CountdownStatus enum (`uOa`):**
+
+| Value | Name                    | Description                |
+|:------|:------------------------|:---------------------------|
+| 0     | `notInCountdown`        | No self-timer active       |
+| 1     | `selfTimerCountdown`    | Self-timer counting down   |
+| 2     | `scheduledTimeWaiting`  | Waiting for scheduled time |
+
+**CapturingStatus enum (`tOa`):**
+
+| Value | Name                    | Description                |
+|:------|:------------------------|:---------------------------|
+| 0     | `notInShootingProcess`  | Camera idle / ready        |
+| 1     | `inShootingProcess`     | Camera currently capturing |
+
+**UserMode enum (`zPa`):**
+
+| Value | Name    | Description                           |
+|:------|:--------|:--------------------------------------|
+| 0     | `Other` | Standard mode (P/Av/Tv/M/etc.)       |
+| 1     | `U1`    | User preset 1 (mode dial position)   |
+| 2     | `U2`    | User preset 2                        |
+| 3     | `U3`    | User preset 3                        |
 
 **ExposureModel:**
 
@@ -1379,12 +1562,35 @@ ExposureModel(
 
 **DeviceModel:**
 
+A composite UI-facing model that aggregates data from BLE characteristics, notifications,
+and HTTP responses:
+
 ```dart
 DeviceModel(
   deviceInfo: DeviceInfoModel,
-  cameraModel: String,
-  cameraName: String,
-  cameraType: CameraType
+  isBleConnected: bool,
+  isWifiConnected: bool,
+  isLocationExisted: bool,
+  storageType: StorageType,
+  batteryLevel: int,
+  inMemoryRemainingPictures: int,
+  sdCardRemainingPictures: int,
+  cameraPower: bool,
+  isInMemoryLocked: bool,
+  isSdCardLocked: bool,
+  isInMemoryAvailable: bool,
+  isSdCardAvailable: bool,
+  isInMemoryFormatted: bool,
+  isSdCardFormatted: bool,
+  isValidFirmwareVersion: bool
+)
+```
+
+**CurrentDeviceModel:**
+
+```dart
+CurrentDeviceModel(
+  currentDevice: DeviceModel   // The currently active/selected camera
 )
 ```
 
@@ -1411,12 +1617,16 @@ DeviceInfoModel(
 
 **CameraInformationServiceModel:**
 
+Read via the 6 custom UUIDs in Section 2.1.3:
+
 ```dart
 CameraInformationServiceModel(
-  manufacturerNameString: String,
-  modelNumberString: String,
-  batteryLevel: int,
-  txPowerLevel: int
+  manufacturerNameString: String,     // e.g., "RICOH" (UUID: B4EB8905)
+  bluetoothDeviceName: String,        // e.g., "RICOH GR IIIx" (UUID: 97E34DA2)
+  bluetoothMacAddressString: String,  // Bluetooth MAC address (UUID: 35FE6272)
+  firmwareRevisionString: String,     // Firmware version (UUID: F5666A48)
+  modelNumberString: String,          // Model number (UUID: 6FE9D605)
+  serialNumberString: String          // Serial number (UUID: 0D2FC4D5)
 )
 ```
 
@@ -1468,12 +1678,13 @@ GalleryPhotoInfoModel(
 ```dart
 ImageControlModel(
   id: int,
-  raw: Uint8List,                    // Binary control data
+  raw: Uint8List,                    // Binary control data (.BIN format)
   name: String,
   thumbPath: String,
   viewPath: String,
   imageControlType: ImageControlType,
   imageControlCameraType: ImageControlCameraType,
+  customImageType: CustomImageType,  // Target custom slot type
   customImageId: int,
   customImageVersion: int,
   isFavorite: bool,
@@ -1496,145 +1707,31 @@ ImageControlModel(
 
 The app uses these Riverpod providers for reactive state:
 
-| Provider                                     | Purpose                       |
-|:---------------------------------------------|:------------------------------|
-| `cameraPowerNotifierProvider`                | Camera power on/off state     |
-| `batteryLevelNotifierProvider`               | Battery level updates         |
-| `captureStatusNotifierProvider`              | Capture state (idle/shooting) |
-| `shootingModeNotifierProvider`               | Still/Movie mode              |
-| `captureModeNotifierProvider`                | Single/Continuous/etc.        |
-| `driveModeNotifierProvider`                  | Drive mode setting            |
-| `storageInformationNotifierProvider`         | Storage status                |
-| `powerOffDuringFileTransferNotifierProvider` | Transfer behavior             |
-| `imageControlViewModelProvider`              | Image Control state           |
-| `cameraLogViewModelProvider`                 | GR Log state                  |
-| `cameraInfoViewModelProvider`                | Camera info                   |
-| `cameraSettingsViewModelProvider`            | Settings state                |
+| Provider                                     | Notification Type | Purpose                       |
+|:---------------------------------------------|:------------------|:------------------------------|
+| `cameraPowerNotifierProvider`                | `YNa`             | Camera power on/off state — `CameraPowerModel(isPower)` |
+| `batteryLevelNotifierProvider`               | `XNa`             | Battery level updates — `BatteryLevelModel(level)` |
+| `captureStatusNotifierProvider`              | `tPa`             | Capture state — `countdownStatus` + `capturingStatus` |
+| `shootingModeNotifierProvider`               | `uPa`             | Exposure mode + user mode — `yPa` (P/Av/Tv/M/B/BT/T/SFP) + `zPa` (Other/U1/U2/U3) |
+| `captureModeNotifierProvider`                | `sPa`             | Capture mode (image/video) — `vOa` enum |
+| `driveModeNotifierProvider`                  | `ZNa`             | Drive mode — `QOa` enum (oneFrame, tenSecondFrame, ...) |
+| `storageInformationNotifierProvider`         | `eOa`             | Storage status — `List<StorageInformationModel>` |
+| `geoTagNotifierProvider`                     | `cOa`             | GeoTag enabled status — `GeoTagModel(isEnabled)` |
+| `powerOffDuringFileTransferNotifierProvider` | `dOa`             | Transfer behavior — `behavior` + `autoResize` |
+| `fileTransferListNotifierProvider`           | `aOa`             | File transfer state — `isNotEmpty` + `isChanged` |
+| `firmwareUpdateResultNotifierProvider`       | `bOa`             | Firmware update result — `FMa` enum (`invalid`, `success`, `failure`) |
+| `bleConnectionStateNotifierProvider`         | —                 | BLE connection state |
+| `websocketConnectionStateNotifierProvider`   | —                 | WebSocket connection state |
+| `imageControlViewModelProvider`              | —                 | Image Control state           |
+| `cameraLogViewModelProvider`                 | —                 | GR Log state                  |
+| `cameraInfoViewModelProvider`                | —                 | Camera info                   |
+| `cameraSettingsViewModelProvider`            | —                 | Settings state                |
 
 ---
 
-## 11. Local Database Schema
+## 11. Error Handling Strategy
 
-### 11.1. Device Information
-
-```sql
-CREATE TABLE device_info(
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  model_name TEXT,
-  model_type INTEGER,
-  device_name TEXT,           -- User-editable camera name
-  bd_name TEXT,               -- Bluetooth device name
-  remote_id TEXT,
-  serial_no TEXT,
-  firmware_version TEXT,
-  ssid TEXT,
-  bssid TEXT,
-  security TEXT,
-  password TEXT,
-  wlan_frequency INTEGER DEFAULT 0,  -- 0=2.4GHz, 1=5GHz
-  is_time_sync INTEGER DEFAULT 0,
-  created_at INTEGER,
-  updated_at INTEGER
-);
-```
-
-### 11.2. Photo Information
-
-```sql
-CREATE TABLE photo_info(
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  camera_model TEXT,
-  serial_no TEXT,
-  memory INTEGER,             -- Storage slot
-  dir TEXT,                   -- Directory (e.g., "100RICOH")
-  file TEXT,                  -- Filename (e.g., "R0001234.DNG")
-  recorded_size TEXT,
-  size INTEGER,               -- File size in bytes
-  datetime INTEGER,           -- Unix timestamp
-  recorded_time TEXT,
-  orientation INTEGER,        -- EXIF orientation
-  aspect_ratio TEXT,          -- "3:2", "4:3", "1:1", "16:9"
-  av TEXT,                    -- Aperture (e.g., "F2.8")
-  tv TEXT,                    -- Shutter speed (e.g., "1/250")
-  sv TEXT,                    -- ISO (e.g., "ISO200")
-  xv TEXT,                    -- Exposure compensation
-  lat_lng TEXT,               -- GPS coordinates
-  gps_info TEXT,              -- Full GPS data
-  thumb_last_access_datetime INTEGER,
-  thumb_image_path TEXT,
-  view_last_access_datetime INTEGER,
-  view_image_path TEXT,
-  full_image_path TEXT,
-  full_image_id TEXT,
-  xs_image_path TEXT,         -- Extra-small preview
-  created_at INTEGER,
-  updated_at INTEGER
-);
-```
-
-### 11.3. Camera Log (GR Log)
-
-```sql
-CREATE TABLE monthly_camera_log(
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  device_info_id INTEGER NOT NULL,
-  date TEXT NOT NULL,         -- "YYYY-MM"
-  completed INTEGER NOT NULL DEFAULT 0,
-  created_at INTEGER,
-  updated_at INTEGER,
-  FOREIGN KEY(device_info_id) REFERENCES device_info(id) ON DELETE CASCADE
-);
-
-CREATE TABLE daily_camera_log(
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  monthly_camera_log_id INTEGER NOT NULL,
-  day TEXT NOT NULL,
-  still_count INTEGER NOT NULL,
-  video_count INTEGER NOT NULL,
-  -- Exposure mode counts
-  exposure_p INTEGER NOT NULL,
-  exposure_tv INTEGER NOT NULL,
-  exposure_av INTEGER NOT NULL,
-  exposure_m INTEGER NOT NULL,
-  exposure_b INTEGER NOT NULL,
-  exposure_t INTEGER NOT NULL,
-  exposure_bt INTEGER NOT NULL,
-  exposure_sfp INTEGER NOT NULL,
-  -- Image Control/Effect counts
-  effect_off INTEGER NOT NULL,
-  effect_col_vivid INTEGER NOT NULL,
-  effect_efc_monochrome INTEGER NOT NULL,
-  effect_efc_soft_monochrome INTEGER NOT NULL,
-  effect_efc_hard_monochrome INTEGER NOT NULL,
-  effect_efc_high_contrast INTEGER NOT NULL,
-  effect_efc_posi_film INTEGER NOT NULL,
-  effect_efc_bleach_bypass INTEGER NOT NULL,
-  effect_efc_retro INTEGER NOT NULL,
-  effect_efc_hdr_tone INTEGER NOT NULL,
-  effect_col_custom1 INTEGER NOT NULL,
-  effect_col_custom2 INTEGER NOT NULL,
-  effect_col_custom3 INTEGER NOT NULL,
-  -- GR IV Mono-specific effects
-  effect_efc_mono_standard INTEGER DEFAULT 0,
-  effect_efc_mono_soft INTEGER DEFAULT 0,
-  effect_efc_mono_high_contrast INTEGER DEFAULT 0,
-  effect_efc_mono_grainy INTEGER DEFAULT 0,
-  effect_efc_mono_solid INTEGER DEFAULT 0,
-  effect_efc_mono_hdr_tone INTEGER DEFAULT 0,
-  -- Aspect ratio counts
-  aspect_ratio_one_to_one INTEGER,
-  aspect_ratio_three_to_two INTEGER,
-  aspect_ratio_four_to_three INTEGER,
-  aspect_ratio_sixteen_to_nine INTEGER,
-  FOREIGN KEY(monthly_camera_log_id) REFERENCES monthly_camera_log(id)
-);
-```
-
----
-
-## 12. Error Handling Strategy
-
-### 12.1. HTTP Response Handling
+### 11.1. HTTP Response Handling
 
 | Code  | Meaning      | Action                                                          |
 |:------|:-------------|:----------------------------------------------------------------|
@@ -1643,7 +1740,7 @@ CREATE TABLE daily_camera_log(
 | `401` | Unauthorized | Re-run Wi-Fi Handoff                                            |
 | Other | Error        | Display "GET/PUT error" with response code                      |
 
-### 12.2. User-Facing Errors
+### 11.2. User-Facing Errors
 
 | Scenario                        | User Message / Action                                                             |
 |:--------------------------------|:----------------------------------------------------------------------------------|
@@ -1661,7 +1758,7 @@ CREATE TABLE daily_camera_log(
 | **Shooting Mode Error**         | "The camera could not be switched to the shooting mode."                          |
 | **Image Control Not Supported** | "The camera does not support the Image Control setting feature. Update firmware." |
 
-### 12.3. Connection Recovery
+### 11.3. Connection Recovery
 
 If WLAN connection fails:
 
@@ -1672,7 +1769,7 @@ If WLAN connection fails:
 
 ---
 
-## 13. State Machine Summary
+## 12. State Machine Summary
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
@@ -1730,9 +1827,9 @@ If WLAN connection fails:
 
 ---
 
-## 14. Implementation Checklist
+## 13. Implementation Checklist
 
-### 14.1. BLE Layer
+### 13.1. BLE Layer
 
 - [ ] Scan with service UUID filter
 - [ ] Handle bonding state machine
@@ -1742,7 +1839,7 @@ If WLAN connection fails:
 - [ ] Handle camera power state changes
 - [ ] Handle disconnect/reconnection gracefully
 
-### 14.2. Wi-Fi Layer
+### 13.2. Wi-Fi Layer
 
 - [ ] Read credentials from BLE characteristic
 - [ ] Implement WPA2/WPA3 fallback
@@ -1750,7 +1847,7 @@ If WLAN connection fails:
 - [ ] Verify camera with `/v1/props`
 - [ ] Handle timeout and retry logic
 
-### 14.3. HTTP/WebSocket Layer
+### 13.3. HTTP/WebSocket Layer
 
 - [ ] Implement photo listing with pagination
 - [ ] Handle thumbnail/preview/full download
@@ -1758,7 +1855,7 @@ If WLAN connection fails:
 - [ ] WebSocket connection for live status
 - [ ] Camera log sync
 
-### 14.4. Firmware Update
+### 13.4. Firmware Update
 
 - [x] Check cloud for latest version (Hybrid strategy)
     - **AWS API**: Used for newer models (e.g., GR IV).
@@ -1769,14 +1866,14 @@ If WLAN connection fails:
 - [ ] Upload to camera
 - [ ] Trigger reboot
 
-### 14.5. Image Control
+### 13.5. Image Control
 
 - [ ] Read Image Controls from photos
 - [ ] Store in local database
 - [ ] Apply to camera Custom slots
 - [ ] Handle GR IV Mono-specific presets
 
-### 14.6. UI/UX
+### 13.6. UI/UX
 
 - [ ] Model-specific iconography
 - [ ] Battery level indicators
@@ -1786,9 +1883,9 @@ If WLAN connection fails:
 
 ---
 
-## 15. Security Considerations
+## 14. Security Considerations
 
-### 15.1. API Keys
+### 14.1. API Keys
 
 The AWS API keys documented above are extracted from the official app. For a clean-room
 implementation:
@@ -1797,13 +1894,13 @@ implementation:
 - The keys may be rotated by Ricoh
 - Monitor for authentication failures
 
-### 15.2. Network Security
+### 14.2. Network Security
 
 - Camera AP uses WPA2/WPA3
 - No HTTPS (HTTP only over local network)
 - Ensure network binding to prevent data leakage to internet
 
-### 15.3. Bluetooth Security
+### 14.3. Bluetooth Security
 
 - BLE bonding provides encryption
 - Store bond information securely
@@ -1811,7 +1908,7 @@ implementation:
 
 ---
 
-## 16. Known Limitations & Quirks
+## 15. Known Limitations & Quirks
 
 1. **Movie Mode Restriction:** WLAN cannot be enabled when camera is in movie mode
 2. **USB Connection:** WLAN cannot be enabled when camera is connected via USB
