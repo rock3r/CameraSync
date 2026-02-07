@@ -1762,7 +1762,8 @@ If WLAN connection fails:
 
 - [x] Check cloud for latest version (Hybrid strategy)
     - **AWS API**: Used for newer models (e.g., GR IV).
-    - **Scraped Data**: Used for legacy models (GR II, GR III/IIIx). Fetched from `ricoh_firmware.json` hosted on GitHub Pages.
+    - **Scraped Data**: Used for legacy models (GR II, GR III/IIIx). Fetched from
+      `ricoh_firmware.json` hosted on GitHub Pages.
 - [ ] Compare with camera version
 - [ ] Download firmware binary
 - [ ] Upload to camera
