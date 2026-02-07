@@ -16,8 +16,12 @@ import androidx.compose.animation.graphics.res.animatedVectorResource
 import androidx.compose.animation.graphics.res.rememberAnimatedVectorPainter
 import androidx.compose.animation.graphics.vector.AnimatedImageVector
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Icon
@@ -36,9 +40,11 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import dev.sebastiano.camerasync.R
 import dev.sebastiano.camerasync.domain.model.DeviceConnectionState
+import dev.sebastiano.camerasync.ui.theme.CameraSyncTheme
 import kotlin.math.PI
 import kotlin.math.cos
 import kotlin.math.sin
@@ -236,4 +242,35 @@ internal fun ConnectionStatusText(state: DeviceConnectionState, modifier: Modifi
         color = color,
         modifier = modifier,
     )
+}
+
+@Preview(name = "All Status Variants", showBackground = true)
+@Composable
+private fun ConnectionStatusPreview() {
+    CameraSyncTheme {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+        ) {
+            StatusRow(state = DeviceConnectionState.Disabled)
+            StatusRow(state = DeviceConnectionState.Disconnected)
+            StatusRow(state = DeviceConnectionState.Searching)
+            StatusRow(state = DeviceConnectionState.Connecting)
+            StatusRow(state = DeviceConnectionState.Unreachable)
+            StatusRow(state = DeviceConnectionState.Connected())
+            StatusRow(state = DeviceConnectionState.Syncing())
+            StatusRow(state = DeviceConnectionState.Error("Connection timed out"))
+        }
+    }
+}
+
+@Composable
+private fun StatusRow(state: DeviceConnectionState) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(16.dp),
+    ) {
+        ConnectionStatusIcon(state = state)
+        ConnectionStatusText(state = state)
+    }
 }

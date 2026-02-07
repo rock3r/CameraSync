@@ -58,13 +58,14 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.sebastiano.camerasync.R
+import dev.sebastiano.camerasync.ui.theme.CameraSyncTheme
 
 /** Screen for viewing system and app logs. */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LogViewerScreen(viewModel: LogViewerViewModel, onNavigateBack: () -> Unit) {
     val logs by viewModel.logs.collectAsState()
@@ -72,8 +73,32 @@ fun LogViewerScreen(viewModel: LogViewerViewModel, onNavigateBack: () -> Unit) {
     val filterLevel by viewModel.filterLevel.collectAsState()
     val isRefreshing by viewModel.isRefreshing
 
+    LogViewerScreenContent(
+        logs = logs,
+        filterText = filterText,
+        filterLevel = filterLevel,
+        isRefreshing = isRefreshing,
+        onNavigateBack = onNavigateBack,
+        onFilterTextChange = viewModel::setFilterText,
+        onFilterLevelChange = viewModel::setFilterLevel,
+        onRefresh = viewModel::refresh,
+    )
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun LogViewerScreenContent(
+    logs: List<LogEntry>,
+    filterText: String,
+    filterLevel: LogLevel?,
+    isRefreshing: Boolean,
+    onNavigateBack: () -> Unit,
+    onFilterTextChange: (String) -> Unit,
+    onFilterLevelChange: (LogLevel?) -> Unit,
+    onRefresh: () -> Unit,
+) {
     var showFilterMenu by remember { mutableStateOf(false) }
-    var showSearchField by remember { mutableStateOf(false) }
+    var showSearchField by remember { mutableStateOf(filterText.isNotEmpty()) }
 
     Scaffold(
         topBar = {
@@ -114,7 +139,7 @@ fun LogViewerScreen(viewModel: LogViewerViewModel, onNavigateBack: () -> Unit) {
                             DropdownMenuItem(
                                 text = { Text(stringResource(R.string.filter_all_levels)) },
                                 onClick = {
-                                    viewModel.setFilterLevel(null)
+                                    onFilterLevelChange(null)
                                     showFilterMenu = false
                                 },
                             )
@@ -124,14 +149,14 @@ fun LogViewerScreen(viewModel: LogViewerViewModel, onNavigateBack: () -> Unit) {
                                     DropdownMenuItem(
                                         text = { Text(level.name) },
                                         onClick = {
-                                            viewModel.setFilterLevel(level)
+                                            onFilterLevelChange(level)
                                             showFilterMenu = false
                                         },
                                     )
                                 }
                         }
                     }
-                    IconButton(onClick = { viewModel.refresh() }, enabled = !isRefreshing) {
+                    IconButton(onClick = onRefresh, enabled = !isRefreshing) {
                         if (isRefreshing) {
                             CircularProgressIndicator(
                                 modifier = Modifier.size(24.dp),
@@ -152,7 +177,7 @@ fun LogViewerScreen(viewModel: LogViewerViewModel, onNavigateBack: () -> Unit) {
             if (showSearchField) {
                 TextField(
                     value = filterText,
-                    onValueChange = { viewModel.setFilterText(it) },
+                    onValueChange = onFilterTextChange,
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
                     placeholder = { Text(stringResource(R.string.placeholder_filter_logs)) },
                     leadingIcon = {
@@ -160,7 +185,7 @@ fun LogViewerScreen(viewModel: LogViewerViewModel, onNavigateBack: () -> Unit) {
                     },
                     trailingIcon = {
                         if (filterText.isNotEmpty()) {
-                            IconButton(onClick = { viewModel.setFilterText("") }) {
+                            IconButton(onClick = { onFilterTextChange("") }) {
                                 Icon(
                                     painterResource(R.drawable.ic_close_24dp),
                                     contentDescription = stringResource(R.string.content_desc_clear),
@@ -183,13 +208,13 @@ fun LogViewerScreen(viewModel: LogViewerViewModel, onNavigateBack: () -> Unit) {
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Text(
-                        stringResource(R.string.label_level_filter, filterLevel!!.name),
+                        stringResource(R.string.label_level_filter, filterLevel.name),
                         style = MaterialTheme.typography.labelMedium,
-                        color = getLogLevelColor(filterLevel!!),
+                        color = getLogLevelColor(filterLevel),
                     )
                     Spacer(Modifier.width(8.dp))
                     IconButton(
-                        onClick = { viewModel.setFilterLevel(null) },
+                        onClick = { onFilterLevelChange(null) },
                         modifier = Modifier.size(16.dp),
                     ) {
                         Icon(
@@ -394,4 +419,42 @@ private data class LogScrollbarFactory(
                 drawRect(color = thumbColor, topLeft = topLeft, size = size, alpha = thumbAlpha)
             }
         }
+}
+
+@Preview(name = "Log Viewer Screen", showBackground = true)
+@Composable
+private fun LogViewerScreenPreview() {
+    CameraSyncTheme {
+        LogViewerScreenContent(
+            logs =
+                listOf(
+                    LogEntry("12:00:01", LogLevel.INFO, "MainActivity", "App started"),
+                    LogEntry("12:00:05", LogLevel.DEBUG, "BLE", "Scanning for devices..."),
+                    LogEntry("12:00:10", LogLevel.WARN, "Sync", "Connection weak, retrying in 5s"),
+                    LogEntry("12:00:15", LogLevel.ERROR, "Sync", "Failed to connect to GR IIIx"),
+                ),
+            filterText = "",
+            filterLevel = null,
+            isRefreshing = false,
+            onNavigateBack = {},
+            onFilterTextChange = {},
+            onFilterLevelChange = {},
+            onRefresh = {},
+        )
+    }
+}
+
+@Preview(name = "Log Entry - Portrait", showBackground = true)
+@Composable
+private fun LogEntryPortraitPreview() {
+    CameraSyncTheme {
+        LogEntryPortrait(
+            LogEntry(
+                timestamp = "12:00:00.000",
+                level = LogLevel.DEBUG,
+                tag = "CameraRepository",
+                message = "Searching for cameras with service UUID 0000... ",
+            )
+        )
+    }
 }

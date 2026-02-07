@@ -32,11 +32,14 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import dev.sebastiano.camerasync.R
 import dev.sebastiano.camerasync.devicesync.formatElapsedTimeSince
 import dev.sebastiano.camerasync.domain.model.DeviceConnectionState
+import dev.sebastiano.camerasync.domain.model.PairedDevice
 import dev.sebastiano.camerasync.domain.model.PairedDeviceWithState
+import dev.sebastiano.camerasync.ui.theme.CameraSyncTheme
 
 @Composable
 internal fun DeviceCard(
@@ -268,5 +271,132 @@ private fun DeviceDetailRowWithBadge(label: String, value: String, latestVersion
                 }
             }
         }
+    }
+}
+
+@Preview(name = "Disconnected", showBackground = true)
+@Composable
+private fun DeviceCardDisconnectedPreview() {
+    CameraSyncTheme {
+        DeviceCard(
+            deviceWithState =
+                PairedDeviceWithState(
+                    device =
+                        PairedDevice(
+                            macAddress = "00:11:22:33:44:55",
+                            name = "GR IIIx",
+                            vendorId = "ricoh",
+                            isEnabled = true,
+                        ),
+                    connectionState = DeviceConnectionState.Disconnected,
+                ),
+            displayInfo = DeviceDisplayInfo("Ricoh", "GR IIIx", "My Camera", true),
+            onEnabledChange = {},
+            onUnpairClick = {},
+            onRetryClick = {},
+        )
+    }
+}
+
+@Preview(name = "Syncing with Firmware Update", showBackground = true)
+@Composable
+private fun DeviceCardSyncingPreview() {
+    CameraSyncTheme {
+        DeviceCard(
+            deviceWithState =
+                PairedDeviceWithState(
+                    device =
+                        PairedDevice(
+                            macAddress = "00:11:22:33:44:55",
+                            name = "GR IIIx",
+                            vendorId = "ricoh",
+                            isEnabled = true,
+                            lastSyncedAt = System.currentTimeMillis() - 30000,
+                            firmwareVersion = "1.10",
+                            latestFirmwareVersion = "1.20",
+                        ),
+                    connectionState = DeviceConnectionState.Syncing(firmwareVersion = "1.10"),
+                ),
+            displayInfo = DeviceDisplayInfo("Ricoh", "GR IIIx", null, false),
+            onEnabledChange = {},
+            onUnpairClick = {},
+            onRetryClick = {},
+        )
+    }
+}
+
+@Preview(name = "Unreachable", showBackground = true)
+@Composable
+private fun DeviceCardUnreachablePreview() {
+    CameraSyncTheme {
+        DeviceCard(
+            deviceWithState =
+                PairedDeviceWithState(
+                    device =
+                        PairedDevice(
+                            macAddress = "00:11:22:33:44:55",
+                            name = "Alpha 7 IV",
+                            vendorId = "sony",
+                            isEnabled = true,
+                        ),
+                    connectionState = DeviceConnectionState.Unreachable,
+                ),
+            displayInfo = DeviceDisplayInfo("Sony", "Alpha 7 IV", "Studio A", true),
+            onEnabledChange = {},
+            onUnpairClick = {},
+            onRetryClick = {},
+        )
+    }
+}
+
+@Preview(name = "Error", showBackground = true)
+@Composable
+private fun DeviceCardErrorPreview() {
+    CameraSyncTheme {
+        DeviceCard(
+            deviceWithState =
+                PairedDeviceWithState(
+                    device =
+                        PairedDevice(
+                            macAddress = "00:11:22:33:44:55",
+                            name = "GR IIIx",
+                            vendorId = "ricoh",
+                            isEnabled = true,
+                        ),
+                    connectionState =
+                        DeviceConnectionState.Error(
+                            message = "Bluetooth connection lost unexpectedly",
+                            isRecoverable = true,
+                        ),
+                ),
+            displayInfo = DeviceDisplayInfo("Ricoh", "GR IIIx", null, false),
+            onEnabledChange = {},
+            onUnpairClick = {},
+            onRetryClick = {},
+        )
+    }
+}
+
+@Preview(name = "Disabled", showBackground = true)
+@Composable
+private fun DeviceCardDisabledPreview() {
+    CameraSyncTheme {
+        DeviceCard(
+            deviceWithState =
+                PairedDeviceWithState(
+                    device =
+                        PairedDevice(
+                            macAddress = "00:11:22:33:44:55",
+                            name = "GR IIIx",
+                            vendorId = "ricoh",
+                            isEnabled = false,
+                        ),
+                    connectionState = DeviceConnectionState.Disabled,
+                ),
+            displayInfo = DeviceDisplayInfo("Ricoh", "GR IIIx", null, false),
+            onEnabledChange = {},
+            onUnpairClick = {},
+            onRetryClick = {},
+        )
     }
 }

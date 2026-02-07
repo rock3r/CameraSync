@@ -32,10 +32,12 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import dev.sebastiano.camerasync.R
 import dev.sebastiano.camerasync.domain.model.GpsLocation
+import dev.sebastiano.camerasync.ui.theme.CameraSyncTheme
 import java.time.ZonedDateTime
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.TimeMark
@@ -203,6 +205,31 @@ private fun UserLocationButton(
                 style = Stroke(puckSizes.dotStrokeWidth.toPx()),
             )
             drawCircle(puckColors.dotFillColorCurrentLocation, puckSizes.dotRadius.toPx())
+        }
+    }
+}
+
+@Preview(name = "Loading", showBackground = true)
+@Composable
+private fun LocationCardLoadingPreview() {
+    CameraSyncTheme { Box(Modifier.padding(16.dp)) { LocationCard(location = null) } }
+}
+
+@Preview(name = "Location Available", showBackground = true)
+@Composable
+private fun LocationCardAvailablePreview() {
+    CameraSyncTheme {
+        Box(Modifier.padding(16.dp)) {
+            LocationCard(
+                location =
+                    GpsLocation(
+                        latitude = 35.6895,
+                        longitude = 139.6917,
+                        altitude = 40.0,
+                        accuracy = 10f,
+                        timestamp = ZonedDateTime.now(),
+                    )
+            )
         }
     }
 }

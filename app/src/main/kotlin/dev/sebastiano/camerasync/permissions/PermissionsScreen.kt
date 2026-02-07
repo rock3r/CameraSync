@@ -50,18 +50,18 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import dev.sebastiano.camerasync.PermissionInfo
 import dev.sebastiano.camerasync.PermissionsRequester
 import dev.sebastiano.camerasync.R
+import dev.sebastiano.camerasync.ui.theme.CameraSyncTheme
 
 @Composable
 fun PermissionsScreen(onPermissionsGranted: () -> Unit) {
-    val context = LocalContext.current
     val viewModel = remember { PermissionsViewModel() }
     val showSuccessAnimation = viewModel.showSuccessAnimation.value
     val shouldNavigate by viewModel.shouldNavigate.collectAsState()
-    val backgroundPermissionName = stringResource(R.string.perm_bg_location)
 
     // Trigger navigation when ViewModel signals it
     LaunchedEffect(shouldNavigate) {
@@ -79,117 +79,132 @@ fun PermissionsScreen(onPermissionsGranted: () -> Unit) {
         // Check permissions on each recomposition to catch when they're all granted
         LaunchedEffect(permissions) { viewModel.checkPermissions(permissions) }
 
-        Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
-            Box(
-                modifier = Modifier.fillMaxSize().padding(innerPadding),
-                contentAlignment = Alignment.Center,
+        PermissionsScreenContent(
+            permissions = permissions,
+            showSuccessAnimation = showSuccessAnimation,
+            onRequestAll = requestAll,
+        )
+    }
+}
+
+@Composable
+private fun PermissionsScreenContent(
+    permissions: List<PermissionInfo>,
+    showSuccessAnimation: Boolean,
+    onRequestAll: () -> Unit,
+) {
+    val context = LocalContext.current
+    val backgroundPermissionName = stringResource(R.string.perm_bg_location)
+
+    Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
+        Box(
+            modifier = Modifier.fillMaxSize().padding(innerPadding),
+            contentAlignment = Alignment.Center,
+        ) {
+            // Success animation overlay
+            if (showSuccessAnimation) {
+                key(showSuccessAnimation) {
+                    AnimatedTickMark(
+                        modifier = Modifier.size(120.dp),
+                        color = MaterialTheme.colorScheme.primary,
+                    )
+                }
+            }
+
+            // Main content with fade animation
+            val contentAlpha by
+                animateFloatAsState(
+                    targetValue = if (showSuccessAnimation) 0f else 1f,
+                    label = "content_alpha",
+                    animationSpec = tween(durationMillis = 500),
+                )
+
+            Column(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp).alpha(contentAlpha),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(24.dp),
             ) {
-                // Success animation overlay
-                if (showSuccessAnimation) {
-                    key(showSuccessAnimation) {
-                        AnimatedTickMark(
-                            modifier = Modifier.size(120.dp),
-                            color = MaterialTheme.colorScheme.primary,
-                        )
-                    }
+                // Header
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    Text(
+                        text = stringResource(R.string.welcome_title),
+                        style = MaterialTheme.typography.headlineMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface,
+                    )
+                    Text(
+                        text = stringResource(R.string.welcome_subtitle),
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
                 }
 
-                // Main content with fade animation
-                val contentAlpha by
-                    animateFloatAsState(
-                        targetValue = if (showSuccessAnimation) 0f else 1f,
-                        label = "content_alpha",
-                        animationSpec = tween(durationMillis = 500),
-                    )
+                Spacer(Modifier.height(8.dp))
 
-                Column(
-                    modifier =
-                        Modifier.fillMaxWidth().padding(horizontal = 24.dp).alpha(contentAlpha),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(24.dp),
+                // Permissions checklist
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(20.dp),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+                    colors =
+                        CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.surfaceVariant
+                        ),
                 ) {
-                    // Header
                     Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                        modifier = Modifier.padding(20.dp),
+                        verticalArrangement = Arrangement.spacedBy(16.dp),
                     ) {
-                        Text(
-                            text = stringResource(R.string.welcome_title),
-                            style = MaterialTheme.typography.headlineMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onSurface,
-                        )
-                        Text(
-                            text = stringResource(R.string.welcome_subtitle),
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-
-                    Spacer(Modifier.height(8.dp))
-
-                    // Permissions checklist
-                    Card(
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(20.dp),
-                        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
-                        colors =
-                            CardDefaults.cardColors(
-                                containerColor = MaterialTheme.colorScheme.surfaceVariant
-                            ),
-                    ) {
-                        Column(
-                            modifier = Modifier.padding(20.dp),
-                            verticalArrangement = Arrangement.spacedBy(16.dp),
-                        ) {
-                            permissions.forEachIndexed { index, permission ->
-                                PermissionChecklistItem(
-                                    permission = permission,
-                                    modifier = Modifier.fillMaxWidth(),
-                                )
-                                if (index < permissions.size - 1) {
-                                    Spacer(Modifier.height(4.dp))
-                                }
+                        permissions.forEachIndexed { index, permission ->
+                            PermissionChecklistItem(
+                                permission = permission,
+                                modifier = Modifier.fillMaxWidth(),
+                            )
+                            if (index < permissions.size - 1) {
+                                Spacer(Modifier.height(4.dp))
                             }
                         }
                     }
+                }
 
-                    // Request button - only show when there are missing permissions
-                    val hasMissingPermissions = permissions.any { !it.isGranted }
-                    val backgroundMissing =
-                        permissions.any { it.name == backgroundPermissionName && !it.isGranted }
-                    AnimatedVisibility(visible = hasMissingPermissions) {
-                        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                            ElevatedButton(
-                                onClick = { requestAll() },
+                // Request button - only show when there are missing permissions
+                val hasMissingPermissions = permissions.any { !it.isGranted }
+                val backgroundMissing =
+                    permissions.any { it.name == backgroundPermissionName && !it.isGranted }
+                AnimatedVisibility(visible = hasMissingPermissions) {
+                    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        ElevatedButton(
+                            onClick = { onRequestAll() },
+                            modifier = Modifier.fillMaxWidth().height(56.dp),
+                            shape = RoundedCornerShape(16.dp),
+                        ) {
+                            Text(
+                                text = stringResource(R.string.action_grant_all),
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.SemiBold,
+                            )
+                        }
+                        if (backgroundMissing) {
+                            OutlinedButton(
+                                onClick = {
+                                    val intent =
+                                        Intent(
+                                            Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                                            Uri.fromParts("package", context.packageName, null),
+                                        )
+                                    context.startActivity(intent)
+                                },
                                 modifier = Modifier.fillMaxWidth().height(56.dp),
                                 shape = RoundedCornerShape(16.dp),
                             ) {
                                 Text(
-                                    text = stringResource(R.string.action_grant_all),
+                                    text = stringResource(R.string.action_open_settings),
                                     style = MaterialTheme.typography.titleMedium,
                                     fontWeight = FontWeight.SemiBold,
                                 )
-                            }
-                            if (backgroundMissing) {
-                                OutlinedButton(
-                                    onClick = {
-                                        val intent =
-                                            Intent(
-                                                Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
-                                                Uri.fromParts("package", context.packageName, null),
-                                            )
-                                        context.startActivity(intent)
-                                    },
-                                    modifier = Modifier.fillMaxWidth().height(56.dp),
-                                    shape = RoundedCornerShape(16.dp),
-                                ) {
-                                    Text(
-                                        text = stringResource(R.string.action_open_settings),
-                                        style = MaterialTheme.typography.titleMedium,
-                                        fontWeight = FontWeight.SemiBold,
-                                    )
-                                }
                             }
                         }
                     }
@@ -376,6 +391,66 @@ private fun AnimatedTickMark(
                 end = Offset(secondEndX, secondEndY),
                 strokeWidth = strokeWidth,
                 cap = StrokeCap.Round,
+            )
+        }
+    }
+}
+
+@Preview(name = "Permissions Screen", showBackground = true)
+@Composable
+private fun PermissionsScreenPreview() {
+    CameraSyncTheme {
+        PermissionsScreenContent(
+            permissions =
+                listOf(
+                    PermissionInfo("Location", "Required for GPS sync", true),
+                    PermissionInfo("Bluetooth", "Required for camera connection", false),
+                    PermissionInfo("Notifications", "Required for status updates", false),
+                ),
+            showSuccessAnimation = false,
+            onRequestAll = {},
+        )
+    }
+}
+
+@Preview(name = "Permissions Screen - Success", showBackground = true)
+@Composable
+private fun PermissionsScreenSuccessPreview() {
+    CameraSyncTheme {
+        PermissionsScreenContent(
+            permissions =
+                listOf(
+                    PermissionInfo("Location", "Required for GPS sync", true),
+                    PermissionInfo("Bluetooth", "Required for camera connection", true),
+                    PermissionInfo("Notifications", "Required for status updates", true),
+                ),
+            showSuccessAnimation = true,
+            onRequestAll = {},
+        )
+    }
+}
+
+@Preview(name = "Permission Item - Granted", showBackground = true)
+@Composable
+private fun PermissionChecklistItemGrantedPreview() {
+    CameraSyncTheme {
+        Box(Modifier.padding(16.dp)) {
+            PermissionChecklistItem(
+                permission = PermissionInfo("Location", "Required for GPS sync", true),
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
+    }
+}
+
+@Preview(name = "Permission Item - Missing", showBackground = true)
+@Composable
+private fun PermissionChecklistItemMissingPreview() {
+    CameraSyncTheme {
+        Box(Modifier.padding(16.dp)) {
+            PermissionChecklistItem(
+                permission = PermissionInfo("Bluetooth", "Required for camera connection", false),
+                modifier = Modifier.fillMaxWidth(),
             )
         }
     }

@@ -370,6 +370,18 @@ private fun IdleContentPreview() {
     CameraSyncTheme { IdleContent(onStartPairing = {}) }
 }
 
+@Preview(name = "Already Bonded State", showBackground = true)
+@Composable
+private fun AlreadyBondedContentPreview() {
+    CameraSyncTheme { AlreadyBondedContent(removeFailed = false, onRemoveBond = {}, onCancel = {}) }
+}
+
+@Preview(name = "Already Bonded State - Remove Failed", showBackground = true)
+@Composable
+private fun AlreadyBondedContentFailedPreview() {
+    CameraSyncTheme { AlreadyBondedContent(removeFailed = true, onRemoveBond = {}, onCancel = {}) }
+}
+
 @Preview(name = "Pairing In Progress", showBackground = true)
 @Composable
 private fun PairingInProgressPreview() {
@@ -392,4 +404,14 @@ private fun PairingFailedTimeoutPreview() {
 @Composable
 private fun PairingFailedUnknownPreview() {
     CameraSyncTheme { PairingFailed(error = PairingError.UNKNOWN, onCancel = {}, onRetry = {}) }
+}
+
+@Preview(name = "Pulsing Bluetooth Icon", showBackground = true)
+@Composable
+private fun PulsingBluetoothIconPreview() {
+    CameraSyncTheme {
+        Box(modifier = Modifier.padding(16.dp)) {
+            PulsingBluetoothIcon(size = 96.dp, iconSize = 48.dp)
+        }
+    }
 }

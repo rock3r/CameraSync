@@ -1,5 +1,6 @@
 package dev.sebastiano.camerasync.devices
 
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -26,8 +27,10 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import dev.sebastiano.camerasync.R
+import dev.sebastiano.camerasync.ui.theme.CameraSyncTheme
 import dev.sebastiano.camerasync.util.BatteryOptimizationUtil
 
 @Composable
@@ -200,4 +203,24 @@ internal fun SyncStoppedWarning(onRefreshClick: () -> Unit, modifier: Modifier =
             }
         }
     }
+}
+
+@Preview(name = "Battery Optimization Warning", showBackground = true)
+@Composable
+private fun BatteryOptimizationWarningPreview() {
+    CameraSyncTheme {
+        Box(Modifier.padding(16.dp)) { BatteryOptimizationWarning(onEnableClick = {}) }
+    }
+}
+
+@Preview(name = "Sync Stopped Warning", showBackground = true)
+@Composable
+private fun SyncStoppedWarningPreview() {
+    CameraSyncTheme { Box(Modifier.padding(16.dp)) { SyncStoppedWarning(onRefreshClick = {}) } }
+}
+
+@Preview(name = "Battery Optimization Dialog", showBackground = true)
+@Composable
+private fun BatteryOptimizationDialogPreview() {
+    CameraSyncTheme { BatteryOptimizationDialog(onConfirm = {}, onDismiss = {}) }
 }

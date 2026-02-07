@@ -22,9 +22,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import dev.sebastiano.camerasync.R
 import dev.sebastiano.camerasync.domain.model.PairedDeviceWithState
+import dev.sebastiano.camerasync.ui.theme.CameraSyncTheme
 
 @Composable
 internal fun LoadingContent(modifier: Modifier = Modifier) {
@@ -124,4 +126,24 @@ internal fun UnpairConfirmationDialog(
             TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) }
         },
     )
+}
+
+@Preview(name = "Loading Content", showBackground = true)
+@Composable
+private fun LoadingContentPreview() {
+    CameraSyncTheme { LoadingContent() }
+}
+
+@Preview(name = "Empty Content", showBackground = true)
+@Composable
+private fun EmptyContentPreview() {
+    CameraSyncTheme { EmptyContent() }
+}
+
+@Preview(name = "Unpair Confirmation Dialog", showBackground = true)
+@Composable
+private fun UnpairConfirmationDialogPreview() {
+    CameraSyncTheme {
+        UnpairConfirmationDialog(deviceName = "GR IIIx", onConfirm = {}, onDismiss = {})
+    }
 }
