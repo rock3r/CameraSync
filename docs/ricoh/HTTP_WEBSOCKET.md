@@ -226,19 +226,39 @@ Sec-WebSocket-Version: 13
 }
 ```
 
-**Capture Status Values:**
+**Capture Status Model:**
+
+The `CaptureStatusModel` contains two sub-states that independently track countdown and capture:
+
+| Field         | Enum               | Values                                                                    |
+|:--------------|:-------------------|:--------------------------------------------------------------------------|
+| `countdown`   | `CaptureCountdown` | `notInCountdown` (0) — no timer; `selfTimerCountdown` (1) — timer active |
+| `capturing`   | `CaptureCapturing` | `notInShootingProcess` (0) — idle; `inShootingProcess` (1) — capturing    |
+
+> **Note on Remote Shutter:** The Ricoh protocol provides a single-step "shoot" command only (HTTP
+> `POST /v1/camera/shoot` or BLE write to `A3C51525`). There is **no half-press/S1 autofocus step**
+> — the camera handles AF internally upon trigger. There is also **no touch AF** or **focus status
+> reading** capability. AF control is Sony-only.
+
+**Capture Status (WebSocket simplified):**
 | Value | Meaning | UI Action |
 | :--- | :--- | :--- |
 | `idle` | Ready to shoot | Enable Shutter Button |
 | `capture` | Currently capturing | Disable Shutter Button, show spinner |
 
-**Shooting Mode Values:**
+**Shooting Mode Values (`ShootingMode`):**
 | Value | Meaning |
 | :--- | :--- |
 | `still` | Still image mode |
 | `movie` | Movie/video mode |
 
-**Capture Mode Values:**
+**Capture Type (`CaptureType`, BLE `3e0673e0`):**
+| Value   | BLE Index | Meaning          |
+|:--------|:----------|:-----------------|
+| `image` | 0         | Still image mode |
+| `video` | 1 (→2)   | Video/movie mode |
+
+**Capture Mode Values (`CaptureMode`, BLE `009A8E70`):**
 | Value | Meaning |
 | :--- | :--- |
 | `single` | Single shot |
@@ -246,7 +266,7 @@ Sec-WebSocket-Version: 13
 | `interval` | Interval timer |
 | `multiExposure` | Multiple exposure |
 
-**Drive Mode Values:**
+**Drive Mode Values (WebSocket, 6 base modes):**
 | Value | Asset | Description |
 | :--- | :--- | :--- |
 | `single` | `drive_single.png` | Single shot |
@@ -255,6 +275,37 @@ Sec-WebSocket-Version: 13
 | `multi_exp` | `drive_multi_exp.png` | Multiple exposure |
 | `interval` | `drive_interval.png` | Interval timer |
 | `multi_exp_interval` | `drive_multi_exp_interval.png` | Multi-exp + interval |
+
+**Drive Mode Enum (BLE `QOa`, 16 values via `A3C51525` notify):**
+
+The BLE drive mode notification on characteristic `A3C51525` provides a finer-grained 16-value enum
+that combines drive mode + self-timer state. Each base drive mode has up to 3 variants (no timer,
+10-second timer, 2-second timer):
+
+| BLE Value | Internal Name                          | Drive Mode           | Timer |
+|:----------|:---------------------------------------|:---------------------|:------|
+| 0         | `oneFrame`                             | Single               | Off   |
+| 1         | `tenSecondFrame`                       | Single               | 10s   |
+| 2         | `twoSecondFrame`                       | Single               | 2s    |
+| 3         | `continuousShootingFrame`              | Continuous           | Off   |
+| 4         | `bracketFrame`                         | Auto Bracket         | Off   |
+| 5         | `bracketTenSecondFrame`                | Auto Bracket         | 10s   |
+| 6         | `bracketTwoSecondFrame`                | Auto Bracket         | 2s    |
+| 7         | `multipleExposureFrame`                | Multi-exposure       | Off   |
+| 8         | `multipleExposureTenSecondFrame`       | Multi-exposure       | 10s   |
+| 9         | `multipleExposureTwoSecondFrame`       | Multi-exposure       | 2s    |
+| 10        | `intervalFrame`                        | Interval             | Off   |
+| 11        | `intervalTenSecondFrame`               | Interval             | 10s   |
+| 12        | `intervalTwoSecondFrame`               | Interval             | 2s    |
+| 13        | `intervalCompositionFrame`             | Interval Composite   | Off   |
+| 14        | `intervalCompositionTenSecondFrame`    | Interval Composite   | 10s   |
+| 15        | `intervalCompositionTwoSecondFrame`    | Interval Composite   | 2s    |
+
+**Time/Bulb Shooting State (`TimeShootingState`):**
+
+For Bulb (`B`), Time (`T`), and Bulb/Time (`BT`) exposure modes, the shutter button acts as a
+toggle: first press starts the exposure, second press stops it. The `TimeShootingState` enum tracks
+this state for the UI (spinner animation during exposure).
 
 **Storage Status Values:**
 | Value | Meaning |
@@ -289,6 +340,8 @@ The camera supports these exposure modes (shown in remote shutter UI):
 
 ## 5.4. Drive Modes
 
+**6 base drive modes** (shown in WebSocket and UI):
+
 | Mode               | Internal ID          | Asset                          |
 |:-------------------|:---------------------|:-------------------------------|
 | Single             | `single`             | `drive_single.png`             |
@@ -297,6 +350,10 @@ The camera supports these exposure modes (shown in remote shutter UI):
 | Multi-exposure     | `multi_exp`          | `drive_multi_exp.png`          |
 | Interval           | `interval`           | `drive_interval.png`           |
 | Multi-exp Interval | `multi_exp_interval` | `drive_multi_exp_interval.png` |
+
+> **See also:** The BLE drive mode notification on `A3C51525` provides a 16-value enum that
+> combines drive mode + self-timer state. See §5.2 "Drive Mode Enum (BLE `QOa`)" for the full
+> mapping.
 
 ---
 

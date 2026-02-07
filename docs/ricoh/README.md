@@ -52,7 +52,7 @@ containing multiple characteristics. This is significantly more complex than a s
 |:---------------------------------------|:-----------------------|:----------------|:---------------------------------------------|
 | `0F291746-0C80-4726-87A7-3C501FD3B4B6` | Handshake/Notify       | Subscribe, Read | "Step 4" liveness check — critical handshake |
 | `5f0a7ba9-ae46-4645-abac-58ab2a1f4fe4` | Wi-Fi Config           | Read            | SSID/Password credential exchange            |
-| `A3C51525-DE3E-4777-A1C2-699E28736FCF` | Drive Mode / Command   | Write, Notify   | Drive mode notifications (`QOa` enum); also used for WLAN on/off commands |
+| `A3C51525-DE3E-4777-A1C2-699E28736FCF` | Drive Mode / Command   | Write, Notify   | Drive mode notifications (`QOa` enum, 16 values — see [HTTP_WEBSOCKET.md §5.2](HTTP_WEBSOCKET.md)); also used for WLAN on/off and remote shutter commands |
 | `FE3A32F8-A189-42DE-A391-BC81AE4DAA76` | Battery/Info           | Read, Notify    | Battery level, camera info                   |
 | `28F59D60-8B8E-4FCD-A81F-61BDB46595A9` | GeoTag Write           | Write           | GPS coordinate data written to camera        |
 
@@ -75,9 +75,9 @@ These 6 UUIDs map 1:1 to the fields of `CameraInformationServiceModel`:
 |:---------------------------------------|:------------------------------------------------|:-----------------------------------------------------|
 | `BD6725FC-5D16-496A-A48A-F784594C8ECB` | Operation mode list (available modes)            | `capture`, `playback`, `bleStartup`, `other`, `powerOffTransfer` |
 | `D9AE1C06-447D-4DEA-8B7D-FC8B19C2CDAE` | Current operation mode                           | Same enum as above                                   |
-| `63BC8463-228F-4698-B30D-FAF8E3D7BD88` | User mode / Shooting mode / Drive mode           | UserMode, ShootingMode, DriveMode enums              |
-| `3e0673e0-1c7b-4f97-8ca6-5c2c8bc56680` | Capture type (still vs. video)                   | `image`, `video`                                     |
-| `009A8E70-B306-4451-B943-7F54392EB971` | Capture mode                                     | CaptureMode enum (single, continuous, interval, etc.)|
+| `63BC8463-228F-4698-B30D-FAF8E3D7BD88` | User mode / Shooting mode / Drive mode           | UserMode, ShootingMode (`still`/`movie`), DriveMode enums |
+| `3e0673e0-1c7b-4f97-8ca6-5c2c8bc56680` | Capture type (still vs. video)                   | `image` (0), `video` (1→2)                           |
+| `009A8E70-B306-4451-B943-7F54392EB971` | Capture mode                                     | CaptureMode enum (`single`, `continuous`, `interval`, `multiExposure`) |
 | `B5589C08-B5FD-46F5-BE7D-AB1B8C074CAA` | Exposure mode (primary)                          | `P`, `Av`, `Tv`, `M`, `B`, `BT`, `T`, `SFP`        |
 | `df77dd09-0a48-44aa-9664-2116d03b6fd7` | Exposure mode (companion)                        | Same enum as above                                   |
 
@@ -320,13 +320,19 @@ This section summarizes the key operations available over BLE. See §2 for full 
 **1. Notifications (Camera State):**
 Subscribe to **Camera State Notification** service characteristics to receive real-time updates:
 - **Battery Level:** (`FE3A32F8`) - 0-100%
-- **Capture Status:** (`tPa`) - Idle/Capturing
+- **Capture Status:** (`tPa`) - `CaptureStatusModel` with two sub-states:
+  - `countdown`: `notInCountdown` (0) / `selfTimerCountdown` (1)
+  - `capturing`: `notInShootingProcess` (0) / `inShootingProcess` (1)
 - **Shooting Mode:** (`uPa`) - Still/Movie, Exposure Mode (P/Av/Tv/M)
-- **Drive Mode:** (`ZNa`) - Single, Continuous, Timer
+- **Drive Mode:** (`A3C51525` notify, `QOa` enum) - 16-value enum combining drive mode + self-timer
+  (see [HTTP_WEBSOCKET.md §5.2](HTTP_WEBSOCKET.md) for full mapping)
 - **Storage Info:** (`eOa`) - SD card status, remaining shots
 
 **2. Commands (Write):**
-- **Remote Shutter:** Trigger capture via Command characteristic (`A3C51525`)
+- **Remote Shutter:** Trigger capture via Command characteristic (`A3C51525`). This is a
+  single-step fire command — no half-press/S1/AF step exists. The camera handles autofocus
+  internally. For Bulb/Time modes, first write starts exposure, second write stops it
+  (`TimeShootingState` tracks this).
 - **WLAN Control:** Enable/Disable camera Wi-Fi (`A3C51525`)
 - **Camera Power:** Turn camera off
 
@@ -433,6 +439,23 @@ The AWS API keys documented in [CLOUD_SERVICES.md](CLOUD_SERVICES.md) are extrac
 - BLE bonding provides encryption
 - Store bond information securely
 - Handle re-pairing gracefully
+
+---
+
+## Confirmed Absent Capabilities
+
+The following capabilities were investigated via binary analysis of the official GR WORLD app
+(libapp.so Dart object pool + Ghidra decompilation) and are **confirmed not present** in the Ricoh
+GR protocol:
+
+| Capability              | Status                  | Evidence                                                           |
+|:------------------------|:------------------------|:-------------------------------------------------------------------|
+| **Live View stream**    | Not supported           | WebSocket is status-only JSON; no video stream endpoint exists; zero references to liveView/viewfinder in binary |
+| **Post-capture preview**| Not supported           | No postView/postCapture references in binary                       |
+| **Half-press AF (S1)**  | Not supported           | Remote shutter is single-step "shoot" command; no focusing/AF state in CaptureStatusModel; no S1/half-press concept |
+| **Touch AF**            | Not supported           | No touch AF/touch operation references in binary                   |
+| **Focus status reading**| Not supported           | No AF result/focus confirmation states; CaptureStatusModel only has countdown + capturing |
+| **Download resume**     | Not supported           | No HTTP Range headers, byte-offset parameters, or partial download mechanism; simple full-file GET only |
 
 ---
 

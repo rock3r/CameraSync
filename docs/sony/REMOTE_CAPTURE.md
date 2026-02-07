@@ -1,8 +1,13 @@
 # Remote Capture + Transfer Flow (BLE + Wi-Fi)
 
-This document describes the full camera remote capture + media transfer flow used by this app.
-It is intended for clean-room reimplementation and is derived from the decompiled codebase.
-USB is intentionally out of scope.
+This document describes the **full Wi-Fi/PTP/IP** remote capture + media transfer flow derived from
+the decompiled Sony Creators' App codebase. USB is intentionally out of scope.
+
+> **Note:** Sony cameras also support a simpler **BLE-only remote shooting** path via the
+> `8000FF00` Remote Control Service (shutter with half-press AF, video recording, zoom, manual
+> focus, custom buttons). See [`BLE_STATE_MONITORING.md`](BLE_STATE_MONITORING.md) Section 2 for
+> details. The BLE remote is sufficient for basic shooting; the Wi-Fi/PTP/IP path described here
+> adds live view, touch AF, full device property control, and media transfer.
 
 Key packages/classes referenced:
 - BLE: `jp.co.sony.ips.portalapp.btconnection.*`, `jp.co.sony.ips.portalapp.bluetooth.continuous.*`
@@ -227,10 +232,197 @@ Typical movie capture:
 2. `pressButton(MovieRec)` -> stop recording
 
 ### 8.3 Mode-specific behavior
-Modes in `ShootingController`:
-- Still, Movie, Continuous, Bulb, High Frame Rate, Panorama, etc.
-- Each mode is mapped to different UI + event handling, but the control layer
-  relies on `EnumControlCode` + `EnumButton`.
+Modes in `ShootingController` (`EnumShootingMode`):
+- `StillMode` — standard still capture (S1/S2 or RequestOneShooting)
+- `MovieMode` — video recording (MovieRec toggle)
+- `ContinuousShootMode` — burst shooting
+- `SpotBoostShootMode` — continuous shooting with spot-boost
+- `BulbShootMode` — manual bulb (S2 hold)
+- `BulbTimerShootMode` — timed bulb (`BulbTimerSetting`/`BulbExposureTimeSetting`)
+- `NoiseReductionMode` — long-exposure noise reduction state
+- `SlowAndQuickMode` — slow & quick motion video
+- `HighFrameRateMode` — HFR recording (HFRStandby → record)
+- `PanoramaShootMode` — panorama sweep
+
+Each mode is mapped to different UI + event handling, but the control layer
+relies on `EnumControlCode` + `EnumButton`.
+
+### 8.4 Full Control Codes (`EnumControlCode`, `SDIO_ControlDevice`)
+
+All PTP control codes sent via `SDIO_ControlDevice` transactions:
+
+| Code  | Name                                     | Data   | Description                                        |
+|-------|------------------------------------------|--------|----------------------------------------------------|
+| 53953 | `S1Button`                               | 2 byte | Half-press AF (press=1 / release=2)                |
+| 53954 | `S2Button`                               | 2 byte | Full-press shutter (press=1 / release=2)           |
+| 53955 | `AELButton`                              | 2 byte | AE Lock toggle                                     |
+| 53956 | `AFLButton`                              | 2 byte | AF Lock toggle                                     |
+| 53959 | `RequestOneShooting`                     | 2 byte | Single-shot capture (no separate S1/S2)            |
+| 53960 | `MovieRecButton`                         | 2 byte | Movie record start/stop toggle                     |
+| 53961 | `FELButton`                              | 2 byte | Flash Exposure Lock toggle                         |
+| 53965 | `RemoteKeyUp`                            | 2 byte | D-pad up                                           |
+| 53966 | `RemoteKeyDown`                          | 2 byte | D-pad down                                         |
+| 53967 | `RemoteKeyLeft`                          | 2 byte | D-pad left                                         |
+| 53968 | `RemoteKeyRight`                         | 2 byte | D-pad right                                        |
+| 53969 | `NearFar`                                | 2 byte | Manual focus near/far (minus=near, plus=far)       |
+| 53970 | `AFMFHold`                               | 2 byte | AF/MF Hold button                                  |
+| 53971 | `CancelPixelShiftShooting`               | 2 byte | Cancel pixel shift shooting                        |
+| 53972 | `PixelShiftShootingMode`                 | 2 byte | Enter pixel shift shooting mode                    |
+| 53973 | `HFRStandby`                             | 2 byte | HFR standby start/stop                             |
+| 53974 | `HFRRecordingCancel`                     | 2 byte | HFR recording cancel                               |
+| 53975 | `FocusStepNear`                          | 2 byte | Focus step near (fine)                             |
+| 53976 | `FocusStepFar`                           | 2 byte | Focus step far (fine)                              |
+| 53977 | `AWBLButton`                             | 2 byte | Auto White Balance Lock toggle                     |
+| 53978 | `ProgramShift`                           | 1 byte | Program shift increment (+1) / decrement (-1)      |
+| 53979 | `WhiteBalanceInitialization`             | 2 byte | Reset white balance                                |
+| 53980 | `AFAreaPosition`                         | 4 byte | Set AF area position (x, y encoded)                |
+| 53981 | `ZoomOperation`                          | 1 byte | Zoom in (+) / out (-)                              |
+| 53987 | `HighResolutionSSAdjust`                 | 2 byte | Hi-Res shutter speed adjust (+/-)                  |
+| 53988 | `RemoteTouchOperation`                   | 4 byte | Touch AF at (x, y) coordinate                     |
+| 53989 | `CancelRemoteTouchOperation`             | 2 byte | Cancel touch AF                                    |
+| 53992 | `WiFiPowerOff`                           | 2 byte | Turn off camera Wi-Fi                              |
+| 54000 | `HighResolutionSSAdjustInIntegralMultiples` | 2 byte | Hi-Res SS adjust by integral steps               |
+| 54001 | `FlickerScan`                            | 2 byte | Initiate flicker scan                              |
+| 54006 | `ContShootSpotBoostButton`               | 2 byte | Continuous shoot spot boost toggle                 |
+| 54024 | `WiFiDirectModeOff`                      | 2 byte | Turn off Wi-Fi Direct mode                         |
+| 54031 | `SetSelectOnCameraTransferEnable`        | 2 byte | Enable/disable select-on-camera transfer           |
+| 54032 | `SetSelectOnCameraTransferMode`          | 2 byte | Set transfer mode                                  |
+| 54033 | `CancelSelectOnCameraTransfer`           | 2 byte | Cancel select-on-camera transfer                   |
+| 54034 | `SetPostViewEnable`                      | 2 byte | Enable/disable post-capture preview                |
+| 54035 | `SetLiveViewEnable`                      | 2 byte | Enable/disable live view stream                    |
+
+### 8.5 Device Properties (PTP/IP `DevicePropCode`)
+
+Sony cameras expose ~150+ readable/observable properties via PTP/IP. The camera
+pushes property-change events on the PTP event channel, enabling real-time UI
+updates. Key shooting-related properties:
+
+**Exposure & Metering:**
+
+| Code  | Name                         | Description                                    |
+|-------|------------------------------|------------------------------------------------|
+| 20494 | `ExposureProgramMode`        | P / A / S / M / Bulb / etc.                    |
+| 20487 | `FNumber`                    | Aperture (F-number)                            |
+| 53773 | `ShutterSpeed`               | Shutter speed                                  |
+| 53663 | `ExtendedShutterSpeed`       | Extended shutter speed (longer exposures)      |
+| 53790 | `ISOSensitivity`             | ISO value                                      |
+| 20496 | `ExposureBiasCompensation`   | Exposure compensation (+/- EV)                 |
+| 20491 | `ExposureMeteringMode`       | Metering mode (matrix, center, spot)           |
+| 53787 | `PictureEffect`              | Creative style / picture effect                |
+| 53824 | `CreativeStyle`              | Creative style preset                          |
+| 53823 | `PictureProfile`             | Picture profile (S-Log, HLG, etc.)             |
+
+**Focus:**
+
+| Code  | Name                                    | Description                                    |
+|-------|-----------------------------------------|------------------------------------------------|
+| 20490 | `FocusMode`                             | AF-S / AF-C / DMF / MF                        |
+| 53779 | `FocusIndication`                       | Focus status (in-focus, not-focused, etc.)     |
+| 53804 | `FocusArea`                             | AF area mode (wide, zone, center, etc.)        |
+| 53810 | `AFAreaPosition`                        | AF area position (x, y)                        |
+| 53836 | `FocalPosition`                         | Current focal position (for MF)                |
+| 53844 | `FocusMagnifierSetting`                 | Focus magnifier on/off                         |
+| 53805 | `FocusMagnifierStatus`                  | Focus magnifier active state                   |
+| 53806 | `FocusMagnifierRatio`                   | Focus magnifier zoom ratio                     |
+| 53808 | `FocusMagnifierPosition`                | Focus magnifier position (x, y)                |
+| 53813 | `NearFarEnableStatus`                   | NearFar (MF) control enable/disable            |
+| 53814 | `AFMFHoldButtonEnableStatus`            | AF/MF Hold button enable/disable               |
+| 53891 | `FunctionOfTouchOperation`              | Touch operation function (AF, tracking, etc.)  |
+| 53892 | `RemoteTouchOperationEnableStatus`      | Remote touch AF enable/disable                 |
+| 53861 | `OnePushAFExecutionState`               | One-push AF execution state                    |
+
+**Shooting State:**
+
+| Code  | Name                         | Description                                    |
+|-------|------------------------------|------------------------------------------------|
+| 53789 | `MovieRecordingState`        | Movie recording state (idle/recording)         |
+| 53802 | `HFRRecordingState`          | HFR recording state                            |
+| 20499 | `StillCaptureMode`           | Still capture mode (single, continuous, timer)  |
+| 53793 | `LiveViewStatus`             | Live view enable/disable state                 |
+| 53786 | `DisableIndication`          | Controls currently disabled by camera          |
+| 53860 | `RemoteControlRestrictionStatus` | Remote control restrictions active          |
+
+**Bulb & Long Exposure:**
+
+| Code  | Name                              | Description                                    |
+|-------|-----------------------------------|------------------------------------------------|
+| 53924 | `BulbTimerSetting`                | Bulb timer on/off                              |
+| 53925 | `BulbExposureTimeSetting`         | Bulb exposure time setting (seconds)           |
+| 53926 | `ElapsedBulbExposureTime`         | Current elapsed bulb time                      |
+| 53927 | `RemainingBulbExposureTime`       | Remaining bulb exposure time                   |
+| 53928 | `RemainingNoiseReductionTime`     | Remaining NR processing time                   |
+
+**Battery & Storage:**
+
+| Code  | Name                              | Description                                    |
+|-------|-----------------------------------|------------------------------------------------|
+| 53774 | `BatteryLevelIndicator`           | Battery level (bar indicator)                  |
+| 53784 | `BatteryRemaining`                | Battery remaining percentage                   |
+| 53549 | `SecondBatteryRemaining`          | Vertical grip battery remaining                |
+| 53832 | `MediaSLOT1Status`                | Slot 1 media status                            |
+| 53833 | `MediaSLOT1RemainingNumberShots`  | Slot 1 remaining still shots                   |
+| 53834 | `MediaSLOT1RemainingShootingTime` | Slot 1 remaining video time (seconds)          |
+| 53846 | `MediaSLOT2Status`                | Slot 2 media status                            |
+| 53847 | `MediaSLOT2RemainingNumberShots`  | Slot 2 remaining still shots                   |
+| 53848 | `MediaSLOT2RemainingShootingTime` | Slot 2 remaining video time (seconds)          |
+
+**Zoom:**
+
+| Code  | Name                         | Description                                    |
+|-------|------------------------------|------------------------------------------------|
+| 53851 | `ZoomOperationEnableStatus`  | Zoom control available                         |
+| 53852 | `ZoomScale`                  | Current zoom level                             |
+| 53853 | `ZoomBarInformation`         | Zoom bar position info                         |
+| 53854 | `ZoomSpeedRange`             | Min/max zoom speed                             |
+
+**White Balance:**
+
+| Code  | Name                                    | Description                                    |
+|-------|-----------------------------------------|------------------------------------------------|
+| 20485 | `WhiteBalance`                          | White balance preset                           |
+| 53775 | `ColorTemperature`                      | Color temperature (K)                          |
+| 53776 | `BiaxialFineTuningGMDirection`          | WB fine-tune G-M axis                          |
+| 53788 | `BiaxialFineTuningABDirection`          | WB fine-tune A-B axis                          |
+| 53838 | `AWBLockIndication`                     | AWB Lock active                                |
+
+**Other:**
+
+| Code  | Name                         | Description                                    |
+|-------|------------------------------|------------------------------------------------|
+| 53777 | `AspectRatio`                | Image aspect ratio                             |
+| 53763 | `ImageSize`                  | Image resolution setting                       |
+| 53842 | `JPEGQuality`                | JPEG quality / compression                     |
+| 53843 | `FileFormatStill`            | Still file format (RAW, JPEG, RAW+JPEG)        |
+| 53825 | `FileFormatMovie`            | Movie file format (XAVC, AVCHD, etc.)          |
+| 53826 | `RecordingSettingMovie`      | Movie resolution/frame rate setting             |
+| 53841 | `DeviceOverheatingState`     | Camera overheating warning                     |
+| 53857 | `RecordingTime`              | Current movie recording time elapsed           |
+
+### 8.6 Live View Stream
+
+Live view is an HTTP-based continuous JPEG stream. When `SetLiveViewEnable` is
+sent via PTP/IP, the camera exposes a `LiveViewUrl` device property with the
+stream URL.
+
+Classes: `LiveViewStream`, `LiveViewGetter`, `LiveViewDownloader`,
+`ChunkedPermanentEeImageDownloader`
+
+The live view `LiveViewDataset` includes:
+- **Header**: coordinate system, frame dimensions
+- **JPEG frame**: viewfinder image
+- **AF frame overlay**: AF point rectangles with lock status (`EnumAfLockStatus`)
+- **Face detection frames**: face rectangles with type and status
+- **Tracking frames**: subject tracking rectangles
+- **EFraming frames**: electronic framing guides
+- **AF range frames**: AF area range indicators
+- **Level indicator**: camera pitch/roll
+- **Arrow indicators**: directional hints
+
+The app uses `LiveviewScreenController` to render the viewfinder with
+overlaid AF frames (`AfFrameDrawer`), aspect markers (`AspectMarkerDrawer`),
+grid lines (`GridlineDrawer`), and touch operations (`TouchOperationController`).
+
+Liveview quality can be adjusted via the `LiveviewImageQuality` device property.
 
 -------------------------------------------------------------------------------
 ## 9) Media Transfer (PTP/IP)
@@ -330,6 +522,25 @@ Common handling:
 
 -------------------------------------------------------------------------------
 ## 12) Minimal Clean-room Implementation Checklist
+
+### Path A: BLE-Only Remote Shooting (simpler, no Wi-Fi)
+
+BLE:
+- Pair & bond with camera (required; unpaired devices are disconnected)
+- Enable "Bluetooth Rmt Ctrl" in camera settings
+- Connect GATT, discover service `8000FF00`
+- Subscribe to `FF02` notifications (focus/shutter/recording status)
+- Write commands to `FF01`:
+  - Still capture: `0x0107` → `0x0109` → `0x0108` → `0x0106`
+  - Video toggle: `0x010E`
+  - Zoom: `[0x02, 0x6D, speed]` / `[0x02, 0x6C, 0x00]`
+  - Focus: `[0x02, 0x47, speed]` / `[0x02, 0x46, 0x00]`
+- **Always** send matched Down/Up pairs; skipping Up leaves camera stuck
+
+Monitoring (optional, via `8000CC00` if accessible alongside `8000FF00`):
+- Subscribe to `CC10` (battery), `CC09` (status), `CC0F` (storage)
+
+### Path B: Full Wi-Fi/PTP/IP Remote Control (advanced features)
 
 BLE:
 - Scan for bonded camera BLE MAC
