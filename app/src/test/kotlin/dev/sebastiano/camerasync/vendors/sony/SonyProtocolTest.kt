@@ -1,6 +1,8 @@
 package dev.sebastiano.camerasync.vendors.sony
 
+import dev.sebastiano.camerasync.domain.model.BatteryPosition
 import dev.sebastiano.camerasync.domain.model.GpsLocation
+import dev.sebastiano.camerasync.domain.model.PowerSource
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.time.ZoneId
@@ -21,6 +23,7 @@ import org.junit.Test
  * - Big-Endian byte order for all multi-byte values (critical for Sony protocol)
  * - Decoding of both packet formats
  * - Edge cases and boundary conditions
+ * - Remote Control encoding and decoding
  *
  * See docs/sony/DATETIME_GPS_SYNC.md for protocol documentation.
  */
@@ -681,5 +684,119 @@ class SonyProtocolTest {
         // Timezone offset (bytes 11-12) - Split format
         assertEquals("TZ hours", 9.toByte(), encoded[11])
         assertEquals("TZ minutes", 0.toByte(), encoded[12])
+    }
+
+    // --- New Tests for Remote Control ---
+
+    @Test
+    fun `decodeBatteryInfo decodes correct percentage and position`() {
+        // [Flag, InfoLithium, Position(Body=1), Status, Level(BigEndian 4 bytes),
+        // PowerSource(last)]
+        // Example: 01 01 01 00 00 00 00 55 ... 00
+        val data = byteArrayOf(1, 1, 1, 0, 0, 0, 0, 85, 0)
+        val info = SonyProtocol.decodeBatteryInfo(data)
+
+        assertEquals(85, info.levelPercentage)
+        assertEquals(BatteryPosition.INTERNAL, info.position)
+        assertEquals(PowerSource.BATTERY, info.powerSource)
+        assertFalse(info.isCharging)
+    }
+
+    @Test
+    fun `decodeBatteryInfo detects USB power`() {
+        // PowerSource 0x03 = USB (last byte)
+        val data = byteArrayOf(1, 1, 1, 0, 0, 0, 0, 50, 3)
+        val info = SonyProtocol.decodeBatteryInfo(data)
+
+        assertEquals(50, info.levelPercentage)
+        assertEquals(PowerSource.USB, info.powerSource)
+        assertTrue(info.isCharging)
+    }
+
+    @Test
+    fun `decodeBatteryInfo position byte 0x02 yields GRIP_1`() {
+        val data = byteArrayOf(1, 1, 0x02, 0, 0, 0, 0, 50, 0)
+        val info = SonyProtocol.decodeBatteryInfo(data)
+        assertEquals(BatteryPosition.GRIP_1, info.position)
+    }
+
+    @Test
+    fun `decodeBatteryInfo position byte 0x03 yields GRIP_2`() {
+        val data = byteArrayOf(1, 1, 0x03, 0, 0, 0, 0, 50, 0)
+        val info = SonyProtocol.decodeBatteryInfo(data)
+        assertEquals(BatteryPosition.GRIP_2, info.position)
+    }
+
+    // Regression: Byte.toInt() sign-extends; bytes >= 0x80 become negative and must be masked with
+    // 0xFF
+    // so that when branches (0x01..0x03) are matched by unsigned value.
+    @Test
+    fun `decodeBatteryInfo position byte with high bit set yields UNKNOWN (sign extension regression)`() {
+        val data =
+            byteArrayOf(
+                1,
+                1,
+                0x80.toByte(), // without "and 0xFF" this would be -128 and never match 0x01..0x03
+                0,
+                0,
+                0,
+                0,
+                50,
+                0,
+            )
+        val info = SonyProtocol.decodeBatteryInfo(data)
+        assertEquals(BatteryPosition.UNKNOWN, info.position)
+    }
+
+    @Test
+    fun `decodeBatteryInfo power source byte with high bit set yields BATTERY (sign extension regression)`() {
+        val data =
+            byteArrayOf(
+                1,
+                1,
+                1,
+                0,
+                0,
+                0,
+                0,
+                50,
+                0x80.toByte(), // without "and 0xFF" would be -128; with mask 128, else -> BATTERY
+            )
+        val info = SonyProtocol.decodeBatteryInfo(data)
+        assertEquals(PowerSource.BATTERY, info.powerSource)
+    }
+
+    @Test
+    fun `decodeBatteryInfo power source 0x03 as byte yields USB (unsigned match regression)`() {
+        // 0x03.toByte().toInt() is 3; must match when (powerSourceByte) { 0x03 -> USB }
+        val data = byteArrayOf(1, 1, 1, 0, 0, 0, 0, 50, 0x03)
+        val info = SonyProtocol.decodeBatteryInfo(data)
+        assertEquals(PowerSource.USB, info.powerSource)
+    }
+
+    @Test
+    fun `decodeStorageInfo decodes presence and shots`() {
+        // [Status=1, Shots(BigEndian 100), Time(BigEndian 0)]
+        // 01, 00 00 00 64, 00 00 00 00
+        val data = byteArrayOf(1, 0, 0, 0, 0x64, 0, 0, 0, 0)
+        val info = SonyProtocol.decodeStorageInfo(data)
+
+        assertTrue(info.isPresent)
+        assertEquals(100, info.remainingShots)
+        assertFalse(info.isFull)
+    }
+
+    @Test
+    fun `encodeRemoteControlCommand encodes simple command`() {
+        // [0x01, Code]
+        val bytes = SonyProtocol.encodeRemoteControlCommand(SonyProtocol.RC_SHUTTER_FULL_PRESS)
+        assertArrayEquals(byteArrayOf(0x01, SonyProtocol.RC_SHUTTER_FULL_PRESS.toByte()), bytes)
+    }
+
+    @Test
+    fun `encodeRemoteControlCommand encodes command with parameter`() {
+        // [0x02, Code, Param]
+        val bytes = SonyProtocol.encodeRemoteControlCommand(SonyProtocol.RC_FOCUS_NEAR, 0x20)
+        assertArrayEquals(byteArrayOf(0x02, SonyProtocol.RC_FOCUS_NEAR.toByte(), 0x20), bytes)
     }
 }

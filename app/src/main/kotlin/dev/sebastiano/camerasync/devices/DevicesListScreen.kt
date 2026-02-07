@@ -53,6 +53,7 @@ fun DevicesListScreen(
     viewModel: DevicesListViewModel,
     onAddDeviceClick: () -> Unit,
     onViewLogsClick: () -> Unit,
+    onRemoteControlClick: (String) -> Unit,
 ) {
     val state by viewModel.state
     var deviceToUnpair by remember { mutableStateOf<PairedDeviceWithState?>(null) }
@@ -100,6 +101,7 @@ fun DevicesListScreen(
                 @SuppressLint("MissingPermission")
                 viewModel.retryConnection(device.device.macAddress)
             },
+            onRemoteControlClick = onRemoteControlClick,
             modifier = Modifier.padding(innerPadding),
         )
     }
@@ -237,6 +239,7 @@ private fun DevicesListContent(
     onDeviceEnabledChange: (PairedDeviceWithState, Boolean) -> Unit,
     onUnpairClick: (PairedDeviceWithState) -> Unit,
     onRetryClick: (PairedDeviceWithState) -> Unit,
+    onRemoteControlClick: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     when (state) {
@@ -279,6 +282,7 @@ private fun DevicesListContent(
                         onDeviceEnabledChange = onDeviceEnabledChange,
                         onUnpairClick = onUnpairClick,
                         onRetryClick = onRetryClick,
+                        onRemoteControlClick = onRemoteControlClick,
                     )
                 }
 

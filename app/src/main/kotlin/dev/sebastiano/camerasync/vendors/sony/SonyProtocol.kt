@@ -1,13 +1,20 @@
 package dev.sebastiano.camerasync.vendors.sony
 
+import dev.sebastiano.camerasync.domain.model.BatteryInfo
+import dev.sebastiano.camerasync.domain.model.BatteryPosition
+import dev.sebastiano.camerasync.domain.model.CameraMode
+import dev.sebastiano.camerasync.domain.model.FocusStatus
 import dev.sebastiano.camerasync.domain.model.GpsLocation
+import dev.sebastiano.camerasync.domain.model.PowerSource
+import dev.sebastiano.camerasync.domain.model.RecordingStatus
+import dev.sebastiano.camerasync.domain.model.ShutterStatus
+import dev.sebastiano.camerasync.domain.model.StorageInfo
 import dev.sebastiano.camerasync.domain.vendor.CameraProtocol
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.time.ZoneOffset
 import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter
-import kotlin.math.abs
 
 /**
  * Protocol implementation for Sony Alpha cameras.
@@ -257,4 +264,159 @@ object SonyProtocol : CameraProtocol {
 
     /** Creates the pairing initialization command. */
     fun createPairingInit(): ByteArray = byteArrayOf(0x06, 0x08, 0x01, 0x00, 0x00, 0x00, 0x00)
+
+    // --- New Methods ---
+
+    /** Decodes battery information from the CC10 characteristic. */
+    fun decodeBatteryInfo(bytes: ByteArray): BatteryInfo {
+        // Per-battery-pack: Enable(1) + InfoLithium(1) + Position(1) + Status(1) + Percentage(4) =
+        // 8 bytes. Power supply status is a separate byte after the pack(s), so minimum 9 bytes
+        // to include power source; with only 8 bytes we must not read bytes[7] as power source.
+        if (bytes.size < 8) {
+            return BatteryInfo(
+                0,
+                position = BatteryPosition.UNKNOWN,
+                powerSource = PowerSource.UNKNOWN,
+            )
+        }
+
+        val buffer = ByteBuffer.wrap(bytes).order(ByteOrder.BIG_ENDIAN)
+
+        // First battery block: Offset 0–3 metadata, Offset 4–7 percentage (4 bytes BigEndian).
+        buffer.position(4)
+        val percentage = buffer.int
+
+        val positionByte = bytes[2].toInt() and 0xFF
+        val position =
+            when (positionByte) {
+                0x01 -> BatteryPosition.INTERNAL
+                0x02 -> BatteryPosition.GRIP_1
+                0x03 -> BatteryPosition.GRIP_2
+                else -> BatteryPosition.UNKNOWN
+            }
+
+        // Power source is the byte after the 8-byte pack (index 8). Only read it when present.
+        val powerSource: PowerSource
+        if (bytes.size >= 9) {
+            val powerSourceByte = bytes[8].toInt() and 0xFF
+            powerSource =
+                when (powerSourceByte) {
+                    0x03 -> PowerSource.USB
+                    else -> PowerSource.BATTERY
+                }
+        } else {
+            powerSource = PowerSource.UNKNOWN
+        }
+
+        return BatteryInfo(
+            levelPercentage = percentage,
+            isCharging = powerSource == PowerSource.USB,
+            powerSource = powerSource,
+            position = position,
+        )
+    }
+
+    /** Decodes storage info from CC0F. */
+    fun decodeStorageInfo(bytes: ByteArray): StorageInfo {
+        // "Per-slot (Slot 1, Slot 2): Status, Remaining shots (4-byte), Remaining time (4-byte)"
+        // Status: 0=No Media, 1=Media Present, 2=Format Required? (Guessing based on description)
+        // Let's check docs again carefully.
+        // "Status: No Media / Media Present / Format Required" -> likely 1 byte enum.
+        // Remaining shots: 4 bytes.
+        // Remaining time: 4 bytes.
+        // Total per slot: 1+4+4 = 9 bytes.
+
+        if (bytes.size < 9) return StorageInfo(isPresent = false)
+
+        val buffer = ByteBuffer.wrap(bytes).order(ByteOrder.BIG_ENDIAN)
+
+        val status = buffer.get().toInt()
+        val shots = buffer.int
+        // val time = buffer.int // Remaining video seconds
+
+        // Status mapping (heuristic)
+        // 0x00: No Media
+        // 0x01: Ready
+        // 0x02: Format required / Error?
+        val isPresent = status > 0
+        val isFull = shots == 0 // heuristic
+
+        return StorageInfo(slot = 1, isPresent = isPresent, remainingShots = shots, isFull = isFull)
+    }
+
+    /**
+     * Decodes camera status from CC09 (TLV). Tag 0x0008 = Movie Recording (1=Started, 0=Stopped).
+     * Other tags ignored for BLE mode.
+     */
+    fun decodeCameraStatus(bytes: ByteArray): CameraMode {
+        var pos = 0
+        while (pos + 4 <= bytes.size) {
+            val tag = ((bytes[pos].toInt() and 0xFF) shl 8) or (bytes[pos + 1].toInt() and 0xFF)
+            val length =
+                ((bytes[pos + 2].toInt() and 0xFF) shl 8) or (bytes[pos + 3].toInt() and 0xFF)
+            pos += 4
+            if (pos + length > bytes.size) break
+            if (tag == 0x0008 && length >= 1) {
+                val value = bytes[pos].toInt() and 0xFF
+                return if (value == 1) CameraMode.MOVIE else CameraMode.STILL_IMAGE
+            }
+            pos += length
+        }
+        return CameraMode.UNKNOWN
+    }
+
+    /**
+     * FF02 notification format: [0x02, typeByte, valueByte]. Returns null if payload is not a
+     * recognized FF02 status.
+     */
+    fun parseFf02Notification(bytes: ByteArray): Ff02Notification? {
+        if (bytes.size < 3 || bytes[0].toInt() != 0x02) return null
+        val type = bytes[1].toInt() and 0xFF
+        val value = bytes[2].toInt() and 0xFF
+        return when (type) {
+            0x3F ->
+                Ff02Notification.Focus(if (value == 0x20) FocusStatus.LOCKED else FocusStatus.LOST)
+            0xA0 ->
+                Ff02Notification.Shutter(
+                    if (value == 0x20) ShutterStatus.ACTIVE else ShutterStatus.READY
+                )
+            0xD5 ->
+                Ff02Notification.Recording(
+                    if (value == 0x20) RecordingStatus.RECORDING else RecordingStatus.IDLE
+                )
+            else -> null
+        }
+    }
+
+    /** Parsed FF02 (RemoteNotify) notification payload. */
+    sealed class Ff02Notification {
+        data class Focus(val status: FocusStatus) : Ff02Notification()
+
+        data class Shutter(val status: ShutterStatus) : Ff02Notification()
+
+        data class Recording(val status: RecordingStatus) : Ff02Notification()
+    }
+
+    /**
+     * Encodes a remote control command for FF01.
+     *
+     * Format: [0x01, code] or [0x02, code, parameter]
+     */
+    fun encodeRemoteControlCommand(code: Int, parameter: Int? = null): ByteArray =
+        if (parameter != null) {
+            byteArrayOf(0x02, code.toByte(), parameter.toByte())
+        } else {
+            byteArrayOf(0x01, code.toByte())
+        }
+
+    // Remote Control Codes (FF01)
+    const val RC_SHUTTER_HALF_PRESS = 0x07
+    const val RC_SHUTTER_HALF_RELEASE = 0x06
+    const val RC_SHUTTER_FULL_PRESS = 0x09
+    const val RC_SHUTTER_FULL_RELEASE = 0x08
+    const val RC_VIDEO_REC = 0x0E
+    const val RC_FOCUS_NEAR = 0x47
+    const val RC_FOCUS_FAR = 0x45
+    const val RC_ZOOM_TELE = 0x6D
+    const val RC_ZOOM_WIDE = 0x6B
 }

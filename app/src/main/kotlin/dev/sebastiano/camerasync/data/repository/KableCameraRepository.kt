@@ -20,6 +20,7 @@ import dev.sebastiano.camerasync.domain.model.GpsLocation
 import dev.sebastiano.camerasync.domain.repository.CameraConnection
 import dev.sebastiano.camerasync.domain.repository.CameraRepository
 import dev.sebastiano.camerasync.domain.vendor.CameraVendorRegistry
+import dev.sebastiano.camerasync.domain.vendor.RemoteControlDelegate
 import dev.sebastiano.camerasync.domain.vendor.VendorConnectionDelegate
 import dev.sebastiano.camerasync.logging.KhronicleLogEngine
 import java.io.IOException
@@ -349,10 +350,10 @@ internal class KableCameraConnection(
 
     private val gattSpec = camera.vendor.gattSpec
     private val protocol = camera.vendor.protocol
-    private val capabilities = camera.vendor.getCapabilities()
+    private val syncCapabilities = camera.vendor.getRemoteControlCapabilities().sync
 
     override suspend fun initializePairing(): Boolean {
-        if (!capabilities.requiresVendorPairing) {
+        if (!syncCapabilities.requiresVendorPairing) {
             Log.info(tag = TAG) {
                 "${camera.vendor.vendorName} cameras do not require vendor-specific pairing"
             }
@@ -401,7 +402,7 @@ internal class KableCameraConnection(
     }
 
     override suspend fun readFirmwareVersion(): String {
-        if (!capabilities.supportsFirmwareVersion) {
+        if (!syncCapabilities.supportsFirmwareVersion) {
             throw UnsupportedOperationException(
                 "${camera.vendor.vendorName} cameras do not support firmware version reading"
             )
@@ -424,7 +425,7 @@ internal class KableCameraConnection(
     }
 
     override suspend fun readHardwareRevision(): String {
-        if (!capabilities.supportsHardwareRevision) {
+        if (!syncCapabilities.supportsHardwareRevision) {
             throw UnsupportedOperationException(
                 "${camera.vendor.vendorName} cameras do not support hardware revision reading"
             )
@@ -448,7 +449,7 @@ internal class KableCameraConnection(
     }
 
     override suspend fun setPairedDeviceName(name: String) {
-        if (!capabilities.supportsDeviceName) {
+        if (!syncCapabilities.supportsDeviceName) {
             throw UnsupportedOperationException(
                 "${camera.vendor.vendorName} cameras do not support setting paired device name"
             )
@@ -473,7 +474,7 @@ internal class KableCameraConnection(
 
     /** Syncs date/time to the camera. */
     override suspend fun syncDateTime(dateTime: ZonedDateTime) {
-        if (!capabilities.supportsDateTimeSync) {
+        if (!syncCapabilities.supportsDateTimeSync) {
             throw UnsupportedOperationException(
                 "${camera.vendor.vendorName} cameras do not support date/time synchronization"
             )
@@ -489,7 +490,7 @@ internal class KableCameraConnection(
     }
 
     override suspend fun readDateTime(): ByteArray {
-        if (!capabilities.supportsDateTimeSync) {
+        if (!syncCapabilities.supportsDateTimeSync) {
             throw UnsupportedOperationException(
                 "${camera.vendor.vendorName} cameras do not support date/time reading"
             )
@@ -510,7 +511,7 @@ internal class KableCameraConnection(
     }
 
     override suspend fun setGeoTaggingEnabled(enabled: Boolean) {
-        if (!capabilities.supportsGeoTagging) {
+        if (!syncCapabilities.supportsGeoTagging) {
             throw UnsupportedOperationException(
                 "${camera.vendor.vendorName} cameras do not support geo-tagging control"
             )
@@ -542,7 +543,7 @@ internal class KableCameraConnection(
     }
 
     override suspend fun isGeoTaggingEnabled(): Boolean {
-        if (!capabilities.supportsGeoTagging) {
+        if (!syncCapabilities.supportsGeoTagging) {
             throw UnsupportedOperationException(
                 "${camera.vendor.vendorName} cameras do not support geo-tagging"
             )
@@ -565,7 +566,7 @@ internal class KableCameraConnection(
 
     /** Syncs a GPS location to the camera. */
     override suspend fun syncLocation(location: GpsLocation) {
-        if (!capabilities.supportsLocationSync) {
+        if (!syncCapabilities.supportsLocationSync) {
             throw UnsupportedOperationException(
                 "${camera.vendor.vendorName} cameras do not support location synchronization"
             )
@@ -585,6 +586,30 @@ internal class KableCameraConnection(
         Log.info(tag = TAG) { "Disconnecting from ${camera.name}" }
         connectionDelegate.onDisconnecting(peripheral)
         peripheral.disconnect()
+    }
+
+    @Volatile private var remoteControlDelegate: RemoteControlDelegate? = null
+
+    @Volatile private var remoteControlDelegateCreationFailed: Boolean = false
+
+    private val remoteControlDelegateLock = Any()
+
+    @Suppress("TooGenericExceptionCaught")
+    override fun getRemoteControlDelegate(): RemoteControlDelegate? {
+        if (remoteControlDelegate != null) return remoteControlDelegate
+        if (remoteControlDelegateCreationFailed) return null
+        return synchronized(remoteControlDelegateLock) {
+            if (remoteControlDelegate != null) return@synchronized remoteControlDelegate
+            if (remoteControlDelegateCreationFailed) return@synchronized null
+            try {
+                remoteControlDelegate =
+                    camera.vendor.createRemoteControlDelegate(peripheral, camera)
+            } catch (e: RuntimeException) {
+                remoteControlDelegateCreationFailed = true
+                Log.error(tag = TAG, throwable = e) { "Failed to create RemoteControlDelegate" }
+            }
+            remoteControlDelegate
+        }
     }
 
     companion object {

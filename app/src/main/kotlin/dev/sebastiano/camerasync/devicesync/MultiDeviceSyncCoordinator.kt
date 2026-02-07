@@ -442,9 +442,9 @@ constructor(
     ): String? {
         Log.info(tag = TAG) { "Performing initial setup for ${device.macAddress}" }
 
-        val capabilities = connection.camera.vendor.getCapabilities()
+        val syncCapabilities = connection.camera.vendor.getRemoteControlCapabilities().sync
 
-        if (capabilities.supportsDeviceName) {
+        if (syncCapabilities.supportsDeviceName) {
             try {
                 val deviceName = connection.camera.vendor.getPairedDeviceName(deviceNameProvider)
                 connection.setPairedDeviceName(deviceName)
@@ -469,7 +469,7 @@ constructor(
         val gattSpec = connection.camera.vendor.gattSpec
         val usesUnifiedPacket =
             gattSpec.dateTimeCharacteristicUuid == gattSpec.locationCharacteristicUuid
-        val shouldSyncDateTime = capabilities.supportsDateTimeSync && !usesUnifiedPacket
+        val shouldSyncDateTime = syncCapabilities.supportsDateTimeSync && !usesUnifiedPacket
         if (shouldSyncDateTime) {
             try {
                 connection.syncDateTime(ZonedDateTime.now())
@@ -480,14 +480,14 @@ constructor(
                     "Failed to sync date time for ${device.macAddress}"
                 }
             }
-        } else if (capabilities.supportsDateTimeSync && usesUnifiedPacket) {
+        } else if (syncCapabilities.supportsDateTimeSync && usesUnifiedPacket) {
             Log.debug(tag = TAG) {
                 "Skipping initial date/time sync for ${device.macAddress} - " +
                     "camera uses unified time+location packets, will sync with first location update"
             }
         }
 
-        if (capabilities.supportsGeoTagging) {
+        if (syncCapabilities.supportsGeoTagging) {
             try {
                 connection.setGeoTaggingEnabled(true)
             } catch (e: CancellationException) {
@@ -500,7 +500,7 @@ constructor(
         }
 
         var firmwareVersion: String? = null
-        if (capabilities.supportsFirmwareVersion) {
+        if (syncCapabilities.supportsFirmwareVersion) {
             try {
                 firmwareVersion = connection.readFirmwareVersion()
                 pairedDevicesRepository.updateFirmwareVersion(device.macAddress, firmwareVersion)
@@ -699,7 +699,8 @@ constructor(
         connection: CameraConnection,
         location: GpsLocation,
     ) {
-        if (!connection.camera.vendor.getCapabilities().supportsLocationSync) return
+        if (!connection.camera.vendor.getRemoteControlCapabilities().sync.supportsLocationSync)
+            return
         try {
             connection.syncLocation(location)
             val now = System.currentTimeMillis()

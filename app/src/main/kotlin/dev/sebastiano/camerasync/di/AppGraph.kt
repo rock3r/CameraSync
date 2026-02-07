@@ -36,6 +36,7 @@ import dev.sebastiano.camerasync.pairing.AndroidBluetoothBondingChecker
 import dev.sebastiano.camerasync.pairing.BluetoothBondingChecker
 import dev.sebastiano.camerasync.pairing.CompanionDeviceManagerHelper
 import dev.sebastiano.camerasync.pairing.PairingViewModel
+import dev.sebastiano.camerasync.ui.remote.RemoteShootingViewModel
 import dev.sebastiano.camerasync.util.AndroidBatteryOptimizationChecker
 import dev.sebastiano.camerasync.util.AndroidDeviceNameProvider
 import dev.sebastiano.camerasync.util.BatteryOptimizationChecker
@@ -72,6 +73,8 @@ interface AppGraph {
     fun devicesListViewModel(): DevicesListViewModel
 
     fun pairingViewModel(): PairingViewModel
+
+    fun remoteShootingViewModel(): RemoteShootingViewModel
 
     fun logViewerViewModel(): LogViewerViewModel
 

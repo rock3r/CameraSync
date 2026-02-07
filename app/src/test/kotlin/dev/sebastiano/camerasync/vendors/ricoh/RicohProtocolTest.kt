@@ -1,9 +1,16 @@
 package dev.sebastiano.camerasync.vendors.ricoh
 
+import dev.sebastiano.camerasync.domain.model.BatteryPosition
+import dev.sebastiano.camerasync.domain.model.CameraMode
+import dev.sebastiano.camerasync.domain.model.CaptureStatus
+import dev.sebastiano.camerasync.domain.model.DriveMode
+import dev.sebastiano.camerasync.domain.model.ExposureMode
 import dev.sebastiano.camerasync.domain.model.GpsLocation
+import dev.sebastiano.camerasync.domain.model.PowerSource
 import java.time.ZoneId
 import java.time.ZonedDateTime
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -234,5 +241,92 @@ class RicohProtocolTest {
         assertThrows(IllegalArgumentException::class.java) {
             RicohProtocol.decodeGeoTaggingEnabled(byteArrayOf())
         }
+    }
+
+    // --- New Tests for Remote Control ---
+
+    @Test
+    fun `decodeBatteryInfo decodes correct percentage`() {
+        val info = RicohProtocol.decodeBatteryInfo(byteArrayOf(85))
+        assertEquals(85, info.levelPercentage)
+        assertEquals(BatteryPosition.INTERNAL, info.position)
+        assertEquals(PowerSource.BATTERY, info.powerSource)
+        assertFalse(info.isCharging)
+    }
+
+    @Test
+    fun `decodeStorageInfo decodes basic presence and remaining shots`() {
+        // Status 1 (present), Remaining 100 (0x64 00 00 00 LE)
+        val data = byteArrayOf(1, 0x64, 0, 0, 0)
+        val info = RicohProtocol.decodeStorageInfo(data)
+
+        assertTrue(info.isPresent)
+        assertEquals(100, info.remainingShots)
+        assertFalse(info.isFull)
+    }
+
+    @Test
+    fun `decodeStorageInfo detects full storage`() {
+        // Status 1 (present), Remaining 0
+        val data = byteArrayOf(1, 0, 0, 0, 0)
+        val info = RicohProtocol.decodeStorageInfo(data)
+
+        assertTrue(info.isPresent)
+        assertEquals(0, info.remainingShots)
+        assertTrue(info.isFull)
+    }
+
+    @Test
+    fun `decodeCaptureStatus detects countdown`() {
+        // Countdown = 1, Capturing = 0
+        val data = byteArrayOf(1, 0)
+        val status = RicohProtocol.decodeCaptureStatus(data)
+        assertTrue(status is CaptureStatus.Countdown)
+    }
+
+    @Test
+    fun `decodeCaptureStatus detects capturing`() {
+        // Countdown = 0, Capturing = 1
+        val data = byteArrayOf(0, 1)
+        val status = RicohProtocol.decodeCaptureStatus(data)
+        assertEquals(CaptureStatus.Capturing, status)
+    }
+
+    @Test
+    fun `decodeCaptureStatus detects idle`() {
+        // Countdown = 0, Capturing = 0
+        val data = byteArrayOf(0, 0)
+        val status = RicohProtocol.decodeCaptureStatus(data)
+        assertEquals(CaptureStatus.Idle, status)
+    }
+
+    @Test
+    fun `decodeShootingMode decodes Still + P`() {
+        // Mode 0 (Still), Exposure 0 (P)
+        val data = byteArrayOf(0, 0)
+        val (mode, exposure) = RicohProtocol.decodeShootingMode(data)
+        assertEquals(CameraMode.STILL_IMAGE, mode)
+        assertEquals(ExposureMode.PROGRAM_AUTO, exposure)
+    }
+
+    @Test
+    fun `decodeShootingMode decodes Movie + M`() {
+        // Mode 1 (Movie), Exposure 3 (M)
+        val data = byteArrayOf(1, 3)
+        val (mode, exposure) = RicohProtocol.decodeShootingMode(data)
+        assertEquals(CameraMode.MOVIE, mode)
+        assertEquals(ExposureMode.MANUAL, exposure)
+    }
+
+    @Test
+    fun `decodeDriveMode decodes Single`() {
+        val mode = RicohProtocol.decodeDriveMode(byteArrayOf(0))
+        assertEquals(DriveMode.SINGLE_SHOOTING, mode)
+    }
+
+    @Test
+    fun `decodeDriveMode decodes SelfTimer`() {
+        val mode = RicohProtocol.decodeDriveMode(byteArrayOf(2))
+        assertEquals(DriveMode.SELF_TIMER_2S, mode)
     }
 }

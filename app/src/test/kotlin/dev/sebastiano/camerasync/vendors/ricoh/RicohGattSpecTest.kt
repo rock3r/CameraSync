@@ -71,7 +71,7 @@ class RicohGattSpecTest {
     @Test
     fun `device name characteristic UUID matches specification`() {
         assertEquals(
-            Uuid.parse("fe3a32f8-a189-42de-a391-bc81ae4daa76"),
+            Uuid.parse("97e34da2-2e1a-405b-b80d-f8f0aa9cc51c"),
             RicohGattSpec.DeviceName.NAME_CHARACTERISTIC_UUID,
         )
     }
