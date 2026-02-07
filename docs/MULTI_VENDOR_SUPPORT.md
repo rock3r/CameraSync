@@ -13,19 +13,42 @@ to support new camera brands.
 1. **CameraVendor Interface** (`domain/vendor/CameraVendor.kt`)
     - Defines what each vendor must provide
     - Contains GATT specification, protocol encoder/decoder, and device recognition logic
+    - **New**: Creates a `VendorConnectionDelegate` to handle connection lifecycle
 
-2. **CameraVendorRegistry** (`domain/vendor/CameraVendorRegistry.kt`)
+2. **VendorConnectionDelegate** (`domain/vendor/VendorConnectionDelegate.kt`)
+    - **Primary Abstraction Point**: Encapsulates the entire connection and sync lifecycle
+    - Handles vendor-specific connection setup (MTU, handshake), sync logic (retries, locking), and disconnection cleanup
+    - `DefaultConnectionDelegate`: Base implementation for standard GATT write flows
+    - `SonyConnectionDelegate`: Complex implementation with locking, notifications, and retries
+
+3. **CameraVendorRegistry** (`domain/vendor/CameraVendorRegistry.kt`)
     - Manages all registered camera vendors
     - Identifies which vendor a discovered BLE device belongs to
-    - Provides scan filter UUIDs and name prefixes for all vendors
+    - Aggregates scan filter UUIDs and name prefixes for all vendors
 
-3. **Vendor Implementations** (`vendors/` package)
+4. **Vendor Implementations** (`vendors/` package)
     - Each vendor (Ricoh, Sony, etc.) has its own sub-package
-    - Contains vendor-specific GATT specs, protocol encoding, and capabilities
+    - Contains vendor-specific GATT specs, protocol encoding, capabilities, and connection delegates
 
-4. **Generic Domain Model**
-    - `Camera` (replaces `RicohCamera`) with vendor property
-    - Backward compatibility maintained via type alias
+5. **Generic Domain Model**
+    - `Camera` (replaces `RicohCamera`) with vendor property and generic `vendorMetadata` map
+
+## Connection Delegates
+
+The `VendorConnectionDelegate` is the core of the multi-vendor architecture. It allows vendors to take full control of how data is synchronized to the camera, rather than just providing data for a generic sync loop.
+
+### Why Delegates?
+Different vendors have vastly different connection requirements:
+- **Ricoh**: Simple GATT writes. Connect -> Write -> Done.
+- **Sony**: Complex state machine. Connect -> Request MTU 158 -> Subscribe to Notifications -> Write "Lock" command -> Write "Enable" command -> Read Capabilities -> Write Data -> Disconnect.
+
+The delegate pattern encapsulates this complexity within the vendor's implementation, keeping the core repository clean.
+
+### Standard Delegate Flow
+1. `KableCameraRepository` connects to the device
+2. Calls `delegate.onConnected()` (Sony uses this to enable services)
+3. Delegates `syncLocation()` and `syncDateTime()` calls directly to the delegate implementation
+4. Calls `delegate.onDisconnecting()` for cleanup
 
 ## Directory Structure
 
@@ -37,6 +60,8 @@ app/src/main/kotlin/dev/sebastiano/camerasync/
 │   │   └── ...
 │   ├── vendor/
 │   │   ├── CameraVendor.kt
+│   │   ├── VendorConnectionDelegate.kt  <-- New abstraction
+│   │   ├── DefaultConnectionDelegate.kt <-- Standard impl
 │   │   ├── CameraVendorRegistry.kt
 │   │   └── CameraGattSpec.kt
 │   └── repository/
@@ -48,6 +73,7 @@ app/src/main/kotlin/dev/sebastiano/camerasync/
 │   │   └── RicohProtocol.kt
 │   └── sony/
 │       ├── SonyCameraVendor.kt
+│       ├── SonyConnectionDelegate.kt    <-- Complex logic here
 │       ├── SonyGattSpec.kt
 │       └── SonyProtocol.kt
 ├── data/
@@ -62,152 +88,61 @@ app/src/main/kotlin/dev/sebastiano/camerasync/
 Follow these steps to add support for a new camera brand (e.g., Canon, Nikon):
 
 ### Step 1: Create Vendor Package
-
 Create a new package: `app/src/main/kotlin/dev/sebastiano/camerasync/vendors/[vendor-name]/`
 
 ### Step 2: Implement GATT Specification
-
-Create `[VendorName]GattSpec.kt` implementing `CameraGattSpec`:
-
-```kotlin
-@OptIn(ExperimentalUuidApi::class)
-object CanonGattSpec : CameraGattSpec {
-    // Scan filter UUIDs
-    override val scanFilterServiceUuids: List<Uuid> = listOf(
-        Uuid.parse("YOUR-CANON-SERVICE-UUID")
-    )
-
-    // Firmware service
-    override val firmwareServiceUuid: Uuid? = Uuid.parse("...")
-    override val firmwareVersionCharacteristicUuid: Uuid? = Uuid.parse("...")
-
-    // Device name service
-    override val deviceNameServiceUuid: Uuid? = Uuid.parse("...")
-    override val deviceNameCharacteristicUuid: Uuid? = Uuid.parse("...")
-
-    // DateTime service
-    override val dateTimeServiceUuid: Uuid? = Uuid.parse("...")
-    override val dateTimeCharacteristicUuid: Uuid? = Uuid.parse("...")
-
-    // Geo-tagging
-    override val geoTaggingCharacteristicUuid: Uuid? = Uuid.parse("...")
-
-    // Location service
-    override val locationServiceUuid: Uuid? = Uuid.parse("...")
-    override val locationCharacteristicUuid: Uuid? = Uuid.parse("...")
-}
-```
+Create `[VendorName]GattSpec.kt` implementing `CameraGattSpec` with service/characteristic UUIDs.
 
 ### Step 3: Implement Protocol Encoder/Decoder
+Create `[VendorName]Protocol.kt` implementing `CameraProtocol` to handle binary data formats.
 
-Create `[VendorName]Protocol.kt` implementing `CameraProtocol`:
+### Step 4: Implement Connection Delegate
+- If the camera uses standard GATT writes, you can use `DefaultConnectionDelegate`.
+- If the camera requires complex setup (auth, specific MTU, flow control), implement `VendorConnectionDelegate` or extend `DefaultConnectionDelegate`.
 
 ```kotlin
-object CanonProtocol : CameraProtocol {
-    override fun encodeDateTime(dateTime: ZonedDateTime): ByteArray {
-        // Implement Canon's specific date/time encoding
-    }
-
-    override fun decodeDateTime(bytes: ByteArray): String {
-        // Decode Canon's date/time format
-    }
-
-    override fun encodeLocation(location: GpsLocation): ByteArray {
-        // Implement Canon's specific GPS encoding
-    }
-
-    override fun decodeLocation(bytes: ByteArray): String {
-        // Decode Canon's location format
-    }
-
-    override fun encodeGeoTaggingEnabled(enabled: Boolean): ByteArray {
-        // Encode geo-tagging state
-    }
-
-    override fun decodeGeoTaggingEnabled(bytes: ByteArray): Boolean {
-        // Decode geo-tagging state
+class CanonConnectionDelegate : DefaultConnectionDelegate() {
+    // Optional: Override setup/teardown or sync logic if needed
+    override suspend fun onConnected(peripheral: Peripheral, camera: Camera) {
+        // Perform vendor-specific handshake
     }
 }
 ```
 
-### Step 4: Implement Camera Vendor
-
-Create `[VendorName]CameraVendor.kt` implementing `CameraVendor`:
+### Step 5: Implement Camera Vendor
+Create `[VendorName]CameraVendor.kt` implementing `CameraVendor`. Return your delegate in `createConnectionDelegate()`.
 
 ```kotlin
 @OptIn(ExperimentalUuidApi::class)
 object CanonCameraVendor : CameraVendor {
-    override val vendorId: String = "canon"
-    override val vendorName: String = "Canon"
-    override val gattSpec: CameraGattSpec = CanonGattSpec
-    override val protocol: CameraProtocol = CanonProtocol
+    // ... metadata ...
+    
+    override fun createConnectionDelegate(): VendorConnectionDelegate = CanonConnectionDelegate()
 
-    override fun recognizesDevice(
-        deviceName: String?,
-        serviceUuids: List<Uuid>,
-        manufacturerData: Map<Int, ByteArray>
-    ): Boolean {
-        // Identify Canon cameras by service UUID, device name, or manufacturer data
-        return serviceUuids.any { it in CanonGattSpec.scanFilterServiceUuids }
-            || deviceName?.startsWith("EOS", ignoreCase = true) == true
-    }
-
-    override fun getCapabilities(): CameraCapabilities {
-        return CameraCapabilities(
-            supportsFirmwareVersion = true,
-            supportsDeviceName = true,
-            supportsDateTimeSync = true,
-            supportsGeoTagging = true,
-            supportsLocationSync = true,
-        )
-    }
+    // ... recognition logic ...
 }
 ```
 
-### Step 5: Register Vendor
-
-Update `AppGraph.kt` to register the new vendor in the `provideVendorRegistry` method:
-
-> **Important**: Registering a new vendor automatically updates the global BLE scan filters. The
-`KableCameraRepository` queries the registry for all vendor UUIDs at startup. Ensure your vendor's
-`scanFilterServiceUuids` are correct, or the scanner will filter out your devices.
-
-```kotlin
-@Provides
-@SingleIn(AppGraph::class)
-fun provideVendorRegistry(): CameraVendorRegistry =
-    DefaultCameraVendorRegistry(
-        vendors = listOf(
-            RicohCameraVendor,
-            SonyCameraVendor,
-            // Add more vendors here:
-            // CanonCameraVendor,
-            // NikonCameraVendor,
-        )
-    )
-```
+### Step 6: Register Vendor
+Update `AppGraph.kt` to register the new vendor in the `provideVendorRegistry` method.
 
 ## How It Works
 
 ### BLE Scanning
-
 1. `KableCameraRepository` asks `CameraVendorRegistry` for all scan filter UUIDs
 2. Scanner is configured to listen for all registered vendor UUIDs
 3. When a device is discovered, the registry identifies which vendor it belongs to
 4. A `Camera` object is created with the appropriate vendor
 
 ### Connection & Communication
-
-1. `KableCameraRepository.connect()` returns a vendor-agnostic `CameraConnection`
-2. `KableCameraConnection` uses the camera's vendor GATT spec to find services/characteristics
-3. Data is encoded/decoded using the vendor's protocol implementation
-4. Unsupported features throw `UnsupportedOperationException` based on vendor capabilities
+1. `KableCameraRepository.connect()` creates a `KableCameraConnection`
+2. `KableCameraConnection` asks the vendor to create a `VendorConnectionDelegate`
+3. All sync operations (`syncLocation`, `syncDateTime`) are passed to the delegate
+4. The delegate handles the specific BLE interactions (encoding, writing, retrying)
+5. Unsupported features throw `UnsupportedOperationException` based on vendor capabilities
 
 ### Vendor Capabilities
-
-Different vendors support different features. The `CameraCapabilities` class defines what each
-vendor supports:
-
+Different vendors support different features. The `CameraCapabilities` class defines what each vendor supports:
 - Firmware version and hardware revision reading
 - Setting paired device name
 - Date/time synchronization
@@ -216,23 +151,7 @@ vendor supports:
 - Vendor-specific pairing initialization (e.g., Sony's EE01 write)
 
 ## Benefits
-
-✅ **Easy Extension**: Add new camera vendors by implementing 3 classes
-✅ **Vendor Isolation**: Each vendor's protocol is self-contained
-✅ **No Core Changes**: Adding vendors doesn't touch core sync logic
-✅ **Type Safety**: Compile-time checks ensure vendor implementations are complete
-✅ **Testability**: Each vendor can be tested independently
-✅ **Backward Compatible**: Existing Ricoh camera support remains functional
-
-## Testing a New Vendor
-
-1. Implement the vendor classes as described above
-2. Add unit tests in `app/src/test/kotlin/dev/sebastiano/camerasync/vendors/[vendor-name]/`
-3. Test protocol encoding/decoding with known byte sequences
-4. Test device recognition with various device names and service UUIDs
-5. Test with actual hardware if available
-
----
-
-**Note**: This architecture ensures that CameraSync can grow to support any BLE-enabled camera brand
-while maintaining a clean, testable codebase.
+✅ **Total Isolation**: Sony's complex locking logic stays in `SonyConnectionDelegate`
+✅ **Clean Core**: `KableCameraRepository` is ~300 lines lighter and simpler
+✅ **Flexibility**: Delegates can handle any weird connection flow (auth, keep-alives, split packets)
+✅ **Testability**: Delegates can be unit tested in isolation

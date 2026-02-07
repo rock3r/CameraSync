@@ -8,6 +8,7 @@ import dev.sebastiano.camerasync.domain.vendor.CameraCapabilities
 import dev.sebastiano.camerasync.domain.vendor.CameraGattSpec
 import dev.sebastiano.camerasync.domain.vendor.CameraProtocol
 import dev.sebastiano.camerasync.domain.vendor.CameraVendor
+import dev.sebastiano.camerasync.domain.vendor.VendorConnectionDelegate
 import java.util.regex.Pattern
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
@@ -41,8 +42,6 @@ object SonyCameraVendor : CameraVendor {
         manufacturerData: Map<Int, ByteArray>,
     ): Boolean {
         // Check 1: Sony manufacturer data with camera device type
-        // According to PROTOCOL_EN.md, Sony cameras advertise with manufacturer ID 0x012D
-        // and device type 0x0003 in the first bytes of manufacturer data
         if (isSonyCamera(manufacturerData)) {
             return true
         }
@@ -55,7 +54,6 @@ object SonyCameraVendor : CameraVendor {
         }
 
         // Check 3: Device name pattern matching (ILCE- prefix for Alpha cameras, DSC- for others)
-        // This is a fallback when neither manufacturer data nor service UUIDs are available
         val hasSonyName =
             deviceName?.let { name ->
                 SonyGattSpec.scanFilterDeviceNames.any { prefix ->
@@ -66,14 +64,20 @@ object SonyCameraVendor : CameraVendor {
         return hasSonyName
     }
 
-    /**
-     * Checks if the manufacturer data indicates a Sony camera.
-     *
-     * According to the Sony BLE protocol documentation, manufacturer data format:
-     * - Bytes 0-1: Device Type ID (0x0003 = Camera, little-endian in raw BLE data)
-     *
-     * Note: The manufacturer ID (0x012D) is the key in the map, already parsed by the BLE stack.
-     */
+    override fun parseAdvertisementMetadata(
+        manufacturerData: Map<Int, ByteArray>
+    ): Map<String, Any> {
+        val version = parseProtocolVersion(manufacturerData)
+        return if (version != null) {
+            mapOf("bleProtocolVersion" to version)
+        } else {
+            emptyMap()
+        }
+    }
+
+    override fun createConnectionDelegate(): VendorConnectionDelegate = SonyConnectionDelegate()
+
+    /** Checks if the manufacturer data indicates a Sony camera. */
     private fun isSonyCamera(manufacturerData: Map<Int, ByteArray>): Boolean {
         val sonyData = manufacturerData[SONY_MANUFACTURER_ID] ?: return false
 
@@ -85,19 +89,7 @@ object SonyCameraVendor : CameraVendor {
         return deviceType.toShort() == DEVICE_TYPE_CAMERA
     }
 
-    /**
-     * Parses the BLE protocol version from Sony manufacturer data.
-     *
-     * According to the Sony BLE protocol documentation, manufacturer data format:
-     * - Bytes 0-1: Device Type ID (0x0003 = Camera)
-     * - Bytes 2-3: Protocol Version (e.g., 0x64 = 100, 0x65 = 101)
-     * - Bytes 4-5: Model Code (ASCII, e.g., "E1" for e-mount)
-     *
-     * Protocol version >= 65 indicates the camera requires the DD30/DD31 unlock sequence for
-     * location sync to work.
-     *
-     * @return The protocol version, or null if not available.
-     */
+    /** Parses the BLE protocol version from Sony manufacturer data. */
     fun parseProtocolVersion(manufacturerData: Map<Int, ByteArray>): Int? {
         val sonyData = manufacturerData[SONY_MANUFACTURER_ID] ?: return null
 
@@ -105,8 +97,6 @@ object SonyCameraVendor : CameraVendor {
         if (sonyData.size < 4) return null
 
         // Protocol version is at bytes 2-3
-        // Based on the documentation example "64 00" = 0x0064 = 100
-        // The byte at index 2 appears to be the version directly
         return sonyData[2].toInt() and 0xFF
     }
 

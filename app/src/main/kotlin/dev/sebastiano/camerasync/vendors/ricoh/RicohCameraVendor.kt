@@ -8,6 +8,8 @@ import dev.sebastiano.camerasync.domain.vendor.CameraCapabilities
 import dev.sebastiano.camerasync.domain.vendor.CameraGattSpec
 import dev.sebastiano.camerasync.domain.vendor.CameraProtocol
 import dev.sebastiano.camerasync.domain.vendor.CameraVendor
+import dev.sebastiano.camerasync.domain.vendor.DefaultConnectionDelegate
+import dev.sebastiano.camerasync.domain.vendor.VendorConnectionDelegate
 import dev.sebastiano.camerasync.util.DeviceNameProvider
 import java.util.regex.Pattern
 import kotlin.uuid.ExperimentalUuidApi
@@ -53,6 +55,8 @@ object RicohCameraVendor : CameraVendor {
         // Accept device if it has the Ricoh service UUID or a recognized name
         return hasRicohService || hasRicohName
     }
+
+    override fun createConnectionDelegate(): VendorConnectionDelegate = DefaultConnectionDelegate()
 
     override fun getCapabilities(): CameraCapabilities {
         return CameraCapabilities(

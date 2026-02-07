@@ -16,36 +16,6 @@ import kotlin.math.abs
  * for full protocol documentation.
  *
  * IMPORTANT: All multi-byte integers are Big-Endian (Network Byte Order).
- *
- * Location packet structure (DD11):
- * - Bytes 0-1: Payload length (Big-Endian, excludes these 2 bytes)
- * - Bytes 2-4: Fixed header (0x08 0x02 0xFC)
- * - Byte 5: Timezone/DST flag (0x03 = include, 0x00 = omit)
- * - Bytes 6-7: Padding (zeros)
- * - Bytes 8-10: Fixed padding (0x10)
- * - Bytes 11-14: Latitude × 10,000,000 (signed int32, Big-Endian)
- * - Bytes 15-18: Longitude × 10,000,000 (signed int32, Big-Endian)
- * - Bytes 19-20: UTC Year (Big-Endian)
- * - Byte 21: UTC Month (1-12)
- * - Byte 22: UTC Day (1-31)
- * - Byte 23: UTC Hour (0-23)
- * - Byte 24: UTC Minute (0-59)
- * - Byte 25: UTC Second (0-59)
- * - Bytes 26-90: Padding (zeros)
- * - Bytes 91-92: Timezone offset in minutes (Big-Endian, only if flag is 0x03)
- * - Bytes 93-94: DST offset in minutes (Big-Endian, only if flag is 0x03)
- *
- * Time Area packet structure (CC13):
- * - Bytes 0-2: Header (0x0C 0x00 0x00)
- * - Bytes 3-4: Year (uint16, Big-Endian)
- * - Byte 5: Month (1-12)
- * - Byte 6: Day (1-31)
- * - Byte 7: Hour (0-23)
- * - Byte 8: Minute (0-59)
- * - Byte 9: Second (0-59)
- * - Byte 10: DST Flag (0=Standard, 1=DST)
- * - Byte 11: Timezone Offset Hours (int8, signed)
- * - Byte 12: Timezone Offset Minutes (uint8)
  */
 object SonyProtocol : CameraProtocol {
 
@@ -80,21 +50,6 @@ object SonyProtocol : CameraProtocol {
     /** Time Area Setting (CC13) header. */
     private val TIME_AREA_HEADER = byteArrayOf(0x0C, 0x00, 0x00)
 
-    /**
-     * Encodes date/time for Sony cameras using the Time Area Setting (CC13) characteristic.
-     *
-     * Payload structure (13 bytes):
-     * - Bytes 0-2: Header (0x0C 0x00 0x00)
-     * - Bytes 3-4: Year (uint16, Big-Endian)
-     * - Byte 5: Month (1-12)
-     * - Byte 6: Day (1-31)
-     * - Byte 7: Hour (0-23)
-     * - Byte 8: Minute (0-59)
-     * - Byte 9: Second (0-59)
-     * - Byte 10: DST Flag (0=Standard, 1=DST)
-     * - Byte 11: Timezone Offset Hours (int8, signed)
-     * - Byte 12: Timezone Offset Minutes (uint8)
-     */
     override fun encodeDateTime(dateTime: ZonedDateTime): ByteArray {
         val buffer = ByteBuffer.allocate(TIME_AREA_PACKET_SIZE).order(ByteOrder.BIG_ENDIAN)
 
@@ -115,12 +70,7 @@ object SonyProtocol : CameraProtocol {
         val isDst = dateTime.zone.rules.isDaylightSavings(dateTime.toInstant())
         buffer.put(if (isDst) 0x01.toByte() else 0x00.toByte())
 
-        // Timezone offset in split format:
-        // Byte 11: Signed hours (int8)
-        // Byte 12: Minutes (uint8)
-        // NOTE: Sony's implementation (BluetoothGattUtil.serializeTimeAreaData) has a bug where
-        // offsets between -01:00 and 00:00 (e.g., UTC-00:30) lose their sign because the hours
-        // byte becomes 0. We preserve this behavior for parity with the official app.
+        // Timezone offset
         val totalOffsetSeconds = dateTime.offset.totalSeconds
         val offsetHours = totalOffsetSeconds / 3600
         val offsetMinutes = kotlin.math.abs((totalOffsetSeconds % 3600) / 60)
@@ -157,9 +107,6 @@ object SonyProtocol : CameraProtocol {
         val tzHours = buffer.get().toInt() // signed
         val tzMinutes = buffer.get().toInt() and 0xFF
 
-        // Sony's encoding loses the sign for offsets between -01:00 and 00:00 (e.g., UTC-00:30
-        // becomes hours=0, mins=30). The decoding logic follows this, incorrectly treating
-        // such offsets as positive.
         val offsetSeconds = tzHours * 3600 + (if (tzHours >= 0) tzMinutes else -tzMinutes) * 60
         val offset = ZoneOffset.ofTotalSeconds(offsetSeconds)
         val dateTime = ZonedDateTime.of(year, month, day, hour, minute, second, 0, offset)
@@ -184,12 +131,12 @@ object SonyProtocol : CameraProtocol {
         return dateTime.format(DateTimeFormatter.ISO_ZONED_DATE_TIME)
     }
 
-    override fun encodeLocation(location: GpsLocation, includeTimezone: Boolean): ByteArray {
+    override fun encodeLocation(location: GpsLocation): ByteArray {
         return encodeLocationPacket(
             latitude = location.latitude,
             longitude = location.longitude,
             dateTime = location.timestamp,
-            includeTimezone = includeTimezone,
+            includeTimezone = true, // Default to including timezone for backward compatibility
         )
     }
 
@@ -220,7 +167,6 @@ object SonyProtocol : CameraProtocol {
         return "Lat: $latitude, Lon: $longitude, Time: $dateTimeStr"
     }
 
-    // Sony doesn't have a separate geo-tagging toggle characteristic.
     override fun encodeGeoTaggingEnabled(enabled: Boolean): ByteArray = byteArrayOf()
 
     override fun decodeGeoTaggingEnabled(bytes: ByteArray): Boolean = false
@@ -231,11 +177,6 @@ object SonyProtocol : CameraProtocol {
      * Encodes a complete location packet for Sony cameras.
      *
      * IMPORTANT: All multi-byte integers are Big-Endian (Network Byte Order).
-     *
-     * @param latitude Latitude in degrees (-90 to 90)
-     * @param longitude Longitude in degrees (-180 to 180)
-     * @param dateTime The timestamp to encode
-     * @param includeTimezone Whether to include timezone/DST offset data
      */
     fun encodeLocationPacket(
         latitude: Double,
@@ -244,7 +185,6 @@ object SonyProtocol : CameraProtocol {
         includeTimezone: Boolean,
     ): ByteArray {
         // DD11 uses UTC time (unlike CC13 which uses local time)
-        // Per Sony decompiled code: Calendar.getInstance(TimeZone.getTimeZone("UTC"))
         val utcDateTime = dateTime.withZoneSameInstant(ZoneOffset.UTC)
 
         // Get system timezone for the timezone offset fields
@@ -292,58 +232,29 @@ object SonyProtocol : CameraProtocol {
 
         // Timezone and DST offsets (if included, Big-Endian)
         if (includeTimezone) {
-            // Calculate DST offset (difference between actual and standard offset)
             val dstOffsetSeconds = actualOffset.totalSeconds - standardOffset.totalSeconds
             val dstOffsetMinutes = dstOffsetSeconds / 60
-
-            // Standard timezone offset in minutes (without DST)
             val tzOffsetMinutes = standardOffset.totalSeconds / 60
 
-            // Timezone offset in total minutes (int16, Big-Endian)
             buffer.putShort(tzOffsetMinutes.toShort())
-            // DST offset in minutes (int16, Big-Endian)
             buffer.putShort(dstOffsetMinutes.toShort())
         }
 
         return buffer.array()
     }
 
-    /**
-     * Parses a configuration response from DD21 to determine if timezone data is supported.
-     *
-     * Detection Logic (per Sony protocol documentation):
-     * 1. Read characteristic 0000DD21 (Camera Info)
-     * 2. Check the 5th byte (index 4) of the returned array
-     * 3. Perform a bitwise AND with 0x02 (Bit 1)
-     *     - If (Byte[4] & 0x02) == 0x02: Timezone is supported. Use 95-byte payload.
-     *     - If (Byte[4] & 0x02) == 0x00: Timezone is not supported. Use 91-byte payload.
-     *
-     * @return true if timezone/DST data should be included in location packets (95-byte payload),
-     *   false if timezone is not supported (91-byte payload)
-     */
+    /** Parses a configuration response from DD21 to determine if timezone data is supported. */
     fun parseConfigRequiresTimezone(bytes: ByteArray): Boolean {
         if (bytes.size < 5) return false
         return (bytes[4].toInt() and 0x02) != 0
     }
 
-    /**
-     * Creates the status notification enable command.
-     *
-     * Write this to DD01 to enable status notifications.
-     */
+    /** Creates the status notification enable command. */
     fun createStatusNotifyEnable(): ByteArray = byteArrayOf(0x03, 0x01, 0x02, 0x01)
 
-    /**
-     * Creates the status notification disable command.
-     *
-     * Write this to DD01 to disable status notifications.
-     */
+    /** Creates the status notification disable command. */
     fun createStatusNotifyDisable(): ByteArray = byteArrayOf(0x03, 0x01, 0x02, 0x00)
 
-    /**
-     * Creates the pairing initialization command.
-     *
-     * Write this to EE01 when the camera is in pairing mode.
-     */
+    /** Creates the pairing initialization command. */
     fun createPairingInit(): ByteArray = byteArrayOf(0x06, 0x08, 0x01, 0x00, 0x00, 0x00, 0x00)
 }

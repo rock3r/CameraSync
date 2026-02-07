@@ -1,9 +1,11 @@
 package dev.sebastiano.camerasync.vendors.ricoh
 
+import dev.sebastiano.camerasync.domain.vendor.DefaultConnectionDelegate
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -104,6 +106,30 @@ class RicohCameraVendorTest {
     @Test
     fun `protocol is RicohProtocol`() {
         assertEquals(RicohProtocol, RicohCameraVendor.protocol)
+    }
+
+    // Connection delegate tests
+
+    @Test
+    fun `createConnectionDelegate returns DefaultConnectionDelegate`() {
+        val delegate = RicohCameraVendor.createConnectionDelegate()
+        assertTrue(
+            "Ricoh should use DefaultConnectionDelegate, got ${delegate::class.simpleName}",
+            delegate is DefaultConnectionDelegate,
+        )
+    }
+
+    @Test
+    fun `createConnectionDelegate returns a new instance each time`() {
+        val delegate1 = RicohCameraVendor.createConnectionDelegate()
+        val delegate2 = RicohCameraVendor.createConnectionDelegate()
+        assertTrue("Each call should return a new instance", delegate1 !== delegate2)
+    }
+
+    @Test
+    fun `createConnectionDelegate returns delegate with null MTU`() {
+        val delegate = RicohCameraVendor.createConnectionDelegate()
+        assertNull("Ricoh delegate should not request a specific MTU", delegate.mtu)
     }
 
     // Model extraction tests
