@@ -101,31 +101,50 @@ fun PairingScreen(
     ) { innerPadding ->
         Box(modifier = Modifier.padding(innerPadding)) {
             when (val currentState = state) {
-                is PairingScreenState.Idle -> {
-                    IdleContent(
+                is PairingScreenState.Scanning -> {
+                    ScanningContent(
                         modifier = Modifier.fillMaxSize(),
-                        onStartPairing = { viewModel.requestCompanionPairing() },
+                        devices = currentState.devices,
+                        onPairClick = { viewModel.requestCompanionPairing(it) },
                     )
                 }
 
-                is PairingScreenState.AlreadyBonded -> {
-                    AlreadyBondedContent(
-                        modifier = Modifier.fillMaxSize(),
-                        removeFailed = currentState.removeFailed,
-                        onRemoveBond = { viewModel.removeBondAndRetry(currentState.camera) },
-                        onCancel = { viewModel.cancelPairing() },
-                    )
+                is PairingScreenState.Associating -> {
+                    AssociatingContent(modifier = Modifier.fillMaxSize())
                 }
 
-                is PairingScreenState.Pairing -> {
-                    PairingContent(
+                is PairingScreenState.Bonding -> {
+                    BondingContent(modifier = Modifier.fillMaxSize())
+                }
+
+                is PairingScreenState.Connecting -> {
+                    ConnectingContent(
                         modifier = Modifier.fillMaxSize(),
                         deviceName = currentState.camera.name ?: currentState.camera.macAddress,
+                    )
+                }
+
+                is PairingScreenState.Success -> {
+                    SuccessContent(
+                        modifier = Modifier.fillMaxSize(),
+                        deviceName = currentState.camera.name ?: currentState.camera.macAddress,
+                        onClose = { viewModel.manualCloseSuccess() },
+                    )
+                }
+
+                is PairingScreenState.Error -> {
+                    ErrorContent(
+                        modifier = Modifier.fillMaxSize(),
                         error = currentState.error,
-                        onRetry = {
-                            viewModel.pairDevice(currentState.camera, allowExistingBond = true)
-                        },
+                        canRetry = currentState.canRetry,
                         onCancel = { viewModel.cancelPairing() },
+                        onRetry = {
+                            if (currentState.canRetry) {
+                                viewModel.removeBondAndRetry(currentState.camera)
+                            } else {
+                                viewModel.cancelPairing()
+                            }
+                        },
                     )
                 }
             }

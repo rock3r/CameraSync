@@ -7,7 +7,6 @@ import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -17,10 +16,14 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
+import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -30,7 +33,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.res.painterResource
@@ -41,57 +43,149 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import dev.sebastiano.camerasync.R
+import dev.sebastiano.camerasync.domain.model.Camera
 import dev.sebastiano.camerasync.ui.theme.CameraSyncTheme
-import dev.sebastiano.camerasync.ui.theme.DarkElectricBlue
-import dev.sebastiano.camerasync.ui.theme.ElectricBlue
 
 @Composable
-internal fun IdleContent(modifier: Modifier = Modifier, onStartPairing: () -> Unit) {
+internal fun ScanningContent(
+    modifier: Modifier = Modifier,
+    devices: List<DiscoveredCameraUi>,
+    onPairClick: (Camera) -> Unit,
+) {
     Box(modifier = modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            modifier = Modifier.padding(32.dp),
-        ) {
-            PulsingBluetoothIcon(size = 96.dp, iconSize = 48.dp)
-
-            Spacer(Modifier.height(24.dp))
-
-            Text(
-                stringResource(R.string.ready_to_pair_title),
-                style = MaterialTheme.typography.headlineMedium,
-                fontWeight = FontWeight.Bold,
-            )
-
-            Spacer(Modifier.height(12.dp))
-
-            Text(
-                stringResource(R.string.ready_to_pair_subtitle),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                textAlign = TextAlign.Center,
-            )
-
-            Spacer(Modifier.height(24.dp))
-
-            Button(onClick = onStartPairing) {
-                Icon(
-                    painterResource(R.drawable.ic_bluetooth_searching_24dp),
-                    contentDescription = null,
-                    modifier = Modifier.size(18.dp),
-                )
-                Spacer(Modifier.width(8.dp))
-                Text(stringResource(R.string.action_pair_system))
+        if (devices.isEmpty()) {
+            EmptyScanningState()
+        } else {
+            LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = androidx.compose.foundation.layout.PaddingValues(vertical = 16.dp),
+            ) {
+                items(devices, key = { it.camera.macAddress }) { deviceUi ->
+                    DiscoveredDeviceRow(deviceUi, onPairClick)
+                }
             }
         }
     }
 }
 
 @Composable
-internal fun AlreadyBondedContent(
+private fun EmptyScanningState() {
+    Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(32.dp)) {
+        PulsingBluetoothIcon(size = 96.dp, iconSize = 48.dp)
+
+        Spacer(Modifier.height(24.dp))
+
+        Text(
+            stringResource(R.string.pairing_state_scanning),
+            style = MaterialTheme.typography.headlineMedium,
+            fontWeight = FontWeight.Bold,
+            textAlign = TextAlign.Center,
+        )
+
+        Spacer(Modifier.height(12.dp))
+
+        Text(
+            stringResource(R.string.ready_to_pair_subtitle),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center,
+        )
+    }
+}
+
+@Composable
+private fun DiscoveredDeviceRow(deviceUi: DiscoveredCameraUi, onPairClick: (Camera) -> Unit) {
+    ListItem(
+        headlineContent = {
+            Text(
+                text = "${deviceUi.make} ${deviceUi.model}",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+            )
+        },
+        supportingContent = {
+            Text(text = deviceUi.camera.macAddress, style = MaterialTheme.typography.bodySmall)
+        },
+        leadingContent = {
+            Icon(
+                painterResource(
+                    R.drawable.ic_photo_camera_24dp
+                ), // Ensure this drawable exists or use fallback
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+            )
+        },
+        trailingContent = {
+            if (deviceUi.isProbingModel) {
+                CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
+            } else {
+                FilledTonalButton(onClick = { onPairClick(deviceUi.camera) }) {
+                    Text(stringResource(R.string.action_pair))
+                }
+            }
+        },
+    )
+}
+
+@Composable
+internal fun AssociatingContent(modifier: Modifier = Modifier) {
+    Box(modifier = modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            modifier = Modifier.padding(32.dp),
+        ) {
+            CircularProgressIndicator()
+            Spacer(Modifier.height(24.dp))
+            Text(
+                stringResource(R.string.pairing_state_associating),
+                style = MaterialTheme.typography.titleLarge,
+                textAlign = TextAlign.Center,
+            )
+        }
+    }
+}
+
+@Composable
+internal fun BondingContent(modifier: Modifier = Modifier) {
+    Box(modifier = modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            modifier = Modifier.padding(32.dp),
+        ) {
+            CircularProgressIndicator()
+            Spacer(Modifier.height(24.dp))
+            Text(
+                stringResource(R.string.pairing_state_bonding),
+                style = MaterialTheme.typography.titleLarge,
+                textAlign = TextAlign.Center,
+            )
+        }
+    }
+}
+
+@Composable
+internal fun ConnectingContent(modifier: Modifier = Modifier, deviceName: String) {
+    Box(modifier = modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            modifier = Modifier.padding(32.dp),
+        ) {
+            CircularProgressIndicator()
+            Spacer(Modifier.height(24.dp))
+            Text(
+                stringResource(R.string.pairing_state_connecting, deviceName),
+                style = MaterialTheme.typography.titleLarge,
+                textAlign = TextAlign.Center,
+            )
+        }
+    }
+}
+
+@Composable
+internal fun SuccessContent(
     modifier: Modifier = Modifier,
-    removeFailed: Boolean,
-    onRemoveBond: () -> Unit,
-    onCancel: () -> Unit,
+    deviceName: String,
+    onClose: () -> Unit,
 ) {
     Box(modifier = modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         Column(
@@ -99,31 +193,87 @@ internal fun AlreadyBondedContent(
             modifier = Modifier.padding(32.dp),
         ) {
             Icon(
-                painterResource(R.drawable.ic_settings_24dp),
+                painterResource(R.drawable.ic_check_circle_24dp), // Ensure this exists
                 contentDescription = null,
-                modifier = Modifier.size(64.dp),
+                modifier = Modifier.size(96.dp),
                 tint = MaterialTheme.colorScheme.primary,
             )
 
             Spacer(Modifier.height(24.dp))
 
             Text(
-                stringResource(R.string.bonded_dialog_title),
+                stringResource(R.string.pairing_state_success, deviceName),
                 style = MaterialTheme.typography.headlineMedium,
                 fontWeight = FontWeight.Bold,
+                textAlign = TextAlign.Center,
             )
 
             Spacer(Modifier.height(12.dp))
 
             Text(
-                text =
-                    if (removeFailed) {
-                        stringResource(R.string.bonded_dialog_remove_failed)
-                    } else {
-                        stringResource(R.string.bonded_dialog_message)
-                    },
+                stringResource(R.string.pairing_state_success_subtitle),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center,
+            )
+
+            Spacer(Modifier.height(32.dp))
+
+            Button(onClick = onClose) { Text(stringResource(R.string.action_close)) }
+        }
+    }
+}
+
+@Composable
+internal fun ErrorContent(
+    modifier: Modifier = Modifier,
+    error: PairingError,
+    canRetry: Boolean,
+    onCancel: () -> Unit,
+    onRetry: () -> Unit,
+) {
+    Box(modifier = modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            modifier = Modifier.padding(32.dp),
+        ) {
+            Icon(
+                painterResource(R.drawable.ic_error_24dp),
+                contentDescription = null,
+                modifier = Modifier.size(64.dp),
+                tint = MaterialTheme.colorScheme.error,
+            )
+
+            Spacer(Modifier.height(24.dp))
+
+            Text(
+                stringResource(R.string.pairing_failed_title),
+                style = MaterialTheme.typography.headlineMedium,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.error,
+            )
+
+            Spacer(Modifier.height(12.dp))
+
+            val errorText =
+                when (error) {
+                    PairingError.REJECTED -> stringResource(R.string.error_pairing_rejected)
+                    PairingError.TIMEOUT -> stringResource(R.string.error_pairing_timeout)
+                    PairingError.UNKNOWN -> stringResource(R.string.error_pairing_unknown)
+                }
+            Text(
+                text = errorText,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center,
+            )
+
+            Spacer(Modifier.height(12.dp))
+
+            Text(
+                text = stringResource(R.string.pairing_error_instruction),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
                 textAlign = TextAlign.Center,
             )
 
@@ -132,168 +282,14 @@ internal fun AlreadyBondedContent(
             Row {
                 TextButton(onClick = onCancel) { Text(stringResource(R.string.action_cancel)) }
 
-                Spacer(Modifier.width(16.dp))
-
-                if (!removeFailed) {
-                    Button(onClick = onRemoveBond) {
-                        Text(
-                            stringResource(R.string.action_remove_pairing),
-                            fontWeight = FontWeight.SemiBold,
-                        )
-                    }
-                } else {
-                    TextButton(onClick = onCancel) {
-                        Text(stringResource(R.string.action_ok), fontWeight = FontWeight.SemiBold)
+                if (canRetry) {
+                    Spacer(Modifier.width(16.dp))
+                    Button(onClick = onRetry) {
+                        Text(stringResource(R.string.action_unpair_and_restart))
                     }
                 }
             }
         }
-    }
-}
-
-@Composable
-internal fun PairingContent(
-    modifier: Modifier = Modifier,
-    deviceName: String,
-    error: PairingError?,
-    onRetry: () -> Unit,
-    onCancel: () -> Unit,
-) {
-    Box(modifier = modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        if (error != null) {
-            PairingFailed(error, onCancel, onRetry)
-        } else {
-            PairingInProgress(deviceName, onCancel)
-        }
-    }
-}
-
-@Composable
-internal fun PairingFailed(error: PairingError, onCancel: () -> Unit, onRetry: () -> Unit) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(32.dp)) {
-        val pulseAlpha = rememberPulseAlpha(initialValue = 0.7f, targetValue = 1f, duration = 1500)
-
-        Box(
-            modifier =
-                Modifier.size(96.dp)
-                    .clip(CircleShape)
-                    .background(
-                        MaterialTheme.colorScheme.errorContainer.copy(alpha = pulseAlpha * 0.3f)
-                    ),
-            contentAlignment = Alignment.Center,
-        ) {
-            Icon(
-                painterResource(R.drawable.ic_error_24dp),
-                contentDescription = null,
-                modifier = Modifier.size(48.dp),
-                tint = MaterialTheme.colorScheme.error,
-            )
-        }
-
-        Spacer(Modifier.height(24.dp))
-
-        Text(
-            stringResource(R.string.pairing_failed_title),
-            style = MaterialTheme.typography.headlineMedium,
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.error,
-        )
-
-        Spacer(Modifier.height(12.dp))
-
-        val errorText =
-            when (error) {
-                PairingError.REJECTED -> stringResource(R.string.error_pairing_rejected)
-                PairingError.TIMEOUT -> stringResource(R.string.error_pairing_timeout)
-                PairingError.UNKNOWN -> stringResource(R.string.error_pairing_unknown)
-            }
-        Text(
-            text = errorText,
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            textAlign = TextAlign.Center,
-        )
-
-        Spacer(Modifier.height(32.dp))
-
-        Row {
-            TextButton(onClick = onCancel) { Text(stringResource(R.string.action_cancel)) }
-
-            Spacer(Modifier.width(16.dp))
-
-            TextButton(onClick = onRetry) {
-                Text(stringResource(R.string.action_retry), fontWeight = FontWeight.SemiBold)
-            }
-        }
-    }
-}
-
-@Composable
-internal fun PairingInProgress(deviceName: String, onCancel: () -> Unit) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(32.dp)) {
-        val infiniteTransition = rememberInfiniteTransition(label = "pairing_animation")
-        val rotation by
-            infiniteTransition.animateFloat(
-                initialValue = 0f,
-                targetValue = 360f,
-                animationSpec =
-                    InfiniteRepeatableSpec(
-                        animation = tween(2000, easing = EaseInOut),
-                        repeatMode = RepeatMode.Restart,
-                    ),
-                label = "rotation",
-            )
-        val pulseScale =
-            rememberPulseAlpha(initialValue = 0.95f, targetValue = 1.05f, duration = 1500)
-
-        val haloColor = if (isSystemInDarkTheme()) DarkElectricBlue else ElectricBlue
-
-        Box(
-            modifier =
-                Modifier.size(120.dp)
-                    .scale(pulseScale)
-                    .clip(CircleShape)
-                    .background(
-                        Brush.radialGradient(
-                            colors =
-                                listOf(haloColor.copy(alpha = 0.4f), haloColor.copy(alpha = 0.1f))
-                        )
-                    ),
-            contentAlignment = Alignment.Center,
-        ) {
-            CircularProgressIndicator(
-                modifier = Modifier.size(80.dp),
-                strokeWidth = 4.dp,
-                color = MaterialTheme.colorScheme.primary,
-            )
-            Icon(
-                painterResource(R.drawable.ic_bluetooth_searching_24dp),
-                contentDescription = null,
-                modifier = Modifier.rotate(rotation).size(40.dp),
-                tint = MaterialTheme.colorScheme.primary,
-            )
-        }
-
-        Spacer(Modifier.height(32.dp))
-
-        Text(
-            stringResource(R.string.pairing_in_progress_title, deviceName),
-            style = MaterialTheme.typography.headlineSmall,
-            fontWeight = FontWeight.SemiBold,
-        )
-
-        Spacer(Modifier.height(12.dp))
-
-        Text(
-            stringResource(R.string.pairing_in_progress_subtitle),
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            textAlign = TextAlign.Center,
-        )
-
-        Spacer(Modifier.height(32.dp))
-
-        TextButton(onClick = onCancel) { Text(stringResource(R.string.action_cancel)) }
     }
 }
 
@@ -364,46 +360,74 @@ private fun PulsingBluetoothIcon(size: Dp, iconSize: Dp) {
 
 // Previews
 
-@Preview(name = "Idle State", showBackground = true)
+@Preview(name = "Scanning State - Empty", showBackground = true)
 @Composable
-private fun IdleContentPreview() {
-    CameraSyncTheme { IdleContent(onStartPairing = {}) }
+private fun ScanningEmptyPreview() {
+    CameraSyncTheme { ScanningContent(devices = emptyList(), onPairClick = {}) }
 }
 
-@Preview(name = "Already Bonded State", showBackground = true)
+@Preview(name = "Scanning State - Results", showBackground = true)
 @Composable
-private fun AlreadyBondedContentPreview() {
-    CameraSyncTheme { AlreadyBondedContent(removeFailed = false, onRemoveBond = {}, onCancel = {}) }
+private fun ScanningResultsPreview() {
+    val devices =
+        listOf(
+            DiscoveredCameraUi(
+                camera =
+                    Camera(
+                        "id1",
+                        "GR IIIx",
+                        "mac1",
+                        dev.sebastiano.camerasync.vendors.ricoh.RicohCameraVendor,
+                    ),
+                make = "Ricoh",
+                model = "GR IIIx",
+            ),
+            DiscoveredCameraUi(
+                camera =
+                    Camera(
+                        "id2",
+                        "ILCE-7M4",
+                        "mac2",
+                        dev.sebastiano.camerasync.vendors.sony.SonyCameraVendor,
+                    ),
+                make = "Sony",
+                model = "ILCE-7M4",
+                isProbingModel = true,
+            ),
+        )
+    CameraSyncTheme { ScanningContent(devices = devices, onPairClick = {}) }
 }
 
-@Preview(name = "Already Bonded State - Remove Failed", showBackground = true)
+@Preview(name = "Associating State", showBackground = true)
 @Composable
-private fun AlreadyBondedContentFailedPreview() {
-    CameraSyncTheme { AlreadyBondedContent(removeFailed = true, onRemoveBond = {}, onCancel = {}) }
+private fun AssociatingPreview() {
+    CameraSyncTheme { AssociatingContent() }
 }
 
-@Preview(name = "Pairing In Progress", showBackground = true)
+@Preview(name = "Bonding State", showBackground = true)
 @Composable
-private fun PairingInProgressPreview() {
-    CameraSyncTheme { PairingInProgress(deviceName = "GR IIIx", onCancel = {}) }
+private fun BondingPreview() {
+    CameraSyncTheme { BondingContent() }
 }
 
-@Preview(name = "Pairing Failed - Rejected", showBackground = true)
+@Preview(name = "Connecting State", showBackground = true)
 @Composable
-private fun PairingFailedRejectedPreview() {
-    CameraSyncTheme { PairingFailed(error = PairingError.REJECTED, onCancel = {}, onRetry = {}) }
+private fun ConnectingPreview() {
+    CameraSyncTheme { ConnectingContent(deviceName = "GR IIIx") }
 }
 
-@Preview(name = "Pairing Failed - Timeout", showBackground = true)
+@Preview(name = "Success State", showBackground = true)
 @Composable
-private fun PairingFailedTimeoutPreview() {
-    CameraSyncTheme { PairingFailed(error = PairingError.TIMEOUT, onCancel = {}, onRetry = {}) }
+private fun SuccessPreview() {
+    CameraSyncTheme { SuccessContent(deviceName = "GR IIIx", onClose = {}) }
 }
 
-@Preview(name = "Pairing Failed - Unknown", showBackground = true)
+@Preview(name = "Error State", showBackground = true)
 @Composable
-private fun PairingFailedUnknownPreview() {
-    CameraSyncTheme { PairingFailed(error = PairingError.UNKNOWN, onCancel = {}, onRetry = {}) }
+private fun ErrorPreview() {
+    CameraSyncTheme {
+        ErrorContent(error = PairingError.TIMEOUT, canRetry = true, onCancel = {}, onRetry = {})
+    }
 }
 
 @Preview(name = "Pulsing Bluetooth Icon", showBackground = true)

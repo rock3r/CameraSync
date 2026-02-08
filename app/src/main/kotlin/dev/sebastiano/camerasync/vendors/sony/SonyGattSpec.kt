@@ -127,4 +127,7 @@ object SonyGattSpec : CameraGattSpec {
 
     override val pairingServiceUuid: Uuid = PAIRING_SERVICE_UUID
     override val pairingCharacteristicUuid: Uuid = PAIRING_CHARACTERISTIC_UUID
+
+    override val modelNameServiceUuid: Uuid = CAMERA_CONTROL_SERVICE_UUID
+    override val modelNameCharacteristicUuid: Uuid = MODEL_NAME_CHARACTERISTIC_UUID
 }

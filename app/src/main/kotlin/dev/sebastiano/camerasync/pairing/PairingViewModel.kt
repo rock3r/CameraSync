@@ -1,15 +1,13 @@
 package dev.sebastiano.camerasync.pairing
 
 import android.Manifest
-import android.bluetooth.BluetoothDevice
-import android.bluetooth.le.ScanResult
 import android.companion.CompanionDeviceManager
 import android.content.Intent
 import android.content.IntentSender
 import androidx.annotation.RequiresPermission
 import androidx.compose.runtime.State
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
-import androidx.core.util.size
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.juul.khronicle.Log
@@ -17,12 +15,9 @@ import dev.sebastiano.camerasync.domain.model.Camera
 import dev.sebastiano.camerasync.domain.repository.CameraConnection
 import dev.sebastiano.camerasync.domain.repository.CameraRepository
 import dev.sebastiano.camerasync.domain.repository.PairedDevicesRepository
-import dev.sebastiano.camerasync.domain.vendor.CameraVendorRegistry
 import dev.sebastiano.camerasync.feedback.IssueReporter
 import dev.zacsweers.metro.Inject
 import java.io.IOException
-import kotlin.uuid.ExperimentalUuidApi
-import kotlin.uuid.Uuid
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.TimeoutCancellationException
@@ -38,6 +33,13 @@ internal const val PAIRING_CONNECTION_TIMEOUT_MS = 30_000L
 private const val BONDING_TIMEOUT_MS = 60_000L
 private const val BOND_CHECK_DELAY_MS = 500L
 
+data class DiscoveredCameraUi(
+    val camera: Camera,
+    val make: String,
+    val model: String,
+    val isProbingModel: Boolean = false,
+)
+
 /**
  * ViewModel for the pairing screen.
  *
@@ -45,7 +47,6 @@ private const val BOND_CHECK_DELAY_MS = 500L
  *
  * @param pairedDevicesRepository Repository for managing paired devices.
  * @param cameraRepository Repository for BLE camera communication.
- * @param vendorRegistry Registry of supported camera vendors.
  * @param bluetoothBondingChecker Utility for checking and managing Bluetooth bonding.
  * @param companionDeviceManagerHelper Helper for Companion Device Manager association.
  * @param issueReporter Utility for sending feedback reports.
@@ -56,14 +57,13 @@ private const val BOND_CHECK_DELAY_MS = 500L
 class PairingViewModel(
     private val pairedDevicesRepository: PairedDevicesRepository,
     private val cameraRepository: CameraRepository,
-    private val vendorRegistry: CameraVendorRegistry,
     private val bluetoothBondingChecker: BluetoothBondingChecker,
     private val companionDeviceManagerHelper: CompanionDeviceManagerHelper,
     private val issueReporter: IssueReporter,
     private val ioDispatcher: CoroutineDispatcher,
 ) : ViewModel() {
 
-    private val _state = mutableStateOf<PairingScreenState>(PairingScreenState.Idle)
+    private val _state = mutableStateOf<PairingScreenState>(PairingScreenState.Scanning())
 
     /** The current UI state of the pairing screen. */
     val state: State<PairingScreenState> = _state
@@ -79,23 +79,158 @@ class PairingViewModel(
     val associationRequest: Flow<IntentSender> = _associationRequest.receiveAsFlow()
 
     private var pairingJob: Job? = null
+    private var scanJob: Job? = null
+    private var successJob: Job? = null
+    private val probeJobs = mutableStateMapOf<String, Job>()
+    private val discoveredCameras = mutableStateMapOf<String, DiscoveredCameraUi>()
 
-    /** Starts the Companion Device Manager association process. */
-    fun requestCompanionPairing() {
-        Log.info(tag = TAG) { "Requesting companion device pairing" }
-        companionDeviceManagerHelper.requestAssociation(
-            object : CompanionDeviceManager.Callback() {
-                override fun onAssociationPending(chooserLauncher: IntentSender) {
-                    Log.debug(tag = TAG) { "Companion chooser pending" }
-                    viewModelScope.launch { _associationRequest.send(chooserLauncher) }
-                }
+    init {
+        startScanning()
+    }
 
-                override fun onFailure(error: CharSequence?) {
-                    Log.error(tag = TAG) { "Companion Device Association failed: $error" }
-                    _state.value = PairingScreenState.Idle
+    private fun startScanning() {
+        if (scanJob?.isActive == true) return
+
+        scanJob =
+            viewModelScope.launch(ioDispatcher) {
+                cameraRepository.discoveredCameras.collect { camera ->
+                    if (pairedDevicesRepository.isDevicePaired(camera.macAddress)) return@collect
+                    if (discoveredCameras.containsKey(camera.macAddress)) return@collect
+
+                    val make = camera.vendor.vendorName
+                    val model = camera.vendor.extractModelFromPairingName(camera.name)
+
+                    val uiModel =
+                        DiscoveredCameraUi(
+                            camera = camera,
+                            make = make,
+                            model = model,
+                            isProbingModel = camera.vendor.getCapabilities().supportsModelName,
+                        )
+                    discoveredCameras[camera.macAddress] = uiModel
+                    updateScanningState()
+
+                    if (uiModel.isProbingModel) {
+                        probeModelName(camera)
+                    }
                 }
             }
+    }
+
+    private fun updateScanningState() {
+        val currentState = _state.value
+        if (currentState is PairingScreenState.Scanning) {
+            _state.value =
+                currentState.copy(
+                    devices =
+                        discoveredCameras.values.sortedBy { it.camera.name ?: it.camera.macAddress }
+                )
+        }
+    }
+
+    private fun markProbeFailed(camera: Camera, throwable: Throwable, messageSuffix: String) {
+        Log.warn(tag = TAG, throwable = throwable) {
+            "Failed to probe model name for ${camera.macAddress}$messageSuffix"
+        }
+        val existing = discoveredCameras[camera.macAddress]
+        if (existing != null) {
+            discoveredCameras[camera.macAddress] = existing.copy(isProbingModel = false)
+            updateScanningState()
+        }
+    }
+
+    private fun probeModelName(camera: Camera) {
+        if (probeJobs[camera.macAddress]?.isActive == true) return
+
+        val job =
+            viewModelScope.launch(ioDispatcher) {
+                try {
+                    // Use a single timeout for the entire probe operation (connect + read)
+                    withTimeout(15_000L) {
+                        val connection = cameraRepository.connect(camera)
+                        try {
+                            val modelName = connection.readModelName()
+                            val existing = discoveredCameras[camera.macAddress]
+                            if (existing != null) {
+                                discoveredCameras[camera.macAddress] =
+                                    existing.copy(model = modelName, isProbingModel = false)
+                                updateScanningState()
+                            }
+                        } finally {
+                            try {
+                                connection.disconnect()
+                            } catch (e: IOException) {
+                                Log.warn(tag = TAG, throwable = e) {
+                                    "Error disconnecting after model probe"
+                                }
+                            } catch (e: IllegalStateException) {
+                                Log.warn(tag = TAG, throwable = e) {
+                                    "Error disconnecting after model probe"
+                                }
+                            }
+                        }
+                    }
+                } catch (e: TimeoutCancellationException) {
+                    markProbeFailed(camera, e, " (timeout)")
+                } catch (e: IOException) {
+                    markProbeFailed(camera, e, "")
+                } catch (e: UnsupportedOperationException) {
+                    markProbeFailed(camera, e, " (unsupported)")
+                } finally {
+                    probeJobs.remove(camera.macAddress)
+                }
+            }
+
+        probeJobs[camera.macAddress] = job
+    }
+
+    /** Starts the Companion Device Manager association process for a specific camera. */
+    fun requestCompanionPairing(camera: Camera) {
+        stopScanning()
+        _state.value = PairingScreenState.Associating(camera)
+
+        Log.info(tag = TAG) { "Requesting companion device pairing for ${camera.macAddress}" }
+        companionDeviceManagerHelper.requestAssociation(
+            callback =
+                object : CompanionDeviceManager.Callback() {
+                    override fun onAssociationPending(chooserLauncher: IntentSender) {
+                        Log.debug(tag = TAG) { "Companion chooser pending" }
+                        viewModelScope.launch { _associationRequest.send(chooserLauncher) }
+                    }
+
+                    override fun onFailure(error: CharSequence?) {
+                        Log.error(tag = TAG) { "Companion Device Association failed: $error" }
+                        _state.value =
+                            PairingScreenState.Error(
+                                camera = camera,
+                                error = PairingError.UNKNOWN,
+                                canRetry = true,
+                            )
+                    }
+                },
+            macAddress = camera.macAddress,
         )
+    }
+
+    private fun stopScanning() {
+        scanJob?.cancel()
+        scanJob = null
+        cancelProbeJobs()
+    }
+
+    private fun cancelProbeJobs() {
+        val macAddresses = probeJobs.keys.toList()
+        probeJobs.values.forEach { it.cancel() }
+        probeJobs.clear()
+        macAddresses.forEach { macAddress ->
+            val existing = discoveredCameras[macAddress]
+            if (existing != null) {
+                discoveredCameras[macAddress] = existing.copy(isProbingModel = false)
+            }
+        }
+        if (macAddresses.isNotEmpty()) {
+            updateScanningState()
+        }
     }
 
     /**
@@ -106,147 +241,67 @@ class PairingViewModel(
     @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
     @Suppress("DEPRECATION")
     fun onCompanionAssociationResult(data: Intent?) {
-        if (data == null) {
-            Log.warn(tag = TAG) { "Companion association result was null" }
+        val currentState = _state.value
+        val camera =
+            if (currentState is PairingScreenState.Associating) currentState.camera else null
+
+        if (camera == null) {
+            Log.warn(tag = TAG) { "Received association result but no camera was being associated" }
+            // Fallback or ignore? If we don't have a camera, we can't proceed.
+            // Maybe go back to scanning.
+            _state.value = PairingScreenState.Scanning(discoveredCameras.values.toList())
+            startScanning()
             return
         }
 
-        val camera = extractCameraFromIntent(data)
-        if (camera != null) {
-            Log.info(tag = TAG) {
-                "Companion device selected: ${camera.name} (${camera.macAddress})"
-            }
-            pairDevice(camera, allowExistingBond = true)
-        } else {
-            Log.warn(tag = TAG) { "Could not convert companion device result to Camera" }
-            _state.value = PairingScreenState.Idle
-        }
-    }
-
-    @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
-    private fun extractCameraFromIntent(data: Intent): Camera? {
-        return try {
-            val scanResult =
-                data.getParcelableExtra(CompanionDeviceManager.EXTRA_DEVICE, ScanResult::class.java)
-            scanResult?.toCamera()
-                ?: data
-                    .getParcelableExtra(
-                        CompanionDeviceManager.EXTRA_DEVICE,
-                        BluetoothDevice::class.java,
-                    )
-                    ?.toCamera()
-        } catch (e: IllegalArgumentException) {
-            Log.warn(tag = TAG, throwable = e) { "Could not extract device from Intent" }
-            null
-        } catch (e: SecurityException) {
-            Log.warn(tag = TAG, throwable = e) { "Could not extract device from Intent" }
-            null
-        }
-    }
-
-    @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
-    @OptIn(ExperimentalUuidApi::class)
-    private fun ScanResult.toCamera(): Camera? {
-        val record = scanRecord ?: return null
-        val mfrData = record.manufacturerSpecificData
-
-        val mfrMap = mutableMapOf<Int, ByteArray>()
-        for (i in 0 until mfrData.size) {
-            mfrMap[mfrData.keyAt(i)] = mfrData.valueAt(i)
+        if (data == null) {
+            Log.warn(tag = TAG) { "Companion association result was null" }
+            _state.value = PairingScreenState.Scanning(discoveredCameras.values.toList())
+            startScanning()
+            return
         }
 
-        val serviceUuids =
-            record.serviceUuids?.map { Uuid.parse(it.uuid.toString()) } ?: emptyList()
-        val name = device.name ?: record.deviceName
+        // We verify the device returned matches what we expect, or just proceed with our camera
+        // object
+        // The association grants us permission to access the device in background.
 
-        val vendor =
-            vendorRegistry.identifyVendor(
-                deviceName = name,
-                serviceUuids = serviceUuids,
-                manufacturerData = mfrMap,
-            ) ?: return null
-
-        val metadata = vendor.parseAdvertisementMetadata(mfrMap)
-
-        return Camera(
-            identifier = device.address,
-            name = name,
-            macAddress = device.address,
-            vendor = vendor,
-            vendorMetadata = metadata,
-        )
+        Log.info(tag = TAG) { "Companion device associated: ${camera.name} (${camera.macAddress})" }
+        proceedToBonding(camera)
     }
 
-    @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
-    @OptIn(ExperimentalUuidApi::class)
-    private fun BluetoothDevice.toCamera(): Camera? {
-        val name = name
-        val vendor =
-            vendorRegistry.identifyVendor(
-                deviceName = name,
-                serviceUuids = emptyList(),
-                manufacturerData = emptyMap(),
-            ) ?: return null
-
-        return Camera(identifier = address, name = name, macAddress = address, vendor = vendor)
-    }
-
-    /**
-     * Initiates the pairing process with a specific [camera].
-     *
-     * This includes ensuring the device is bonded at the OS level and performing any
-     * vendor-specific pairing initialization.
-     *
-     * @param camera The camera to pair with.
-     * @param allowExistingBond Whether to allow pairing with a device that is already bonded.
-     */
-    fun pairDevice(camera: Camera, allowExistingBond: Boolean = false) {
+    private fun proceedToBonding(camera: Camera) {
         pairingJob =
             viewModelScope.launch(ioDispatcher) {
-                if (pairedDevicesRepository.isDevicePaired(camera.macAddress)) {
-                    onDeviceAlreadyPaired(camera)
+                _state.value = PairingScreenState.Bonding(camera)
+
+                if (bluetoothBondingChecker.isDeviceBonded(camera.macAddress)) {
+                    Log.info(tag = TAG) { "Device ${camera.macAddress} is already bonded" }
+                    proceedToConnecting(camera)
                     return@launch
                 }
 
-                if (
-                    !allowExistingBond && bluetoothBondingChecker.isDeviceBonded(camera.macAddress)
-                ) {
-                    Log.warn(tag = TAG) {
-                        "Device ${camera.macAddress} is already bonded at system level"
+                Log.info(tag = TAG) { "Initiating Bluetooth bonding for ${camera.macAddress}..." }
+                if (!bluetoothBondingChecker.createBond(camera.macAddress)) {
+                    Log.error(tag = TAG) {
+                        "Failed to initiate Bluetooth bonding for ${camera.macAddress}"
                     }
-                    _state.value = PairingScreenState.AlreadyBonded(camera)
+                    _state.value =
+                        PairingScreenState.Error(camera, PairingError.UNKNOWN, canRetry = true)
                     return@launch
                 }
 
-                _state.value = PairingScreenState.Pairing(camera)
-
-                if (!ensureDeviceBonded(camera)) return@launch
-
-                performPairingConnection(camera)
+                if (waitForBonding(camera)) {
+                    proceedToConnecting(camera)
+                } else {
+                    _state.value =
+                        PairingScreenState.Error(camera, PairingError.TIMEOUT, canRetry = true)
+                }
             }
     }
 
-    private suspend fun onDeviceAlreadyPaired(camera: Camera) {
-        Log.info(tag = TAG) { "Device ${camera.macAddress} already paired" }
-        pairedDevicesRepository.setSyncEnabled(true)
-        _state.value = PairingScreenState.Idle
-        _navigationEvents.send(PairingNavigationEvent.DevicePaired)
-    }
-
-    private suspend fun ensureDeviceBonded(camera: Camera): Boolean {
-        if (bluetoothBondingChecker.isDeviceBonded(camera.macAddress)) {
-            Log.info(tag = TAG) { "Device ${camera.macAddress} is already bonded" }
-            return true
-        }
-
-        Log.info(tag = TAG) { "Initiating Bluetooth bonding for ${camera.macAddress}..." }
-        if (!bluetoothBondingChecker.createBond(camera.macAddress)) {
-            Log.error(tag = TAG) { "Failed to initiate Bluetooth bonding for ${camera.macAddress}" }
-            _state.value = PairingScreenState.Pairing(camera, error = PairingError.UNKNOWN)
-            return false
-        }
-
-        return waitForBonding(camera)
+    private suspend fun proceedToConnecting(camera: Camera) {
+        _state.value = PairingScreenState.Connecting(camera)
+        performPairingConnection(camera)
     }
 
     private suspend fun waitForBonding(camera: Camera): Boolean {
@@ -272,7 +327,6 @@ class PairingViewModel(
         }
 
         Log.error(tag = TAG) { "Bluetooth bonding timed out for ${camera.macAddress}" }
-        _state.value = PairingScreenState.Pairing(camera, error = PairingError.TIMEOUT)
         return false
     }
 
@@ -296,14 +350,15 @@ class PairingViewModel(
 
             if (!connection.initializePairing()) {
                 Log.error(tag = TAG) { "Vendor-specific pairing initialization failed" }
-                _state.value = PairingScreenState.Pairing(camera, error = PairingError.UNKNOWN)
+                _state.value =
+                    PairingScreenState.Error(camera, PairingError.UNKNOWN, canRetry = true)
                 return
             }
 
             onPairingSuccessful(camera)
         } catch (e: TimeoutCancellationException) {
             Log.error(tag = TAG, throwable = e) { "Pairing timed out for ${camera.macAddress}" }
-            _state.value = PairingScreenState.Pairing(camera, error = PairingError.TIMEOUT)
+            _state.value = PairingScreenState.Error(camera, PairingError.TIMEOUT, canRetry = true)
         } catch (e: IOException) {
             Log.error(tag = TAG, throwable = e) { "Pairing failed" }
             val error =
@@ -314,7 +369,7 @@ class PairingViewModel(
                         PairingError.TIMEOUT
                     else -> PairingError.UNKNOWN
                 }
-            _state.value = PairingScreenState.Pairing(camera, error = error)
+            _state.value = PairingScreenState.Error(camera, error, canRetry = true)
         } catch (e: IllegalStateException) {
             Log.error(tag = TAG, throwable = e) { "Pairing failed" }
             val error =
@@ -325,7 +380,7 @@ class PairingViewModel(
                         PairingError.TIMEOUT
                     else -> PairingError.UNKNOWN
                 }
-            _state.value = PairingScreenState.Pairing(camera, error = error)
+            _state.value = PairingScreenState.Error(camera, error, canRetry = true)
         } finally {
             try {
                 connection?.disconnect()
@@ -341,8 +396,10 @@ class PairingViewModel(
         Log.info(tag = TAG) { "Pairing successful, adding ${camera.macAddress} to repository..." }
         pairedDevicesRepository.addDevice(camera, enabled = true)
         pairedDevicesRepository.setSyncEnabled(true)
-        _state.value = PairingScreenState.Idle
-        _navigationEvents.send(PairingNavigationEvent.DevicePaired)
+        _state.value = PairingScreenState.Success(camera)
+
+        // Auto-close after delay
+        scheduleSuccessNavigation()
     }
 
     /**
@@ -358,11 +415,16 @@ class PairingViewModel(
                         "Bond removed for ${camera.macAddress}, restarting pairing"
                     }
                     delay(BOND_CHECK_DELAY_MS)
-                    _state.value = PairingScreenState.Idle
-                    requestCompanionPairing()
+                    // Remove from discovered devices to allow re-discovery
+                    discoveredCameras.remove(camera.macAddress)
+                    _state.value = PairingScreenState.Scanning(discoveredCameras.values.toList())
+                    startScanning()
                 } else {
                     Log.warn(tag = TAG) { "Failed to remove bond for ${camera.macAddress}" }
-                    _state.value = PairingScreenState.AlreadyBonded(camera, removeFailed = true)
+                    // If removal fails, we probably should tell the user to do it manually
+                    // or just go back to scanning
+                    _state.value =
+                        PairingScreenState.Error(camera, PairingError.UNKNOWN, canRetry = false)
                 }
             }
     }
@@ -371,7 +433,17 @@ class PairingViewModel(
     fun cancelPairing() {
         pairingJob?.cancel()
         pairingJob = null
-        _state.value = PairingScreenState.Idle
+        stopScanning() // Stop any scanning before restart
+
+        // Reset to scanning
+        _state.value = PairingScreenState.Scanning(discoveredCameras.values.toList())
+        startScanning()
+    }
+
+    fun manualCloseSuccess() {
+        successJob?.cancel()
+        successJob = null
+        viewModelScope.launch { _navigationEvents.send(PairingNavigationEvent.DevicePaired) }
     }
 
     /** Gathers diagnostic information and triggers the system intent to send a feedback report. */
@@ -381,10 +453,22 @@ class PairingViewModel(
             val extraInfo = buildString {
                 appendLine("Pairing State Info:")
                 appendLine("Current State: $currentState")
-                if (currentState is PairingScreenState.Pairing) {
-                    appendLine(
-                        "Target Camera: ${currentState.camera.name} (${currentState.camera.macAddress})"
-                    )
+
+                val camera =
+                    when (currentState) {
+                        is PairingScreenState.Associating -> currentState.camera
+                        is PairingScreenState.Bonding -> currentState.camera
+                        is PairingScreenState.Connecting -> currentState.camera
+                        is PairingScreenState.Success -> currentState.camera
+                        is PairingScreenState.Error -> currentState.camera
+                        is PairingScreenState.Scanning -> null
+                    }
+
+                if (camera != null) {
+                    appendLine("Target Camera: ${camera.name} (${camera.macAddress})")
+                }
+
+                if (currentState is PairingScreenState.Error) {
                     appendLine("Error: ${currentState.error}")
                 }
             }
@@ -395,20 +479,41 @@ class PairingViewModel(
     override fun onCleared() {
         super.onCleared()
         pairingJob?.cancel()
+        scanJob?.cancel()
+        successJob?.cancel()
+        cancelProbeJobs()
+    }
+
+    private fun scheduleSuccessNavigation() {
+        successJob?.cancel()
+        successJob =
+            viewModelScope.launch {
+                delay(5_000L)
+                _navigationEvents.send(PairingNavigationEvent.DevicePaired)
+            }
     }
 }
 
 /** State of the pairing screen. */
 sealed interface PairingScreenState {
-    /** No pairing in progress. */
-    data object Idle : PairingScreenState
+    /** Actively scanning for cameras. */
+    data class Scanning(val devices: List<DiscoveredCameraUi> = emptyList()) : PairingScreenState
 
-    /** Device is already bonded at the OS level but not paired in the app. */
-    data class AlreadyBonded(val camera: Camera, val removeFailed: Boolean = false) :
+    /** Associating with the device via Companion Device Manager. */
+    data class Associating(val camera: Camera) : PairingScreenState
+
+    /** Bonding with the device at OS level. */
+    data class Bonding(val camera: Camera) : PairingScreenState
+
+    /** Connecting to the device to finalize pairing. */
+    data class Connecting(val camera: Camera) : PairingScreenState
+
+    /** Pairing successful. */
+    data class Success(val camera: Camera) : PairingScreenState
+
+    /** Pairing failed. */
+    data class Error(val camera: Camera, val error: PairingError, val canRetry: Boolean) :
         PairingScreenState
-
-    /** Pairing is actively in progress with a specific [camera]. */
-    data class Pairing(val camera: Camera, val error: PairingError? = null) : PairingScreenState
 }
 
 /** Navigation events emitted by the PairingViewModel. */
