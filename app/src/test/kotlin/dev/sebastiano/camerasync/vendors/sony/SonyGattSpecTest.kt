@@ -239,6 +239,15 @@ class SonyGattSpecTest {
     }
 
     @Test
+    fun `model name uses Camera Control Service and CC0B characteristic`() {
+        assertEquals(SonyGattSpec.CAMERA_CONTROL_SERVICE_UUID, SonyGattSpec.modelNameServiceUuid)
+        assertEquals(
+            SonyGattSpec.MODEL_NAME_CHARACTERISTIC_UUID,
+            SonyGattSpec.modelNameCharacteristicUuid,
+        )
+    }
+
+    @Test
     fun `device name is not supported`() {
         assertNull(SonyGattSpec.deviceNameServiceUuid)
         assertNull(SonyGattSpec.deviceNameCharacteristicUuid)

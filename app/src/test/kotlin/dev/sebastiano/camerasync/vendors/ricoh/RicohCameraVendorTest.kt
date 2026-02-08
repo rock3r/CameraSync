@@ -99,6 +99,11 @@ class RicohCameraVendorTest {
     }
 
     @Test
+    fun `capabilities indicate model name support`() {
+        assertTrue(RicohCameraVendor.getCapabilities().supportsModelName)
+    }
+
+    @Test
     fun `gattSpec is RicohGattSpec`() {
         assertEquals(RicohGattSpec, RicohCameraVendor.gattSpec)
     }

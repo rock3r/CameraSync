@@ -14,6 +14,7 @@ import androidx.lifecycle.viewModelScope
 import com.juul.khronicle.Log
 import dev.sebastiano.camerasync.R
 import dev.sebastiano.camerasync.devicesync.MultiDeviceSyncService
+import dev.sebastiano.camerasync.di.IoDispatcher
 import dev.sebastiano.camerasync.domain.model.DeviceConnectionState
 import dev.sebastiano.camerasync.domain.model.GpsLocation
 import dev.sebastiano.camerasync.domain.model.PairedDevice
@@ -61,7 +62,7 @@ class DevicesListViewModel(
     private val issueReporter: IssueReporter,
     private val batteryOptimizationChecker: BatteryOptimizationChecker,
     private val intentFactory: dev.sebastiano.camerasync.devicesync.IntentFactory,
-    private val ioDispatcher: CoroutineDispatcher,
+    @param:IoDispatcher private val ioDispatcher: CoroutineDispatcher,
 ) : ViewModel() {
 
     private val _state = mutableStateOf<DevicesListState>(DevicesListState.Loading)

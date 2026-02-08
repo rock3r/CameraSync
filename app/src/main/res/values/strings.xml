@@ -67,23 +67,25 @@
     <string name="pairing_title">Add Camera</string>
     <string name="content_desc_back">Back</string>
     <string name="pairing_feedback">Having issues? Let us know</string>
-    <string name="ready_to_pair_title">Ready to pair</string>
-    <string name="ready_to_pair_subtitle">Use Android’s pairing flow to select a camera from the system list.</string>
-    <string name="action_pair_system">Pair using Android System</string>
-    <string name="bonded_dialog_title">Camera Already Paired</string>
-    <string name="bonded_dialog_remove_failed">This camera is already paired to your phone at the system level. Please remove the existing pairing from your phone’s Bluetooth settings, then try again.</string>
-    <string name="bonded_dialog_message">This camera is already paired to your phone at the system level. This can interfere with the app’s connection. Would you like to remove the existing pairing?</string>
-    <string name="action_remove_pairing">Remove Pairing</string>
+    <string name="action_pair">Pair</string>
+    <string name="action_close">Close</string>
+    <string name="action_unpair_and_restart">Unpair &amp; Restart</string>
+    <string name="pairing_state_scanning">Scanning for cameras…</string>
+    <string name="scanning_subtitle">Searching for nearby cameras with Bluetooth enabled.\nMake sure your camera is powered on and ready to pair.</string>
+    <string name="select_camera_subtitle">Select a camera to pair with:</string>
+    <string name="scanning_indicator">Scanning…</string>
+    <string name="identifying_camera">Identifying camera…</string>
+    <string name="pairing_state_associating">Requesting system permission…</string>
+    <string name="pairing_state_bonding">Pairing with Android…</string>
+    <string name="pairing_state_connecting">Connecting to %1$s…</string>
+    <string name="pairing_state_success">Successfully paired with %1$s!</string>
+    <string name="pairing_state_success_subtitle">Your camera is now ready to sync GPS data.</string>
+    <string name="pairing_error_instruction">If issues persist, try removing the pairing from both your camera and phone settings before retrying.</string>
     <string name="pairing_failed_title">Pairing failed</string>
     <string name="error_pairing_rejected">The camera rejected the pairing request. Make sure Bluetooth pairing is enabled on your camera.</string>
-    <string name="error_pairing_rejected_long">The camera rejected the pairing request. Make sure Bluetooth pairing is enabled on your camera and try again.</string>
     <string name="error_pairing_timeout">Connection timed out. Make sure the camera is nearby and Bluetooth is enabled.</string>
-    <string name="error_pairing_timeout_long">Connection timed out. Make sure the camera is nearby, Bluetooth is enabled, and try again.</string>
     <string name="error_pairing_unknown">An unexpected error occurred. Please try again.</string>
-    <string name="error_connection_failed">Connection failed. Please try again.</string>
     <string name="error_unknown_vendor">Unknown camera vendor.</string>
-    <string name="pairing_in_progress_title">Pairing with %1$s…</string>
-    <string name="pairing_in_progress_subtitle">Please wait while we connect to your camera.</string>
 
     <!-- Log Viewer -->
     <string name="log_viewer_title">Log Viewer</string>
