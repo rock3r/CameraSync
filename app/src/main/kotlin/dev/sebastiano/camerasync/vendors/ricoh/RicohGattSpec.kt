@@ -60,4 +60,10 @@ object RicohGattSpec : CameraGattSpec {
 
     override val locationServiceUuid: Uuid = Location.SERVICE_UUID
     override val locationCharacteristicUuid: Uuid = Location.LOCATION_CHARACTERISTIC_UUID
+
+    // Standard Device Information Service (0x180A)
+    // Model Number String (0x2A24)
+    override val modelNameServiceUuid: Uuid = Uuid.parse("0000180a-0000-1000-8000-00805f9b34fb")
+    override val modelNameCharacteristicUuid: Uuid =
+        Uuid.parse("00002a24-0000-1000-8000-00805f9b34fb")
 }

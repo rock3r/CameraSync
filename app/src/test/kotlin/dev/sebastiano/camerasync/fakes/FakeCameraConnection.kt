@@ -41,6 +41,12 @@ class FakeCameraConnection(override val camera: Camera) : CameraConnection {
     var readHardwareRevisionCalled = false
         private set
 
+    var modelName = "Test Model"
+        private set
+
+    var readModelNameCalled = false
+        private set
+
     var initializePairingCalled = false
         private set
 
@@ -64,6 +70,11 @@ class FakeCameraConnection(override val camera: Camera) : CameraConnection {
     override suspend fun readHardwareRevision(): String {
         readHardwareRevisionCalled = true
         return hardwareRevision
+    }
+
+    override suspend fun readModelName(): String {
+        readModelNameCalled = true
+        return modelName
     }
 
     override suspend fun setPairedDeviceName(name: String) {
@@ -92,6 +103,10 @@ class FakeCameraConnection(override val camera: Camera) : CameraConnection {
     override suspend fun disconnect() {
         disconnectCalled = true
         _isConnected.value = false
+    }
+
+    fun setModelName(name: String) {
+        modelName = name
     }
 
     fun setConnected(connected: Boolean) {

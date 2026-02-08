@@ -74,6 +74,7 @@ object FakeCameraVendor : CameraVendor {
             supportsDateTimeSync = true,
             supportsGeoTagging = true,
             supportsLocationSync = true,
+            supportsModelName = true,
         )
 
     override fun extractModelFromPairingName(pairingName: String?): String {

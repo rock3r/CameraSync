@@ -110,6 +110,11 @@ class SonyCameraVendorTest {
     }
 
     @Test
+    fun `capabilities indicate model name support`() {
+        assertTrue(SonyCameraVendor.getCapabilities().supportsModelName)
+    }
+
+    @Test
     fun `gattSpec is SonyGattSpec`() {
         assertEquals(SonyGattSpec, SonyCameraVendor.gattSpec)
     }
