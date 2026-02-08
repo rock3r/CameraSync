@@ -11,10 +11,12 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Badge
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Switch
@@ -48,6 +50,7 @@ internal fun DeviceCard(
     onEnabledChange: (Boolean) -> Unit,
     onUnpairClick: () -> Unit,
     onRetryClick: () -> Unit,
+    onRemoteControlClick: () -> Unit,
 ) {
     var isExpanded by remember { mutableStateOf(false) }
     val device = deviceWithState.device
@@ -208,12 +211,33 @@ internal fun DeviceCard(
 
                     Spacer(Modifier.height(12.dp))
 
-                    // Unpair action
-                    TextButton(onClick = onUnpairClick, modifier = Modifier.align(Alignment.End)) {
-                        Text(
-                            stringResource(R.string.unpair_device),
-                            color = MaterialTheme.colorScheme.error,
-                        )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                    ) {
+                        // Remote Control action
+                        FilledTonalButton(
+                            onClick = onRemoteControlClick,
+                            enabled =
+                                connectionState is DeviceConnectionState.Connected ||
+                                    connectionState is DeviceConnectionState.Syncing,
+                        ) {
+                            Icon(
+                                painterResource(R.drawable.ic_photo_camera_24dp),
+                                contentDescription = null,
+                                modifier = Modifier.size(18.dp),
+                            )
+                            Spacer(Modifier.width(8.dp))
+                            Text("Remote Control")
+                        }
+
+                        // Unpair action
+                        TextButton(onClick = onUnpairClick) {
+                            Text(
+                                stringResource(R.string.unpair_device),
+                                color = MaterialTheme.colorScheme.error,
+                            )
+                        }
                     }
                 }
             }
@@ -294,6 +318,7 @@ private fun DeviceCardDisconnectedPreview() {
             onEnabledChange = {},
             onUnpairClick = {},
             onRetryClick = {},
+            onRemoteControlClick = {},
         )
     }
 }
@@ -321,6 +346,7 @@ private fun DeviceCardSyncingPreview() {
             onEnabledChange = {},
             onUnpairClick = {},
             onRetryClick = {},
+            onRemoteControlClick = {},
         )
     }
 }
@@ -345,6 +371,7 @@ private fun DeviceCardUnreachablePreview() {
             onEnabledChange = {},
             onUnpairClick = {},
             onRetryClick = {},
+            onRemoteControlClick = {},
         )
     }
 }
@@ -373,6 +400,7 @@ private fun DeviceCardErrorPreview() {
             onEnabledChange = {},
             onUnpairClick = {},
             onRetryClick = {},
+            onRemoteControlClick = {},
         )
     }
 }
@@ -397,6 +425,7 @@ private fun DeviceCardDisabledPreview() {
             onEnabledChange = {},
             onUnpairClick = {},
             onRetryClick = {},
+            onRemoteControlClick = {},
         )
     }
 }

@@ -1,6 +1,14 @@
 package dev.sebastiano.camerasync.vendors.ricoh
 
+import dev.sebastiano.camerasync.domain.model.BatteryInfo
+import dev.sebastiano.camerasync.domain.model.BatteryPosition
+import dev.sebastiano.camerasync.domain.model.CameraMode
+import dev.sebastiano.camerasync.domain.model.CaptureStatus
+import dev.sebastiano.camerasync.domain.model.DriveMode
+import dev.sebastiano.camerasync.domain.model.ExposureMode
 import dev.sebastiano.camerasync.domain.model.GpsLocation
+import dev.sebastiano.camerasync.domain.model.PowerSource
+import dev.sebastiano.camerasync.domain.model.StorageInfo
 import dev.sebastiano.camerasync.domain.vendor.CameraProtocol
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
@@ -147,6 +155,136 @@ object RicohProtocol : CameraProtocol {
         return bytes.first() == 1.toByte()
     }
 
+    /** Decodes battery information from the FE3A32F8 characteristic. */
+    fun decodeBatteryInfo(bytes: ByteArray): BatteryInfo {
+        if (bytes.isEmpty()) {
+            return BatteryInfo(
+                0,
+                position = BatteryPosition.UNKNOWN,
+                powerSource = PowerSource.UNKNOWN,
+            )
+        }
+        val level = bytes[0].toInt() and 0xFF
+        return BatteryInfo(
+            levelPercentage = level,
+            isCharging = false, // Ricoh BLE doesn't seem to report charging status directly here
+            powerSource = PowerSource.BATTERY,
+            position = BatteryPosition.INTERNAL,
+        )
+    }
+
+    /**
+     * Decodes storage information from the eOa notification.
+     *
+     * Format: List of storage entries. We usually care about the first one (internal or SD). The
+     * exact binary format is complex (TLV or struct), but based on observation: It's often a status
+     * byte followed by remaining shots (int).
+     */
+    fun decodeStorageInfo(bytes: ByteArray): StorageInfo {
+        // Simplified decoding based on common patterns. Real implementation might need more reverse
+        // engineering.
+        // Assuming: [Status, RemainingShots (4 bytes LE)]
+        if (bytes.size < 5) return StorageInfo(isPresent = false)
+
+        // Status byte interpretation needs verification. Assuming non-zero is present/ready.
+        val status = bytes[0].toInt() and 0xFF
+        val isPresent = status != 0
+
+        val buffer = ByteBuffer.wrap(bytes).order(ByteOrder.LITTLE_ENDIAN)
+        buffer.position(1)
+        val remainingShots = buffer.int
+
+        return StorageInfo(
+            slot = 1,
+            isPresent = isPresent,
+            remainingShots = remainingShots,
+            isFull = remainingShots == 0, // heuristic
+        )
+    }
+
+    /**
+     * Decodes capture status from tPa notification.
+     *
+     * Format: [CountdownStatus, CapturingStatus] Countdown: 0 = None, 1 = Countdown Capturing: 0 =
+     * Idle, 1 = Capturing
+     */
+    fun decodeCaptureStatus(bytes: ByteArray): CaptureStatus {
+        if (bytes.size < 2) return CaptureStatus.Idle
+
+        val countdown = bytes[0].toInt() and 0xFF
+        val capturing = bytes[1].toInt() and 0xFF
+
+        return when {
+            countdown > 0 ->
+                CaptureStatus.Countdown(
+                    secondsRemaining = -1
+                ) // Specific seconds not provided in simple status
+            capturing > 0 -> CaptureStatus.Capturing
+            else -> CaptureStatus.Idle
+        }
+    }
+
+    /**
+     * Decodes exposure mode from a single-byte characteristic (e.g. EXPOSURE_MODE_CHARACTERISTIC).
+     *
+     * Format: 1 byte enum (P=0, Av=1, Tv=2, M=3, B=4, BT=5, T=6, SFP=7).
+     */
+    fun decodeExposureMode(bytes: ByteArray): ExposureMode {
+        if (bytes.isEmpty()) return ExposureMode.UNKNOWN
+        return exposureModeFromByte(bytes[0].toInt() and 0xFF)
+    }
+
+    /**
+     * Decodes shooting mode from uPa notification.
+     *
+     * Format: [ShootingMode (Still=0/Movie=1), ExposureMode]
+     */
+    fun decodeShootingMode(bytes: ByteArray): Pair<CameraMode, ExposureMode> {
+        if (bytes.size < 2) return Pair(CameraMode.UNKNOWN, ExposureMode.UNKNOWN)
+
+        val modeByte = bytes[0].toInt()
+        val cameraMode = if (modeByte == 1) CameraMode.MOVIE else CameraMode.STILL_IMAGE
+
+        val exposureMode = exposureModeFromByte(bytes[1].toInt() and 0xFF)
+        return Pair(cameraMode, exposureMode)
+    }
+
+    private fun exposureModeFromByte(exposureByte: Int): ExposureMode =
+        when (exposureByte) {
+            0 -> ExposureMode.PROGRAM_AUTO
+            1 -> ExposureMode.APERTURE_PRIORITY
+            2 -> ExposureMode.SHUTTER_PRIORITY
+            3 -> ExposureMode.MANUAL
+            4 -> ExposureMode.BULB
+            5 -> ExposureMode.BULB_TIMER
+            6 -> ExposureMode.TIME
+            7 -> ExposureMode.SNAP_FOCUS_PROGRAM
+            else -> ExposureMode.UNKNOWN
+        }
+
+    /**
+     * Decodes drive/capture mode from CAPTURE_MODE_CHARACTERISTIC (009a8e70) notification.
+     *
+     * Format: 1 byte enum (16 values).
+     */
+    fun decodeDriveMode(bytes: ByteArray): DriveMode {
+        if (bytes.isEmpty()) return DriveMode.UNKNOWN
+        val value = bytes[0].toInt() and 0xFF
+
+        return when (value) {
+            0 -> DriveMode.SINGLE_SHOOTING
+            1 -> DriveMode.SELF_TIMER_10S
+            2 -> DriveMode.SELF_TIMER_2S
+            3 -> DriveMode.CONTINUOUS_SHOOTING
+            4 -> DriveMode.BRACKET
+            // 5-9: Multi-exposure / bracket variants
+            in 5..9 -> DriveMode.MULTI_EXPOSURE
+            // 10-15: Interval / Interval Composition
+            in 10..15 -> DriveMode.INTERVAL
+            else -> DriveMode.UNKNOWN
+        }
+    }
+
     /**
      * Formats raw date/time bytes as a hex string for debugging.
      *
@@ -154,17 +292,21 @@ object RicohProtocol : CameraProtocol {
      */
     @OptIn(ExperimentalStdlibApi::class)
     fun formatDateTimeHex(bytes: ByteArray): String = buildString {
-        append(bytes.sliceArray(0..1).toHexString())
-        append("_")
-        append(bytes[2].toHexString())
-        append("_")
-        append(bytes[3].toHexString())
-        append("_")
-        append(bytes[4].toHexString())
-        append("_")
-        append(bytes[5].toHexString())
-        append("_")
-        append(bytes[6].toHexString())
+        if (bytes.size >= 7) {
+            append(bytes.sliceArray(0..1).toHexString())
+            append("_")
+            append(bytes[2].toHexString())
+            append("_")
+            append(bytes[3].toHexString())
+            append("_")
+            append(bytes[4].toHexString())
+            append("_")
+            append(bytes[5].toHexString())
+            append("_")
+            append(bytes[6].toHexString())
+        } else {
+            append(bytes.toHexString())
+        }
     }
 
     /**
@@ -174,25 +316,29 @@ object RicohProtocol : CameraProtocol {
      */
     @OptIn(ExperimentalStdlibApi::class)
     fun formatLocationHex(bytes: ByteArray): String = buildString {
-        append(bytes.sliceArray(0..7).toHexString())
-        append("_")
-        append(bytes.sliceArray(8..15).toHexString())
-        append("_")
-        append(bytes.sliceArray(16..23).toHexString())
-        append("_")
-        append(bytes.sliceArray(24..25).toHexString())
-        append("_")
-        append(bytes[26].toHexString())
-        append("_")
-        append(bytes[27].toHexString())
-        append("_")
-        append(bytes[28].toHexString())
-        append("_")
-        append(bytes[29].toHexString())
-        append("_")
-        append(bytes[30].toHexString())
-        append("_")
-        append(bytes[31].toHexString())
+        if (bytes.size >= 32) {
+            append(bytes.sliceArray(0..7).toHexString())
+            append("_")
+            append(bytes.sliceArray(8..15).toHexString())
+            append("_")
+            append(bytes.sliceArray(16..23).toHexString())
+            append("_")
+            append(bytes.sliceArray(24..25).toHexString())
+            append("_")
+            append(bytes[26].toHexString())
+            append("_")
+            append(bytes[27].toHexString())
+            append("_")
+            append(bytes[28].toHexString())
+            append("_")
+            append(bytes[29].toHexString())
+            append("_")
+            append(bytes[30].toHexString())
+            append("_")
+            append(bytes[31].toHexString())
+        } else {
+            append(bytes.toHexString())
+        }
     }
 }
 

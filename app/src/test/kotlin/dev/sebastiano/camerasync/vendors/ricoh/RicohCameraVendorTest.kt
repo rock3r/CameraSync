@@ -70,32 +70,32 @@ class RicohCameraVendorTest {
 
     @Test
     fun `capabilities indicate firmware version support`() {
-        assertTrue(RicohCameraVendor.getCapabilities().supportsFirmwareVersion)
+        assertTrue(RicohCameraVendor.getRemoteControlCapabilities().sync.supportsFirmwareVersion)
     }
 
     @Test
     fun `capabilities indicate device name support`() {
-        assertTrue(RicohCameraVendor.getCapabilities().supportsDeviceName)
+        assertTrue(RicohCameraVendor.getRemoteControlCapabilities().sync.supportsDeviceName)
     }
 
     @Test
     fun `capabilities indicate date time sync support`() {
-        assertTrue(RicohCameraVendor.getCapabilities().supportsDateTimeSync)
+        assertTrue(RicohCameraVendor.getRemoteControlCapabilities().sync.supportsDateTimeSync)
     }
 
     @Test
     fun `capabilities indicate geo tagging support`() {
-        assertTrue(RicohCameraVendor.getCapabilities().supportsGeoTagging)
+        assertTrue(RicohCameraVendor.getRemoteControlCapabilities().sync.supportsGeoTagging)
     }
 
     @Test
     fun `capabilities indicate location sync support`() {
-        assertTrue(RicohCameraVendor.getCapabilities().supportsLocationSync)
+        assertTrue(RicohCameraVendor.getRemoteControlCapabilities().sync.supportsLocationSync)
     }
 
     @Test
     fun `capabilities indicate hardware revision support`() {
-        assertTrue(RicohCameraVendor.getCapabilities().supportsHardwareRevision)
+        assertTrue(RicohCameraVendor.getRemoteControlCapabilities().sync.supportsHardwareRevision)
     }
 
     @Test

@@ -1,7 +1,9 @@
 package dev.sebastiano.camerasync.devicesync
 
+import dev.sebastiano.camerasync.di.AppGraph
 import dev.sebastiano.camerasync.domain.repository.CameraConnection
 import dev.zacsweers.metro.Inject
+import dev.zacsweers.metro.SingleIn
 import kotlinx.coroutines.Job
 
 /**
@@ -12,6 +14,7 @@ import kotlinx.coroutines.Job
  * thread-safe.
  */
 @Inject
+@SingleIn(AppGraph::class)
 class DeviceConnectionManager {
     private val deviceJobs = mutableMapOf<String, Job>()
     private val deviceConnections = mutableMapOf<String, CameraConnection>()

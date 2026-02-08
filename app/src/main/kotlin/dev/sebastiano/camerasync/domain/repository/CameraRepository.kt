@@ -2,6 +2,7 @@ package dev.sebastiano.camerasync.domain.repository
 
 import dev.sebastiano.camerasync.domain.model.Camera
 import dev.sebastiano.camerasync.domain.model.GpsLocation
+import dev.sebastiano.camerasync.domain.vendor.RemoteControlDelegate
 import java.time.ZonedDateTime
 import kotlinx.coroutines.flow.Flow
 
@@ -97,4 +98,7 @@ interface CameraConnection {
 
     /** Disconnects from the camera. */
     suspend fun disconnect()
+
+    /** Returns a RemoteControlDelegate for this connection, or creates one if supported. */
+    fun getRemoteControlDelegate(): RemoteControlDelegate?
 }

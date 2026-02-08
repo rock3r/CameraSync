@@ -4,12 +4,21 @@ import android.bluetooth.le.ScanFilter
 import android.companion.BluetoothLeDeviceFilter
 import android.companion.DeviceFilter
 import android.os.ParcelUuid
-import dev.sebastiano.camerasync.domain.vendor.CameraCapabilities
+import dev.sebastiano.camerasync.domain.vendor.AdvancedShootingCapabilities
+import dev.sebastiano.camerasync.domain.vendor.BatteryMonitoringCapabilities
 import dev.sebastiano.camerasync.domain.vendor.CameraGattSpec
 import dev.sebastiano.camerasync.domain.vendor.CameraProtocol
 import dev.sebastiano.camerasync.domain.vendor.CameraVendor
+import dev.sebastiano.camerasync.domain.vendor.ConnectionModeSupport
 import dev.sebastiano.camerasync.domain.vendor.DefaultConnectionDelegate
+import dev.sebastiano.camerasync.domain.vendor.ImageBrowsingCapabilities
+import dev.sebastiano.camerasync.domain.vendor.ImageControlCapabilities
+import dev.sebastiano.camerasync.domain.vendor.RemoteCaptureCapabilities
+import dev.sebastiano.camerasync.domain.vendor.RemoteControlCapabilities
+import dev.sebastiano.camerasync.domain.vendor.StorageMonitoringCapabilities
+import dev.sebastiano.camerasync.domain.vendor.SyncCapabilities
 import dev.sebastiano.camerasync.domain.vendor.VendorConnectionDelegate
+import dev.sebastiano.camerasync.domain.vendor.VideoRecordingCapabilities
 import dev.sebastiano.camerasync.util.DeviceNameProvider
 import java.util.regex.Pattern
 import kotlin.uuid.ExperimentalUuidApi
@@ -58,14 +67,64 @@ object RicohCameraVendor : CameraVendor {
 
     override fun createConnectionDelegate(): VendorConnectionDelegate = DefaultConnectionDelegate()
 
-    override fun getCapabilities(): CameraCapabilities {
-        return CameraCapabilities(
-            supportsFirmwareVersion = true,
-            supportsDeviceName = true,
-            supportsDateTimeSync = true,
-            supportsGeoTagging = true,
-            supportsLocationSync = true,
-            supportsHardwareRevision = true,
+    override fun createRemoteControlDelegate(
+        peripheral: com.juul.kable.Peripheral,
+        camera: dev.sebastiano.camerasync.domain.model.Camera,
+    ): dev.sebastiano.camerasync.domain.vendor.RemoteControlDelegate =
+        RicohRemoteControlDelegate(peripheral, camera)
+
+    override fun getRemoteControlCapabilities(): RemoteControlCapabilities {
+        return RemoteControlCapabilities(
+            connectionModeSupport =
+                ConnectionModeSupport(bleOnlyShootingSupported = true, wifiAddsFeatures = true),
+            batteryMonitoring = BatteryMonitoringCapabilities(supported = true),
+            storageMonitoring = StorageMonitoringCapabilities(supported = true),
+            remoteCapture =
+                RemoteCaptureCapabilities(
+                    supported = true,
+                    requiresWifi = false,
+                    supportsBulbMode = true,
+                ),
+            advancedShooting =
+                AdvancedShootingCapabilities(
+                    supported = true,
+                    requiresWifi = false,
+                    supportsExposureModeReading = true,
+                    supportsDriveModeReading = true,
+                    supportsSelfTimer = true,
+                    supportsUserModes = true,
+                ),
+            videoRecording =
+                VideoRecordingCapabilities(
+                    supported = true, // Partial support via BLE capture type
+                    requiresWifi = false,
+                ),
+            imageControl =
+                ImageControlCapabilities(
+                    supported = true,
+                    requiresWifi = true,
+                    supportsCustomPresets = true,
+                    supportsParameterAdjustment = true,
+                ),
+            imageBrowsing =
+                ImageBrowsingCapabilities(
+                    supported = true,
+                    supportsThumbnails = true,
+                    supportsPreview = true,
+                    supportsFullDownload = true,
+                    supportsExifReading = true,
+                    supportsPushTransfer = true,
+                ),
+            // Legacy capabilities mapped
+            sync =
+                SyncCapabilities(
+                    supportsFirmwareVersion = true,
+                    supportsDeviceName = true,
+                    supportsDateTimeSync = true,
+                    supportsGeoTagging = true,
+                    supportsLocationSync = true,
+                    supportsHardwareRevision = true,
+                ),
         )
     }
 

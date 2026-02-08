@@ -1,12 +1,16 @@
 package dev.sebastiano.camerasync.fakes
 
+import com.juul.kable.Peripheral
+import dev.sebastiano.camerasync.domain.model.Camera
 import dev.sebastiano.camerasync.domain.model.GpsLocation
-import dev.sebastiano.camerasync.domain.vendor.CameraCapabilities
 import dev.sebastiano.camerasync.domain.vendor.CameraGattSpec
 import dev.sebastiano.camerasync.domain.vendor.CameraProtocol
 import dev.sebastiano.camerasync.domain.vendor.CameraVendor
 import dev.sebastiano.camerasync.domain.vendor.CameraVendorRegistry
 import dev.sebastiano.camerasync.domain.vendor.DefaultConnectionDelegate
+import dev.sebastiano.camerasync.domain.vendor.RemoteControlCapabilities
+import dev.sebastiano.camerasync.domain.vendor.RemoteControlDelegate
+import dev.sebastiano.camerasync.domain.vendor.SyncCapabilities
 import dev.sebastiano.camerasync.domain.vendor.VendorConnectionDelegate
 import java.time.ZonedDateTime
 import kotlin.uuid.ExperimentalUuidApi
@@ -67,13 +71,21 @@ object FakeCameraVendor : CameraVendor {
 
     override fun createConnectionDelegate(): VendorConnectionDelegate = DefaultConnectionDelegate()
 
-    override fun getCapabilities(): CameraCapabilities =
-        CameraCapabilities(
-            supportsFirmwareVersion = true,
-            supportsDeviceName = true,
-            supportsDateTimeSync = true,
-            supportsGeoTagging = true,
-            supportsLocationSync = true,
+    override fun createRemoteControlDelegate(
+        peripheral: Peripheral,
+        camera: Camera,
+    ): RemoteControlDelegate = FakeRemoteControlDelegate()
+
+    override fun getRemoteControlCapabilities(): RemoteControlCapabilities =
+        RemoteControlCapabilities(
+            sync =
+                SyncCapabilities(
+                    supportsFirmwareVersion = true,
+                    supportsDeviceName = true,
+                    supportsDateTimeSync = true,
+                    supportsGeoTagging = true,
+                    supportsLocationSync = true,
+                )
         )
 
     override fun extractModelFromPairingName(pairingName: String?): String {

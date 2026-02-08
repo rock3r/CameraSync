@@ -97,7 +97,7 @@ class MultiDeviceSyncCoordinatorFirmwareTest {
         connectionManager = DeviceConnectionManager()
 
         val notificationBuilder =
-            object : dev.sebastiano.camerasync.devicesync.NotificationBuilder {
+            object : NotificationBuilder {
                 override fun build(
                     channelId: String,
                     title: String,
@@ -107,7 +107,7 @@ class MultiDeviceSyncCoordinatorFirmwareTest {
                     priority: Int,
                     category: String?,
                     isSilent: Boolean,
-                    actions: List<dev.sebastiano.camerasync.devicesync.NotificationAction>,
+                    actions: List<NotificationAction>,
                     contentIntent: PendingIntent?,
                 ): Notification = mockk(relaxed = true)
             }
@@ -222,17 +222,26 @@ class MultiDeviceSyncCoordinatorFirmwareTest {
                     override fun createConnectionDelegate(): VendorConnectionDelegate =
                         DefaultConnectionDelegate()
 
-                    override fun getCapabilities() =
-                        dev.sebastiano.camerasync.domain.vendor.CameraCapabilities(
-                            supportsFirmwareVersion = false,
-                            supportsDeviceName = true,
-                            supportsDateTimeSync = true,
-                            supportsGeoTagging = true,
-                            supportsLocationSync = true,
+                    override fun getRemoteControlCapabilities() =
+                        dev.sebastiano.camerasync.domain.vendor.RemoteControlCapabilities(
+                            sync =
+                                dev.sebastiano.camerasync.domain.vendor.SyncCapabilities(
+                                    supportsFirmwareVersion = false,
+                                    supportsDeviceName = true,
+                                    supportsDateTimeSync = true,
+                                    supportsGeoTagging = true,
+                                    supportsLocationSync = true,
+                                )
                         )
 
                     override fun extractModelFromPairingName(pairingName: String?) =
                         pairingName ?: "No FW"
+
+                    override fun createRemoteControlDelegate(
+                        peripheral: com.juul.kable.Peripheral,
+                        camera: dev.sebastiano.camerasync.domain.model.Camera,
+                    ): dev.sebastiano.camerasync.domain.vendor.RemoteControlDelegate =
+                        dev.sebastiano.camerasync.fakes.FakeRemoteControlDelegate()
                 }
 
             vendorRegistry.addVendor(noFirmwareVendor)
@@ -318,17 +327,26 @@ class MultiDeviceSyncCoordinatorFirmwareTest {
                     override fun createConnectionDelegate(): VendorConnectionDelegate =
                         DefaultConnectionDelegate()
 
-                    override fun getCapabilities() =
-                        dev.sebastiano.camerasync.domain.vendor.CameraCapabilities(
-                            supportsFirmwareVersion = false,
-                            supportsDeviceName = false,
-                            supportsDateTimeSync = false,
-                            supportsGeoTagging = false,
-                            supportsLocationSync = false,
+                    override fun getRemoteControlCapabilities() =
+                        dev.sebastiano.camerasync.domain.vendor.RemoteControlCapabilities(
+                            sync =
+                                dev.sebastiano.camerasync.domain.vendor.SyncCapabilities(
+                                    supportsFirmwareVersion = false,
+                                    supportsDeviceName = false,
+                                    supportsDateTimeSync = false,
+                                    supportsGeoTagging = false,
+                                    supportsLocationSync = false,
+                                )
                         )
 
                     override fun extractModelFromPairingName(pairingName: String?) =
                         pairingName ?: "Limited"
+
+                    override fun createRemoteControlDelegate(
+                        peripheral: com.juul.kable.Peripheral,
+                        camera: dev.sebastiano.camerasync.domain.model.Camera,
+                    ): dev.sebastiano.camerasync.domain.vendor.RemoteControlDelegate =
+                        dev.sebastiano.camerasync.fakes.FakeRemoteControlDelegate()
                 }
 
             vendorRegistry.addVendor(limitedVendor)

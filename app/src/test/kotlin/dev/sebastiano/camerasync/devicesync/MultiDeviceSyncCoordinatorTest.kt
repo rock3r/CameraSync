@@ -1005,10 +1005,11 @@ class MultiDeviceSyncCoordinatorTest {
     fun `connection is disconnected if performInitialSetup fails`() =
         testScope.runTest {
             // We need performInitialSetup to throw.
-            // One way is to make getCapabilities throw.
+            // One way is to make getRemoteControlCapabilities throw.
             val throwingVendor = mockk<CameraVendor>()
             every { throwingVendor.vendorId } returns "throwing"
-            every { throwingVendor.getCapabilities() } throws IllegalStateException("Setup failed")
+            every { throwingVendor.getRemoteControlCapabilities() } throws
+                IllegalStateException("Setup failed")
             vendorRegistry.addVendor(throwingVendor)
 
             val throwingDevice = testDevice1.copy(vendorId = "throwing")
