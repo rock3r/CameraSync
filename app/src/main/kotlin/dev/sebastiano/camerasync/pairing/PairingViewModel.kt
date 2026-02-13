@@ -20,9 +20,11 @@ import dev.sebastiano.camerasync.feedback.IssueReporter
 import dev.zacsweers.metro.Inject
 import java.io.IOException
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicReference
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
@@ -106,6 +108,7 @@ class PairingViewModel(
     private var pairingJob: Job? = null
     private var scanJob: Job? = null
     private val successJob = AtomicReference<Job?>(null)
+    private val successEventSent = AtomicBoolean(false)
     private val probeJobs = ConcurrentHashMap<String, Job>()
     private val discoveredCameras = ConcurrentHashMap<String, DiscoveredCameraUi>()
     private val probeSemaphore = Semaphore(MODEL_PROBE_CONCURRENCY)
@@ -465,6 +468,7 @@ class PairingViewModel(
         withContext(mainDispatcher) { _state.value = PairingScreenState.Success(camera) }
 
         // Auto-close after delay
+        successEventSent.set(false)
         scheduleSuccessNavigation()
     }
 
@@ -519,8 +523,10 @@ class PairingViewModel(
 
     fun manualCloseSuccess() {
         successJob.getAndSet(null)?.cancel()
-        viewModelScope.launch(mainDispatcher) {
-            _navigationEvents.send(PairingNavigationEvent.DevicePaired)
+        if (successEventSent.compareAndSet(false, true)) {
+            viewModelScope.launch(mainDispatcher) {
+                _navigationEvents.send(PairingNavigationEvent.DevicePaired)
+            }
         }
     }
 
@@ -563,11 +569,18 @@ class PairingViewModel(
 
     private fun scheduleSuccessNavigation() {
         val job =
-            viewModelScope.launch(mainDispatcher) {
+            viewModelScope.launch(mainDispatcher, start = CoroutineStart.LAZY) {
                 delay(5_000L)
-                _navigationEvents.send(PairingNavigationEvent.DevicePaired)
+                if (successEventSent.compareAndSet(false, true)) {
+                    _navigationEvents.send(PairingNavigationEvent.DevicePaired)
+                }
             }
         successJob.getAndSet(job)?.cancel()
+        if (successJob.get() === job && !job.isCancelled) {
+            job.start()
+        } else {
+            job.cancel()
+        }
     }
 }
 
