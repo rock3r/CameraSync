@@ -135,6 +135,30 @@ class MultiDeviceSyncService(
                 launch { refreshConnections() }
                 FirmwareUpdateScheduler.triggerOneTimeCheck(this)
             }
+            ACTION_REFRESH_DEVICE -> {
+                val macAddress = intent.getStringExtra(EXTRA_DEVICE_ADDRESS)
+                if (macAddress.isNullOrBlank()) {
+                    Log.warn(tag = TAG) { "Refresh device intent missing mac address" }
+                    return START_NOT_STICKY
+                }
+                Log.info(tag = TAG) { "Received device refresh intent for $macAddress" }
+                if (!checkPermissions()) return START_NOT_STICKY
+                startForegroundService()
+                startDeviceMonitoring()
+                launch {
+                    val device = pairedDevicesRepository.getDevice(macAddress)
+                    if (device == null) {
+                        Log.warn(tag = TAG) { "Device $macAddress not found for refresh" }
+                        return@launch
+                    }
+                    if (!device.isEnabled) {
+                        Log.warn(tag = TAG) { "Device $macAddress is disabled; skipping refresh" }
+                        return@launch
+                    }
+                    syncCoordinator.stopDeviceSync(macAddress, awaitCompletion = true)
+                    syncCoordinator.startDeviceSync(device)
+                }
+            }
             ACTION_DEVICE_FOUND -> {
                 Log.info(tag = TAG) {
                     "Received device found intent, starting service and connecting..."
@@ -486,6 +510,9 @@ class MultiDeviceSyncService(
         /** Action to manually refresh connections. */
         const val ACTION_REFRESH = "dev.sebastiano.camerasync.REFRESH_CONNECTIONS"
 
+        /** Action to refresh a single device connection. */
+        const val ACTION_REFRESH_DEVICE = "dev.sebastiano.camerasync.REFRESH_DEVICE"
+
         /** Action triggered when a device is found during background scanning. */
         const val ACTION_DEVICE_FOUND = "dev.sebastiano.camerasync.DEVICE_FOUND"
 
@@ -530,6 +557,19 @@ class MultiDeviceSyncService(
          */
         fun createRefreshIntent(context: Context): Intent =
             Intent(context, MultiDeviceSyncService::class.java).apply { action = ACTION_REFRESH }
+
+        /**
+         * Creates an [Intent] to refresh a single device connection.
+         *
+         * @param context The context.
+         * @param macAddress The device MAC address.
+         * @return The refresh intent for the device.
+         */
+        fun createRefreshDeviceIntent(context: Context, macAddress: String): Intent =
+            Intent(context, MultiDeviceSyncService::class.java).apply {
+                action = ACTION_REFRESH_DEVICE
+                putExtra(EXTRA_DEVICE_ADDRESS, macAddress)
+            }
 
         /**
          * Creates an [Intent] to notify that a device was found.

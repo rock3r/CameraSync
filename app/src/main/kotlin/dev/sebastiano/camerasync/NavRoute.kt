@@ -18,4 +18,7 @@ sealed interface NavRoute : Parcelable {
 
     /** Log viewer screen. */
     @Parcelize @Serializable data object LogViewer : NavRoute
+
+    /** Remote control screen for a specific device. */
+    @Parcelize @Serializable data class RemoteControl(val macAddress: String) : NavRoute
 }

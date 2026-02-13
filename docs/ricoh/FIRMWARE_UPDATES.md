@@ -63,4 +63,5 @@ Only **GR IV** (`gr4`) currently supports in-app firmware update.
 - Phone storage space available  
 - Camera not in shooting mode  
 
-BLE firmware-update cancel characteristics: see [README.md](README.md) §2.1.7 (`B29E6DE3`, `0936b04c`). Notification type `bOa` for firmware update result.
+BLE firmware update **cancel** characteristics are not documented in the public UUID lists.
+Cancel is reliably supported via HTTP `GET /v1/configs/firmware/cancel`.

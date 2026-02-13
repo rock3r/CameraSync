@@ -7,6 +7,7 @@
     <string name="action_ok">OK</string>
     <string name="action_cancel">Cancel</string>
     <string name="action_retry">Retry</string>
+    <string name="action_reset_remote_shooting">Reset remote shooting</string>
 
     <!-- Quick Settings Tile -->
     <string name="tile_sync_label">Camera Sync</string>
@@ -152,6 +153,32 @@
     <string name="perm_bt_connect_desc">Connect to your camera</string>
     <string name="perm_notifications">Notifications</string>
     <string name="perm_notifications_desc">Show sync status updates</string>
+
+    <!-- Remote Shooting -->
+    <string name="remote_shooting_title">Remote control</string>
+    <string name="remote_connection_ble">Connected via Bluetooth (Basic mode)</string>
+    <string name="remote_connection_wifi">Connected via Wi‑Fi (Full control)</string>
+    <string name="remote_wifi_coming_soon">Full mode (Wi‑Fi) coming soon</string>
+    <string name="remote_disconnect_wifi">Disconnect Wi‑Fi (save battery)</string>
+    <string name="remote_status_battery">Battery: %1$d%%</string>
+    <string name="remote_status_battery_unknown">Battery: --</string>
+    <string name="remote_status_storage">Storage: %1$s shots</string>
+    <string name="remote_status_storage_no_card">Storage: No card</string>
+    <string name="remote_capture_button">Shutter</string>
+    <string name="content_desc_capture">Take photo</string>
+    <string name="remote_live_view_placeholder">Live view stream</string>
+    <string name="remote_live_view_touch_af">Touch AF supported</string>
+    <string name="remote_shooting_settings">Shooting settings</string>
+    <string name="remote_label_mode">Mode</string>
+    <string name="remote_label_drive">Drive</string>
+    <string name="remote_label_focus">Focus</string>
+    <string name="remote_image_control">Image control</string>
+    <string name="remote_image_control_standard">Standard</string>
+    <string name="remote_half_press_supported">Half-press AF supported</string>
+    <string name="remote_action_in_progress">Performing action...</string>
+    <string name="action_go_back">Go back</string>
+    <string name="remote_error_not_connected">Device not connected via BLE. Connect from the main list first.</string>
+    <string name="remote_error_unsupported">Remote control not supported for this device</string>
 
     <!-- Widget -->
     <plurals name="cameras_syncing">

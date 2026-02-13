@@ -13,12 +13,23 @@ and firmware operations. This document describes the endpoints, WebSocket status
 
 ### 5.1.1. Camera Information & Control
 
-| Method | Endpoint            | Purpose                                           | Timeout                   |
-|:-------|:--------------------|:--------------------------------------------------|:--------------------------|
-| `GET`  | `/v1/props`         | Camera properties (model, serial, SSID, firmware) | 3s (verify), 10s (normal) |
-| `GET`  | `/v1/status/device` | Device status (power state, etc.)                 | 10s                       |
-| `POST` | `/v1/device/finish` | End session/disconnect (empty body)               | 10s                       |
-| `PUT`  | `/v1/params/device` | Set device parameters (WiFi config)               | 10s                       |
+| Method | Endpoint                 | Purpose                                           | Timeout                   |
+|:-------|:-------------------------|:--------------------------------------------------|:--------------------------|
+| `GET`  | `/v1/props`              | Camera properties (model, serial, SSID, firmware) | 3s (verify), 10s (normal) |
+| `GET`  | `/v1/ping`               | Ping device (returns camera time)                 | 3s                        |
+| `GET`  | `/v1/liveview`           | Live view MJPEG stream (if supported)             | 10s                       |
+| `GET`  | `/v1/constants/device`   | Legacy device info (GR II era)                    | 10s                       |
+| `GET`  | `/_gr/objs`              | Legacy object list (GR Remote/GR II)              | 10s                       |
+| `POST` | `/v1/device/finish`      | End session / shutdown camera                     | 10s                       |
+| `POST` | `/v1/device/wlan/finish` | Shutdown WLAN only                                | 10s                       |
+| `PUT`  | `/v1/params/device`      | Set device parameters (e.g., stillFormat)         | 10s                       |
+| `PUT`  | `/v1/params/camera`      | Set capture parameters                            | 10s                       |
+| `PUT`  | `/v1/params/camera/compAdjust` | Composition adjustment                      | 10s                       |
+| `PUT`  | `/v1/params/lens`        | Set lens parameters (e.g., focusSetting)          | 10s                       |
+| `POST` | `/v1/lens/focus`          | Focus at point                                   | 10s                       |
+| `POST` | `/v1/lens/focus/lock`     | Lock focus                                       | 10s                       |
+| `POST` | `/v1/lens/focus/unlock`   | Unlock focus                                     | 10s                       |
+| `POST` | `/v1/params/lens/zoom`    | Set zoom level                                   | 10s                       |
 
 **`/v1/props` Response:**
 
@@ -44,116 +55,80 @@ and firmware operations. This document describes the endpoints, WebSocket status
 | `bdName`          | string | Bluetooth device name                                    |
 | `firmwareVersion` | string | Firmware version (e.g., "1.50")                          |
 
-**`/v1/params/device` Body (WiFi Configuration):**
+**`/v1/params/device` Body (Device Parameters):**
 
-```
-Content-Type: application/json
-
-channel=0&ssid=RICOH_1234&key=password123
-```
+OpenAPI defines this as a form body with fields like `stillFormat`. It is **not** the Wi-Fi
+configuration endpoint; Wi-Fi credentials are managed via BLE or `/v1/props`.
 
 ### 5.1.2. Photo Operations
 
-| Method | Endpoint                             | Purpose                     | Timeout |
-|:-------|:-------------------------------------|:----------------------------|:--------|
-| `GET`  | `/v1/photos/infos?storage=in&after=` | List photos with pagination | 10s     |
-| `GET`  | `/v1/photos/<path>?size=thumb`       | Get thumbnail               | 15s     |
-| `GET`  | `/v1/photos/<path>?size=view`        | Get preview/view size       | 15s     |
-| `GET`  | `/v1/photos/<path>?size=xs`          | Get extra-small preview     | 15s     |
-| `GET`  | `/v1/photos/<path>?storage=in`       | Download full image         | 120s    |
-| `GET`  | `/v1/photos/<path>/info?storage=in`   | Get single photo info       | 10s     |
-| `PUT`  | `/v1/photos/<path>/transfer`         | Prepare file for transfer   | 10s     |
-| `GET`  | `/v1/transfers?status=&storage=`     | List transfer queue status  | 10s     |
+| Method | Endpoint                                          | Purpose                     | Timeout |
+|:-------|:--------------------------------------------------|:----------------------------|:--------|
+| `GET`  | `/v1/photos?storage=in&limit=&after=`            | List photos with pagination | 10s     |
+| `GET`  | `/v1/photos/{dir}/{file}?size=thumb`             | Get thumbnail               | 15s     |
+| `GET`  | `/v1/photos/{dir}/{file}?size=view`              | Get preview/view size       | 15s     |
+| `GET`  | `/v1/photos/{dir}/{file}?size=xs`                | Get extra-small preview     | 15s     |
+| `GET`  | `/v1/photos/{dir}/{file}`                        | Download full image         | 120s    |
+| `GET`  | `/v1/photos/{dir}/{file}/info`                   | Get single photo info       | 10s     |
+| `PUT`  | `/v1/photos/{dir}/{file}/transfer`               | Set transfer status         | 10s     |
+| `GET`  | `/v1/transfers?status=&storage=&limit=&after=`   | List transfer queue status  | 10s     |
 
 **Storage Parameter Values:**
 
 - `storage=in` - Internal storage
 - `storage=sd1` - SD card slot 1
 
-**`/v1/photos/infos` Response:**
+**`/v1/photos` Response (list only):**
 
 ```json
 {
   "errCode": 200,
   "dirs": [
-    "100RICOH",
-    "101RICOH"
-  ],
-  "files": [
     {
-      "memory": 0,
-      "dir": "100RICOH",
-      "file": "R0001234.DNG",
-      "size": 25165824,
-      "recorded_size": "24.0MB",
-      "datetime": 1704067200,
-      "recorded_time": "2024-01-01 12:00:00",
-      "orientation": 1,
-      "aspect_ratio": "3:2",
-      "av": "F2.8",
-      "tv": "1/250",
-      "sv": "ISO200",
-      "xv": "+0.3",
-      "lat_lng": "35.6762,139.6503",
-      "gps_info": "{...}"
+      "name": "100RICOH",
+      "files": ["R0001234.DNG", "R0001235.JPG"]
     }
   ]
 }
 ```
 
-| Field           | Type   | Description                                  |
-|:----------------|:-------|:---------------------------------------------|
-| `memory`        | int    | Storage location (0 = internal, 1 = SD card) |
-| `dir`           | string | Directory name (e.g., "100RICOH")           |
-| `file`          | string | Filename (e.g., "R0001234.DNG")             |
-| `size`          | int    | File size in bytes                          |
-| `recorded_size` | string | Human-readable file size                    |
-| `datetime`      | int    | Unix timestamp                              |
-| `recorded_time` | string | Formatted datetime string                   |
-| `orientation`   | int    | EXIF orientation (1-8)                      |
-| `aspect_ratio`  | string | "1:1", "3:2", "4:3", "16:9"                 |
-| `av`            | string | Aperture value (e.g., "F2.8")               |
-| `tv`            | string | Shutter speed (e.g., "1/250")                |
-| `sv`            | string | ISO sensitivity (e.g., "ISO200")            |
-| `xv`            | string | Exposure compensation (e.g., "+0.3")          |
-| `lat_lng`       | string | GPS coordinates "lat,lng"                   |
-| `gps_info`      | string | Full GPS info JSON                          |
+**`/v1/photos/{dir}/{file}/info` Response (metadata):**
 
-**Transfer Status Response (`/v1/transfers`):**
+Returns fields like `cameraModel`, `orientation`, `aspectRatio`, `av`, `tv`, `sv`, `xv`, `size`,
+`gpsInfo`, and `datetime` (see OpenAPI schema `PhotoMetadata`).
+
+**Transfer List Response (`/v1/transfers`):**
 
 ```json
 {
   "errCode": 200,
   "transfers": [
     {
+      "index": 1,
       "filepath": "/100RICOH/R0001234.DNG",
-      "status": "transferred"
+      "size": 25165824
     }
   ]
 }
 ```
 
-| Status          | Meaning                  |
-|:----------------|:-------------------------|
-| `transferred`   | File transfer complete    |
-| `untransferred` | File not yet transferred |
+Filter by status using the `status` query parameter (`transferred` or `untransferred`).
 
-**Transfer PUT Body (`/v1/photos/<path>/transfer`):**
+**Transfer PUT Body (`/v1/photos/{dir}/{file}/transfer`):**
 
-```
-Content-Type: application/json
-
-storage=in
-```
+OpenAPI defines a form body with `status` and `storage` (e.g., `status=transferred&storage=sd1`).
 
 **Aspect Ratios:** `1:1`, `3:2`, `4:3`, `16:9`
 
 ### 5.1.3. Remote Shooting
 
-| Method     | Endpoint                | Purpose                     |
-|:-----------|:------------------------|:----------------------------|
-| `POST`     | `/v1/camera/shoot`      | Trigger shutter             |
-| `GET/POST` | `/v1/photos?storage=in` | Photo capture/list endpoint |
+| Method | Endpoint                     | Purpose                 |
+|:------|:------------------------------|:------------------------|
+| `POST` | `/v1/camera/shoot`           | Trigger shutter         |
+| `POST` | `/v1/camera/shoot/start`     | Start shoot (sequence)  |
+| `POST` | `/v1/camera/shoot/compose`   | Compose shoot           |
+| `POST` | `/v1/camera/shoot/cancel`    | Cancel shoot            |
+| `POST` | `/v1/camera/shoot/finish`    | Finish shoot            |
 
 ### 5.1.4. Image Control (Read)
 
@@ -236,7 +211,7 @@ The `CaptureStatusModel` contains two sub-states that independently track countd
 | `capturing`   | `CaptureCapturing` | `notInShootingProcess` (0) — idle; `inShootingProcess` (1) — capturing    |
 
 > **Note on Remote Shutter:** The Ricoh protocol provides a single-step "shoot" command only (HTTP
-> `POST /v1/camera/shoot` or BLE write to `A3C51525`). There is **no half-press/S1 autofocus step**
+> `POST /v1/camera/shoot` or BLE write to **Operation Request** `559644B8`). There is **no half-press/S1 autofocus step**
 > — the camera handles AF internally upon trigger. There is also **no touch AF** or **focus status
 > reading** capability. AF control is Sony-only.
 
@@ -252,19 +227,11 @@ The `CaptureStatusModel` contains two sub-states that independently track countd
 | `still` | Still image mode |
 | `movie` | Movie/video mode |
 
-**Capture Type (`CaptureType`, BLE `3e0673e0`):**
-| Value   | BLE Index | Meaning          |
-|:--------|:----------|:-----------------|
-| `image` | 0         | Still image mode |
-| `video` | 1 (→2)   | Video/movie mode |
-
-**Capture Mode Values (`CaptureMode`, BLE `009A8E70`):**
+**Capture Mode (BLE `78009238`):**
 | Value | Meaning |
 | :--- | :--- |
-| `single` | Single shot |
-| `continuous` | Continuous shooting |
-| `interval` | Interval timer |
-| `multiExposure` | Multiple exposure |
+| `0` | Still image mode |
+| `2` | Movie/video mode |
 
 **Drive Mode Values (WebSocket, 6 base modes):**
 | Value | Asset | Description |
@@ -276,30 +243,11 @@ The `CaptureStatusModel` contains two sub-states that independently track countd
 | `interval` | `drive_interval.png` | Interval timer |
 | `multi_exp_interval` | `drive_multi_exp_interval.png` | Multi-exp + interval |
 
-**Drive Mode Enum (BLE `QOa`, 16 values via `A3C51525` notify):**
+**Drive Mode Enum (BLE `B29E6DE3`):**
 
-The BLE drive mode notification on characteristic `A3C51525` provides a finer-grained 16-value enum
-that combines drive mode + self-timer state. Each base drive mode has up to 3 variants (no timer,
-10-second timer, 2-second timer):
-
-| BLE Value | Internal Name                          | Drive Mode           | Timer |
-|:----------|:---------------------------------------|:---------------------|:------|
-| 0         | `oneFrame`                             | Single               | Off   |
-| 1         | `tenSecondFrame`                       | Single               | 10s   |
-| 2         | `twoSecondFrame`                       | Single               | 2s    |
-| 3         | `continuousShootingFrame`              | Continuous           | Off   |
-| 4         | `bracketFrame`                         | Auto Bracket         | Off   |
-| 5         | `bracketTenSecondFrame`                | Auto Bracket         | 10s   |
-| 6         | `bracketTwoSecondFrame`                | Auto Bracket         | 2s    |
-| 7         | `multipleExposureFrame`                | Multi-exposure       | Off   |
-| 8         | `multipleExposureTenSecondFrame`       | Multi-exposure       | 10s   |
-| 9         | `multipleExposureTwoSecondFrame`       | Multi-exposure       | 2s    |
-| 10        | `intervalFrame`                        | Interval             | Off   |
-| 11        | `intervalTenSecondFrame`               | Interval             | 10s   |
-| 12        | `intervalTwoSecondFrame`               | Interval             | 2s    |
-| 13        | `intervalCompositionFrame`             | Interval Composite   | Off   |
-| 14        | `intervalCompositionTenSecondFrame`    | Interval Composite   | 10s   |
-| 15        | `intervalCompositionTwoSecondFrame`    | Interval Composite   | 2s    |
+The BLE Drive Mode characteristic exposes a **0–65** enum that includes self-timer and remote
+variants (see dm-zharov Drive Mode table). The WebSocket/UI still uses the 6 base drive modes
+above.
 
 **Time/Bulb Shooting State (`TimeShootingState`):**
 
@@ -351,9 +299,8 @@ The camera supports these exposure modes (shown in remote shutter UI):
 | Interval           | `interval`           | `drive_interval.png`           |
 | Multi-exp Interval | `multi_exp_interval` | `drive_multi_exp_interval.png` |
 
-> **See also:** The BLE drive mode notification on `A3C51525` provides a 16-value enum that
-> combines drive mode + self-timer state. See §5.2 "Drive Mode Enum (BLE `QOa`)" for the full
-> mapping.
+> **See also:** The BLE **Drive Mode** characteristic is `B29E6DE3` and exposes a 0–65 enum with
+> self-timer and remote variants. See dm-zharov for the full mapping.
 
 ---
 

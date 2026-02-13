@@ -229,3 +229,7 @@ Compose:
     active: true
   ViewModelInjection:
     active: true
+
+camerasync:
+  NoFullyQualifiedAppReference:
+    active: true

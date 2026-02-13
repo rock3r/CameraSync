@@ -77,10 +77,38 @@ android {
     }
 
     buildFeatures { compose = true }
+    testOptions { unitTests.isIncludeAndroidResources = true }
     installation { installOptions += listOf("--user", "0") }
 }
 
 ktfmt { kotlinLangStyle() }
+
+tasks.withType<Test>().configureEach {
+    if (name == "testReleaseUnitTest") {
+        // Robolectric fails to resolve test activities for the release variant.
+        // Debug unit tests still run, so keep release unit tests disabled for now.
+        enabled = false
+        return@configureEach
+    }
+    if (!name.endsWith("UnitTest")) {
+        return@configureEach
+    }
+    val variantName = name.removePrefix("test").removeSuffix("UnitTest")
+    if (variantName.isEmpty()) {
+        return@configureEach
+    }
+    val variantDir = variantName.replaceFirstChar { it.lowercase() }
+    val manifestPath =
+        layout.buildDirectory
+            .file(
+                "intermediates/packaged_manifests/${variantDir}UnitTest/" +
+                    "process${variantName}UnitTestManifest/AndroidManifest.xml"
+            )
+            .get()
+            .asFile
+            .absolutePath
+    doFirst { systemProperty("robolectric.manifest", manifestPath) }
+}
 
 kotlin { compilerOptions { jvmTarget.set(JvmTarget.JVM_11) } }
 
@@ -126,6 +154,10 @@ dependencies {
     testImplementation(libs.kotlinx.coroutines.test)
     testImplementation(libs.mockk)
     testImplementation(libs.mockwebserver)
+    testImplementation(platform(libs.androidx.compose.bom))
+    testImplementation(libs.androidx.ui.test.junit4)
+    testImplementation(libs.androidx.ui.test.manifest)
+    testImplementation(libs.robolectric)
 
     androidTestImplementation(libs.androidx.espresso.core)
     androidTestImplementation(libs.androidx.junit)
@@ -133,6 +165,7 @@ dependencies {
     androidTestImplementation(platform(libs.androidx.compose.bom))
 
     detektPlugins(libs.compose.rules.detekt)
+    detektPlugins(project(":detekt-rules"))
 }
 
 // Setup protobuf configuration, generating lite Java and Kotlin classes

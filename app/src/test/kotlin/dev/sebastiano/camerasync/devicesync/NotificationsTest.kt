@@ -7,6 +7,7 @@ import android.content.res.Resources
 import androidx.core.app.NotificationCompat
 import dev.sebastiano.camerasync.CameraSyncApp
 import dev.sebastiano.camerasync.R
+import dev.sebastiano.camerasync.di.TestGraph
 import dev.sebastiano.camerasync.di.TestGraphFactory
 import dev.sebastiano.camerasync.fakes.FakeIntentFactory
 import dev.sebastiano.camerasync.fakes.FakeKhronicleLogger
@@ -32,7 +33,7 @@ class NotificationsTest {
 
     private lateinit var context: Context
     private lateinit var notificationManager: NotificationManager
-    private lateinit var testGraph: dev.sebastiano.camerasync.di.TestGraph
+    private lateinit var testGraph: TestGraph
 
     // Store fake instances to avoid getting new instances on each testGraph.* access
     private lateinit var notificationBuilder: FakeNotificationBuilder
@@ -347,15 +348,15 @@ class NotificationsTest {
         // Verify PendingIntentFactory was called 3 times (2 actions + 1 content intent)
         assertEquals(3, pendingIntentFactory.calls.size)
         assertEquals(
-            dev.sebastiano.camerasync.devicesync.MultiDeviceSyncService.REFRESH_REQUEST_CODE,
+            MultiDeviceSyncService.REFRESH_REQUEST_CODE,
             pendingIntentFactory.calls[0].requestCode,
         )
         assertEquals(
-            dev.sebastiano.camerasync.devicesync.MultiDeviceSyncService.STOP_REQUEST_CODE,
+            MultiDeviceSyncService.STOP_REQUEST_CODE,
             pendingIntentFactory.calls[1].requestCode,
         )
         assertEquals(
-            dev.sebastiano.camerasync.devicesync.MultiDeviceSyncService.MAIN_ACTIVITY_REQUEST_CODE,
+            MultiDeviceSyncService.MAIN_ACTIVITY_REQUEST_CODE,
             pendingIntentFactory.calls[2].requestCode,
         )
 

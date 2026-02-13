@@ -10,6 +10,7 @@ import com.juul.khronicle.Log
 import com.juul.khronicle.Logger
 import dev.sebastiano.camerasync.devicesync.registerNotificationChannel
 import dev.sebastiano.camerasync.di.AppGraph
+import dev.sebastiano.camerasync.di.MetroAppComponentFactory
 import dev.sebastiano.camerasync.firmware.FirmwareUpdateCheckWorkerFactory
 import dev.sebastiano.camerasync.firmware.FirmwareUpdateScheduler
 import dev.sebastiano.camerasync.widget.SyncWidgetReceiver
@@ -22,10 +23,7 @@ import kotlinx.coroutines.launch
 
 /** Application-level configuration and dependency creation for CameraSync. */
 class CameraSyncApp : Application(), Provider {
-    /**
-     * Holder reference for the app graph for
-     * [dev.sebastiano.camerasync.di.MetroAppComponentFactory].
-     */
+    /** Holder reference for the app graph for [MetroAppComponentFactory]. */
     val appGraph by lazy { createGraphFactory<AppGraph.Factory>().create(application = this) }
 
     private val applicationScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)

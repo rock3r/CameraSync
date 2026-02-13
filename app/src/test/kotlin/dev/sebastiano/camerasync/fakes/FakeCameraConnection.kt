@@ -3,6 +3,7 @@ package dev.sebastiano.camerasync.fakes
 import dev.sebastiano.camerasync.domain.model.Camera
 import dev.sebastiano.camerasync.domain.model.GpsLocation
 import dev.sebastiano.camerasync.domain.repository.CameraConnection
+import dev.sebastiano.camerasync.domain.vendor.RemoteControlDelegate
 import java.io.IOException
 import java.time.ZonedDateTime
 import kotlinx.coroutines.flow.Flow
@@ -92,6 +93,20 @@ class FakeCameraConnection(override val camera: Camera) : CameraConnection {
     override suspend fun disconnect() {
         disconnectCalled = true
         _isConnected.value = false
+    }
+
+    override fun supportsLocationSync(): Boolean =
+        camera.vendor.getSyncCapabilities().supportsLocationSync
+
+    /**
+     * Optional delegate for remote control tests. When set, [getRemoteControlDelegate] returns it.
+     */
+    private var _remoteControlDelegate: RemoteControlDelegate? = null
+
+    override fun getRemoteControlDelegate(): RemoteControlDelegate? = _remoteControlDelegate
+
+    fun setRemoteControlDelegate(delegate: RemoteControlDelegate?) {
+        _remoteControlDelegate = delegate
     }
 
     fun setConnected(connected: Boolean) {

@@ -84,7 +84,6 @@
         android:theme="@style/Theme.CameraSync"
         tools:replace="android:appComponentFactory"
         tools:targetApi="34">
-
         <!-- False lint positive, it's ctor-injected by Metro -->
         <service
             android:name=".devicesync.MultiDeviceSyncService"

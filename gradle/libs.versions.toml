@@ -22,6 +22,7 @@ maplibre = "0.12.1"
 maplibre-spatialk = "0.6.1"
 mockk = "1.14.9"
 mockwebserver = "4.12.0"
+robolectric = "4.12.2"
 metro = "0.10.2"
 navigation3 = "1.0.0"
 protobufPlugin = "0.9.6"
@@ -63,6 +64,7 @@ kotlinx-coroutines-test = { group = "org.jetbrains.kotlinx", name = "kotlinx-cor
 kotlinx-serialization-json = { group = "org.jetbrains.kotlinx", name = "kotlinx-serialization-json", version.ref = "kotlinxSerialization" }
 mockk = { group = "io.mockk", name = "mockk", version.ref = "mockk" }
 mockwebserver = { group = "com.squareup.okhttp3", name = "mockwebserver", version.ref = "mockwebserver" }
+robolectric = { group = "org.robolectric", name = "robolectric", version.ref = "robolectric" }
 play-services-location = { group = "com.google.android.gms", name = "play-services-location", version.ref = "playServicesLocation" }
 maplibre-core = { module = "org.maplibre.compose:maplibre-compose-android", version.ref = "maplibre" }
 maplibre-material3 = { module = "org.maplibre.compose:maplibre-compose-material3-android", version.ref = "maplibre" }
