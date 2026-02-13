@@ -7,7 +7,7 @@ simultaneously, with centralized location collection and independent device conn
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                         UI Layer                                 │
+│                         UI Layer                                │
 ├─────────────────────────────────────────────────────────────────┤
 │  DevicesListScreen          │  PairingScreen                    │
 │  - Shows paired devices     │  - BLE scanning                   │
@@ -21,7 +21,7 @@ simultaneously, with centralized location collection and independent device conn
                               │
                               ▼
 ┌─────────────────────────────────────────────────────────────────┐
-│                       Service Layer                              │
+│                       Service Layer                             │
 ├─────────────────────────────────────────────────────────────────┤
 │  MultiDeviceSyncService (Foreground Service)                    │
 │  - Manages service lifecycle                                    │
@@ -55,7 +55,7 @@ simultaneously, with centralized location collection and independent device conn
 │  CameraRepository                                               │
 │  - BLE scanning and discovery                                   │
 │  - Device connection management                                 │
-│  - Passive scan registration via PendingIntent                 │
+│  - Passive scan registration via PendingIntent                  │
 │                                                                 │
 │  LocationRepository                                             │
 │  - Fused Location Provider                                      │
@@ -247,7 +247,7 @@ is missing or older than 24 hours.
 User selects device in PairingScreen
         │
         ▼
-PairingViewModel.pairDevice(camera)
+PairingViewModel.requestCompanionPairing(camera) → bonding → connecting
         │
         ▼
 PairedDevicesRepository.addDevice(camera, enabled=true)
@@ -359,7 +359,7 @@ All key interfaces have fake implementations for testing:
 | `CameraVendorRegistry`          | `FakeVendorRegistry`          |
 | `NotificationBuilder`           | `FakeNotificationBuilder`     |
 | `IntentFactory`                 | `FakeIntentFactory`           |
-| `PendingIntentFactory`    | `FakePendingIntentFactory`    |
+| `PendingIntentFactory`          | `FakePendingIntentFactory`    |
 | `WidgetUpdateHelper`            | `FakeWidgetUpdateHelper`      |
 
 **Dependency Injection**: The project uses Metro for compile-time DI. Tests use `TestGraphFactory`

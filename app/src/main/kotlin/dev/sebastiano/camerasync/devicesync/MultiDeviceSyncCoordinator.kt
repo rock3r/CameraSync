@@ -63,9 +63,8 @@ private const val FIRMWARE_CHECK_INTERVAL_MS = 24 * 60 * 60 * 1000L
  * - Per-device connection state
  * - Broadcasting location updates to all connected devices
  */
-class MultiDeviceSyncCoordinator
 @AssistedInject
-constructor(
+class MultiDeviceSyncCoordinator(
     private val context: Context,
     private val cameraRepository: CameraRepository,
     private val vendorRegistry: CameraVendorRegistry,

@@ -27,6 +27,7 @@ navigation3 = "1.0.0"
 protobufPlugin = "0.9.6"
 protobuf = "4.33.5"
 playServicesLocation = "21.3.0"
+robolectric = "4.12.2"
 workRuntimeKtx = "2.11.1"
 
 [libraries]
@@ -52,6 +53,7 @@ androidx-ui = { group = "androidx.compose.ui", name = "ui" }
 androidx-ui-graphics = { group = "androidx.compose.ui", name = "ui-graphics" }
 androidx-ui-test-junit4 = { group = "androidx.compose.ui", name = "ui-test-junit4" }
 androidx-ui-test-manifest = { group = "androidx.compose.ui", name = "ui-test-manifest" }
+androidx-ui-test = { group = "androidx.compose.ui", name = "ui-test" }
 androidx-ui-tooling = { group = "androidx.compose.ui", name = "ui-tooling" }
 androidx-ui-tooling-preview = { group = "androidx.compose.ui", name = "ui-tooling-preview" }
 androidx-work-runtime-ktx = { group = "androidx.work", name = "work-runtime-ktx", version.ref = "workRuntimeKtx" }
@@ -64,6 +66,7 @@ kotlinx-serialization-json = { group = "org.jetbrains.kotlinx", name = "kotlinx-
 mockk = { group = "io.mockk", name = "mockk", version.ref = "mockk" }
 mockwebserver = { group = "com.squareup.okhttp3", name = "mockwebserver", version.ref = "mockwebserver" }
 play-services-location = { group = "com.google.android.gms", name = "play-services-location", version.ref = "playServicesLocation" }
+robolectric = { group = "org.robolectric", name = "robolectric", version.ref = "robolectric" }
 maplibre-core = { module = "org.maplibre.compose:maplibre-compose-android", version.ref = "maplibre" }
 maplibre-material3 = { module = "org.maplibre.compose:maplibre-compose-material3-android", version.ref = "maplibre" }
 maplibre-spatialk = { module = "org.maplibre.spatialk:geojson", version.ref = "maplibre-spatialk" }

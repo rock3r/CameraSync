@@ -13,6 +13,9 @@ class FakeBluetoothBondingChecker : BluetoothBondingChecker {
     /** Controls whether createBond will automatically mark the device as bonded. */
     var createBondAutoBonds: Boolean = true
 
+    /** Controls whether removeBond will succeed. */
+    var removeBondSucceeds: Boolean = true
+
     /** Sets whether a device is bonded. */
     fun setBonded(macAddress: String, bonded: Boolean) {
         if (bonded) {
@@ -30,6 +33,9 @@ class FakeBluetoothBondingChecker : BluetoothBondingChecker {
 
     override fun removeBond(macAddress: String): Boolean {
         val wasBonded = isDeviceBonded(macAddress)
+        if (!removeBondSucceeds) {
+            return false
+        }
         if (wasBonded) {
             bondedDevices.remove(macAddress.uppercase())
         }

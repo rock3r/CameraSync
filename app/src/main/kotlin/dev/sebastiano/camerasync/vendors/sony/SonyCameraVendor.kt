@@ -112,6 +112,7 @@ object SonyCameraVendor : CameraVendor {
             supportsLocationSync = true,
             requiresVendorPairing = true, // Sony requires writing to EE01 characteristic
             supportsHardwareRevision = true,
+            supportsModelName = true,
         )
     }
 

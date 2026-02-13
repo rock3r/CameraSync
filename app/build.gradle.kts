@@ -77,6 +77,7 @@ android {
     }
 
     buildFeatures { compose = true }
+    testOptions { unitTests.isIncludeAndroidResources = true }
     installation { installOptions += listOf("--user", "0") }
 }
 
@@ -123,9 +124,15 @@ dependencies {
     debugImplementation(libs.androidx.ui.tooling)
 
     testImplementation(libs.junit)
+    testImplementation(platform(libs.androidx.compose.bom))
+    testImplementation(libs.androidx.junit)
+    testImplementation(libs.robolectric)
     testImplementation(libs.kotlinx.coroutines.test)
     testImplementation(libs.mockk)
     testImplementation(libs.mockwebserver)
+    testImplementation(libs.androidx.ui.test)
+    testImplementation(libs.androidx.ui.test.junit4)
+    testImplementation(libs.androidx.ui.test.manifest)
 
     androidTestImplementation(libs.androidx.espresso.core)
     androidTestImplementation(libs.androidx.junit)
@@ -133,6 +140,13 @@ dependencies {
     androidTestImplementation(platform(libs.androidx.compose.bom))
 
     detektPlugins(libs.compose.rules.detekt)
+}
+
+tasks.withType<org.gradle.api.tasks.testing.Test>().configureEach {
+    systemProperty(
+        "robolectric.manifest",
+        "${project.projectDir}/src/test/resources/AndroidManifest.xml",
+    )
 }
 
 // Setup protobuf configuration, generating lite Java and Kotlin classes
