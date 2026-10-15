@@ -340,8 +340,7 @@ MultiDeviceSyncService observes change via background monitoring
 ```
 
 **Important:** When a device is disabled, the `checkAndConnectEnabledDevices()` method automatically
-detects connected devices that are no longer in the enabled list and disconnects them. This ensures
-devices are properly disconnected when disabled, preventing them from remaining connected.
+detects connected devices that are no longer in the enabled list and disconnects them.
 
 ## Testing
 
@@ -437,7 +436,7 @@ To prevent `ProfileServiceNotBound` and other GATT write errors:
 4. The coordinator waits for `connection.isConnected` to emit `true` before calling
    `performInitialSetup()`
 
-This ensures that BLE operations only occur when the connection is fully established and active.
+The coordinator starts BLE operations after the connection becomes active.
 
 ### Pairing Errors
 

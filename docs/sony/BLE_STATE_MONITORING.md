@@ -177,8 +177,8 @@ in little-endian — so `0x0601` on the wire becomes bytes `[0x01, 0x06]` matchi
 `[length, command]` format. Prefer writing raw byte arrays to avoid endianness confusion.
 
 **GATT write type:** The freemote implementation uses `write_with_response` (ATT Write Request)
-for all commands to `FF01`. This ensures the camera acknowledges each command before the next
-is sent.
+for all commands to `FF01`. The client waits for the camera to acknowledge each command before
+sending the next.
 
 **Error response:** The camera returns GATT status `0x0185` if it receives an invalid command.
 Invalid commands also cause the camera to disconnect the BLE link immediately. An exhaustive scan

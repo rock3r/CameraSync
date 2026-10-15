@@ -17,15 +17,15 @@ Understanding this state machine is critical to a stable implementation.
 
 1. **BLE (The "Control Plane"):** Used for low-power discovery, persistent pairing, authentication (
    bonding), "waking" the camera, battery monitoring, GPS coordinate transmission, and triggering
-   the remote shutter. It's the lifeline. If BLE drops, the session is dead.
-2. **Wi-Fi (The "Data Plane"):** Used for heavy lifting: listing 1000s of photos, transferring RAW
+   the remote shutter. The session ends if BLE disconnects.
+2. **Wi-Fi (The "Data Plane"):** Used for listing thousands of photos, transferring RAW
    files, WebSocket-based Live View status, Image Control syncing, camera logs, and Firmware
    updates.
 
 **The "Wi-Fi Handoff":** The app maintains a persistent BLE bond. When the user taps "Import
-Photos", the app doesn't just connect to Wi-Fi; it uses BLE to *negotiate* the Wi-Fi credentials,
-then programmatically binds the Android network stack to the camera's Access Point (AP), ensuring
-traffic goes to the camera and not 4G/5G.
+Photos", the app gets Wi-Fi credentials over BLE.
+It then binds the Android network stack to the camera's Access Point (AP).
+This binding routes traffic to the camera instead of the mobile network.
 
 ---
 
@@ -270,7 +270,7 @@ Don't just show a MAC address. Parse the `advertisement.name`.
     * **Sleep:** Wait ~100ms after bonded. If you rush, the camera drops the link.
 3. **Discover Services:** Only *after* bonding is stable.
 
-### 3.3. The "Step 4" Handshake (Crucial)
+### 3.3. The "Step 4" Handshake
 
 The official app logs mention specific step-based errors. This is the "liveness check". If this
 fails, the camera isn't actually listening.

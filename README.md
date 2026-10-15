@@ -24,8 +24,8 @@ Bluetooth is active.
   ![A quick showcase of the widget in action](docs/art/widget.gif)
 - **Firmware Update Notifications**: Automatically notifies you when a firmware update is available
   for your paired cameras.
-- **Battery Optimization Detection**: Proactive warnings and guidance to ensure stable background
-  operation by excluding the app from system battery optimizations.
+- **Battery Optimization Detection**: Warnings and instructions to exclude the app from system
+  battery optimizations that can interrupt background sync.
 - **Feedback & Issue Reporting**: Integrated system to collect BLE metadata and system info for
   troubleshooting.
 - **Material 3 UI**: Modern and clean interface built with Jetpack Compose.
@@ -61,8 +61,8 @@ The app requires the following permissions to function correctly:
 > [!IMPORTANT]
 > The app MUST be in the foreground during the initial connection to the camera. After the
 > connection is established, it can safely run in the background. You should exclude the app from
-> battery optimizations to ensure stable background operation; the app will guide you through this
-> process if needed.
+> battery optimizations to reduce interruptions to background sync. The app shows instructions
+> when needed.
 
 ## Architecture & Multi-Vendor Support
 
@@ -76,7 +76,7 @@ see [docs/MULTI_VENDOR_SUPPORT.md](docs/MULTI_VENDOR_SUPPORT.md).
 
 1. **Clone the repository**:
    ```bash
-   git clone https://github.com/yourusername/CameraSync.git
+   git clone https://github.com/rock3r/CameraSync.git
    cd CameraSync
    ```
 
