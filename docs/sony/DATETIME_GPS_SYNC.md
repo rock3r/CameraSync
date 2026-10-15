@@ -175,7 +175,7 @@ To stop syncing:
     *   **Time Sync (CC13)**: Uses a custom split format (Byte 11 = Signed Hour, Byte 12 = Minute).
     *   **Location Sync (DD11)**: Uses a standard `int16` (Big-Endian) for total minutes.
 4.  **GPS Precision**: Multiply Latitude/Longitude by `1E7` and cast to integer.
-5.  **State Machine**: Implement a robust state machine to handle the Lock -> Enable -> Write -> Unlock sequence. Do not attempt to write location data without first locking and enabling.
+5.  **State Machine**: Follow the Lock -> Enable -> Write -> Unlock sequence. Lock and enable location sync before writing location data.
 6.  **Freshness**: Only send location data if it is fresh (< 10s old). Stale data should be discarded.
 7.  **Keep-Alive Mechanism**: The camera has an internal timeout for location data. If it doesn't receive location updates for an extended period (observed: ~2 minutes), it will show a 🚫 icon on the location link indicator, even if the BLE session is still active. To prevent this:
     *   Implement a keep-alive timer that runs every **30 seconds**.
@@ -187,7 +187,7 @@ To stop syncing:
 
 ## 6. Reference Implementation (Pseudo-Code)
 
-Below are Python-like snippets demonstrating the exact packet creation logic, ensuring zero ambiguity regarding byte order and structure.
+These Python-like snippets show the packet fields and byte order.
 
 ### Time Sync Packet (`0000CC13`)
 

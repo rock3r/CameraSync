@@ -112,7 +112,7 @@ To add support for a new camera brand (e.g., Canon, Nikon):
 
 ### Testing Multi-Vendor Code
 
-- Each vendor has comprehensive tests: `RicohCameraVendorTest.kt`, `SonyCameraVendorTest.kt`
+- Vendor recognition tests: `RicohCameraVendorTest.kt`, `SonyCameraVendorTest.kt`
 - GATT specifications have dedicated tests: `RicohGattSpecTest.kt`, `SonyGattSpecTest.kt`
 - Registry logic is tested in `CameraVendorRegistryTest.kt`
 - Protocol encoding/decoding has dedicated test classes
@@ -145,7 +145,7 @@ For complete details on the multi-vendor architecture, see [`docs/MULTI_VENDOR_S
 ### Testing
 - Unit tests use coroutine test dispatchers with `TestScope`
 - All repository interfaces have fake implementations in `test/fakes/`
-- Each vendor has comprehensive test coverage for device recognition and protocol logic
+- Vendor tests check device recognition and protocol encoding/decoding
 - Use Khronicle for logging throughout the app (initialized in MainActivity)
 - Kable logging uses KhronicleLogEngine adapter
 - Tests use `TestGraphFactory` to get fake dependencies instead of production implementations
