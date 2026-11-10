@@ -1,10 +1,10 @@
 {
-  "last_updated": "2026-11-09T08:09:30Z",
+  "last_updated": "2026-11-10T08:07:58Z",
   "cameras": {
-    "GR IV Monochrome": "1.10",
-    "GR IV / GR IV HDF": "1.20",
-    "GR IIIx": "1.70",
-    "GR III": "2.20",
+    "GR IV Monochrome": "1.11",
+    "GR IV / GR IV HDF": "1.21",
+    "GR IIIx": "1.71",
+    "GR III": "2.21",
     "GR II": "3.00"
   }
 }
