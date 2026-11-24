@@ -66,6 +66,7 @@ object RicohCameraVendor : CameraVendor {
             supportsGeoTagging = true,
             supportsLocationSync = true,
             supportsHardwareRevision = true,
+            supportsModelName = true,
         )
     }
 

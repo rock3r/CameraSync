@@ -447,6 +447,36 @@ internal class KableCameraConnection(
         return revision
     }
 
+    override suspend fun readModelName(): String {
+        if (!capabilities.supportsModelName) {
+            throw UnsupportedOperationException(
+                "${camera.vendor.vendorName} cameras do not support model name reading"
+            )
+        }
+
+        val serviceUuid = gattSpec.modelNameServiceUuid
+        val charUuid = gattSpec.modelNameCharacteristicUuid
+
+        if (serviceUuid == null || charUuid == null) {
+            throw UnsupportedOperationException(
+                "${camera.vendor.vendorName} cameras claims to support model name reading but UUIDs are not configured"
+            )
+        }
+
+        val service =
+            peripheral.services.value.orEmpty().firstOrNull { it.serviceUuid == serviceUuid }
+                ?: error("Model name service not found: $serviceUuid")
+
+        val char =
+            service.characteristics.firstOrNull { it.characteristicUuid == charUuid }
+                ?: error("Model name characteristic not found: $charUuid")
+
+        val bytes = peripheral.read(char)
+        val model = bytes.decodeToString().trimEnd(Char(0))
+        Log.info(tag = TAG) { "Model name: $model" }
+        return model
+    }
+
     override suspend fun setPairedDeviceName(name: String) {
         if (!capabilities.supportsDeviceName) {
             throw UnsupportedOperationException(

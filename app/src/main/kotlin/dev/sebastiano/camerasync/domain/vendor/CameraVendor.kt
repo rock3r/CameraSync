@@ -162,6 +162,14 @@ interface CameraGattSpec {
      */
     val hardwareRevisionCharacteristicUuid: Uuid?
         get() = Uuid.parse("00002a27-0000-1000-8000-00805f9b34fb")
+
+    /** Model name service UUID, or null if not supported. */
+    val modelNameServiceUuid: Uuid?
+        get() = null
+
+    /** Model name characteristic UUID, or null if not supported. */
+    val modelNameCharacteristicUuid: Uuid?
+        get() = null
 }
 
 /** Handles encoding and decoding of data for a camera vendor's BLE protocol. */
@@ -245,4 +253,7 @@ data class CameraCapabilities(
 
     /** Whether the camera supports reading hardware revision. */
     val supportsHardwareRevision: Boolean = false,
+
+    /** Whether the camera supports reading model name. */
+    val supportsModelName: Boolean = false,
 )

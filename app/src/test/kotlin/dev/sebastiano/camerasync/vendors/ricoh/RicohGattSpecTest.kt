@@ -164,6 +164,22 @@ class RicohGattSpecTest {
     }
 
     @Test
+    fun `model name service UUID matches specification`() {
+        assertEquals(
+            Uuid.parse("0000180a-0000-1000-8000-00805f9b34fb"),
+            RicohGattSpec.modelNameServiceUuid,
+        )
+    }
+
+    @Test
+    fun `model name characteristic UUID matches specification`() {
+        assertEquals(
+            Uuid.parse("00002a24-0000-1000-8000-00805f9b34fb"),
+            RicohGattSpec.modelNameCharacteristicUuid,
+        )
+    }
+
+    @Test
     fun `location service UUID matches scan filter service UUID`() {
         // In Ricoh's implementation, the location service and scan filter use the same UUID
         assertEquals(RicohGattSpec.SCAN_FILTER_SERVICE_UUID, RicohGattSpec.Location.SERVICE_UUID)

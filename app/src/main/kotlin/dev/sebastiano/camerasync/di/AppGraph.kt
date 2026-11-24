@@ -33,6 +33,7 @@ import dev.sebastiano.camerasync.logging.LogRepository
 import dev.sebastiano.camerasync.logging.LogViewerViewModel
 import dev.sebastiano.camerasync.logging.LogcatLogRepository
 import dev.sebastiano.camerasync.pairing.AndroidBluetoothBondingChecker
+import dev.sebastiano.camerasync.pairing.AndroidCompanionDeviceManagerHelper
 import dev.sebastiano.camerasync.pairing.BluetoothBondingChecker
 import dev.sebastiano.camerasync.pairing.CompanionDeviceManagerHelper
 import dev.sebastiano.camerasync.pairing.PairingViewModel
@@ -103,7 +104,13 @@ interface AppGraph {
 
     @Provides
     @SingleIn(AppGraph::class)
+    @IoDispatcher
     fun provideIoDispatcher(): CoroutineDispatcher = Dispatchers.IO
+
+    @Provides
+    @SingleIn(AppGraph::class)
+    @MainDispatcher
+    fun provideMainDispatcher(): CoroutineDispatcher = Dispatchers.Main
 
     /**
      * Creates the default camera vendor registry with all supported vendors.
@@ -176,7 +183,7 @@ interface AppGraph {
     fun provideCompanionDeviceManagerHelper(
         context: Context,
         vendorRegistry: CameraVendorRegistry,
-    ): CompanionDeviceManagerHelper = CompanionDeviceManagerHelper(context, vendorRegistry)
+    ): CompanionDeviceManagerHelper = AndroidCompanionDeviceManagerHelper(context, vendorRegistry)
 
     @Provides
     @SingleIn(AppGraph::class)
@@ -189,7 +196,7 @@ interface AppGraph {
     @Provides
     fun provideLogViewerViewModel(
         logRepository: LogRepository,
-        ioDispatcher: CoroutineDispatcher,
+        @IoDispatcher ioDispatcher: CoroutineDispatcher,
     ): LogViewerViewModel = LogViewerViewModel(logRepository, ioDispatcher)
 
     @Provides

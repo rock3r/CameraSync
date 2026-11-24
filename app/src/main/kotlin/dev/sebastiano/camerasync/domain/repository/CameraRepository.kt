@@ -77,6 +77,9 @@ interface CameraConnection {
     /** Reads the camera's hardware revision. */
     suspend fun readHardwareRevision(): String
 
+    /** Reads the camera's model name. */
+    suspend fun readModelName(): String
+
     /** Sets the paired device name on the camera. */
     suspend fun setPairedDeviceName(name: String)
 
