@@ -76,6 +76,7 @@ internal fun DevicesList(
     onDeviceEnabledChange: (PairedDeviceWithState, Boolean) -> Unit,
     onUnpairClick: (PairedDeviceWithState) -> Unit,
     onRetryClick: (PairedDeviceWithState) -> Unit,
+    onRemoteControlClick: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     LazyColumn(
@@ -99,6 +100,7 @@ internal fun DevicesList(
                 },
                 onUnpairClick = { onUnpairClick(deviceWithState) },
                 onRetryClick = { onRetryClick(deviceWithState) },
+                onRemoteControlClick = { onRemoteControlClick(deviceWithState.device.macAddress) },
             )
         }
     }

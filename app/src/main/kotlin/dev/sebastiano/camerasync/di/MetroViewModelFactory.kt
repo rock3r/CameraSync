@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModelProvider
 import dev.sebastiano.camerasync.devices.DevicesListViewModel
 import dev.sebastiano.camerasync.logging.LogViewerViewModel
 import dev.sebastiano.camerasync.pairing.PairingViewModel
+import dev.sebastiano.camerasync.ui.remote.RemoteShootingViewModel
 
 /**
  * A [ViewModelProvider.Factory] that uses the [AppGraph] to create ViewModels.
@@ -21,6 +22,8 @@ class MetroViewModelFactory(private val appGraph: AppGraph) : ViewModelProvider.
                 appGraph.devicesListViewModel() as T
             modelClass.isAssignableFrom(PairingViewModel::class.java) ->
                 appGraph.pairingViewModel() as T
+            modelClass.isAssignableFrom(RemoteShootingViewModel::class.java) ->
+                appGraph.remoteShootingViewModel() as T
             modelClass.isAssignableFrom(LogViewerViewModel::class.java) ->
                 appGraph.logViewerViewModel() as T
             else -> throw IllegalArgumentException("Unknown ViewModel class: ${modelClass.name}")

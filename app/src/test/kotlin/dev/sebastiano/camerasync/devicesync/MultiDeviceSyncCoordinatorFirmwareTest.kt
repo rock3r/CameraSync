@@ -6,18 +6,26 @@ import android.app.PendingIntent
 import android.content.Context
 import androidx.core.app.NotificationManagerCompat
 import dev.sebastiano.camerasync.CameraSyncApp
+import dev.sebastiano.camerasync.domain.model.Camera
 import dev.sebastiano.camerasync.domain.model.PairedDevice
+import dev.sebastiano.camerasync.domain.vendor.CameraVendor
 import dev.sebastiano.camerasync.domain.vendor.DefaultConnectionDelegate
+import dev.sebastiano.camerasync.domain.vendor.RemoteControlCapabilities
+import dev.sebastiano.camerasync.domain.vendor.RemoteControlDelegate
+import dev.sebastiano.camerasync.domain.vendor.SyncCapabilities
 import dev.sebastiano.camerasync.domain.vendor.VendorConnectionDelegate
 import dev.sebastiano.camerasync.fakes.FakeCameraConnection
 import dev.sebastiano.camerasync.fakes.FakeCameraRepository
 import dev.sebastiano.camerasync.fakes.FakeCameraVendor
 import dev.sebastiano.camerasync.fakes.FakeDeviceNameProvider
+import dev.sebastiano.camerasync.fakes.FakeGattSpec
 import dev.sebastiano.camerasync.fakes.FakeIntentFactory
 import dev.sebastiano.camerasync.fakes.FakeKhronicleLogger
 import dev.sebastiano.camerasync.fakes.FakeLocationCollector
 import dev.sebastiano.camerasync.fakes.FakePairedDevicesRepository
 import dev.sebastiano.camerasync.fakes.FakePendingIntentFactory
+import dev.sebastiano.camerasync.fakes.FakeProtocol
+import dev.sebastiano.camerasync.fakes.FakeRemoteControlDelegate
 import dev.sebastiano.camerasync.fakes.FakeVendorRegistry
 import dev.sebastiano.camerasync.firmware.FirmwareUpdateScheduler
 import io.mockk.every
@@ -66,7 +74,7 @@ class MultiDeviceSyncCoordinatorFirmwareTest {
         )
 
     private fun PairedDevice.toTestCamera() =
-        dev.sebastiano.camerasync.domain.model.Camera(
+        Camera(
             identifier = macAddress,
             name = name,
             macAddress = macAddress,
@@ -97,7 +105,7 @@ class MultiDeviceSyncCoordinatorFirmwareTest {
         connectionManager = DeviceConnectionManager()
 
         val notificationBuilder =
-            object : dev.sebastiano.camerasync.devicesync.NotificationBuilder {
+            object : NotificationBuilder {
                 override fun build(
                     channelId: String,
                     title: String,
@@ -107,7 +115,7 @@ class MultiDeviceSyncCoordinatorFirmwareTest {
                     priority: Int,
                     category: String?,
                     isSilent: Boolean,
-                    actions: List<dev.sebastiano.camerasync.devicesync.NotificationAction>,
+                    actions: List<NotificationAction>,
                     contentIntent: PendingIntent?,
                 ): Notification = mockk(relaxed = true)
             }
@@ -207,11 +215,11 @@ class MultiDeviceSyncCoordinatorFirmwareTest {
     fun `firmware update notification not shown when firmware version is null`() =
         testScope.runTest {
             val noFirmwareVendor =
-                object : dev.sebastiano.camerasync.domain.vendor.CameraVendor {
+                object : CameraVendor {
                     override val vendorId: String = "no-fw"
                     override val vendorName: String = "No FW"
-                    override val gattSpec = dev.sebastiano.camerasync.fakes.FakeGattSpec
-                    override val protocol = dev.sebastiano.camerasync.fakes.FakeProtocol
+                    override val gattSpec = FakeGattSpec
+                    override val protocol = FakeProtocol
 
                     override fun recognizesDevice(
                         deviceName: String?,
@@ -222,8 +230,10 @@ class MultiDeviceSyncCoordinatorFirmwareTest {
                     override fun createConnectionDelegate(): VendorConnectionDelegate =
                         DefaultConnectionDelegate()
 
-                    override fun getCapabilities() =
-                        dev.sebastiano.camerasync.domain.vendor.CameraCapabilities(
+                    override fun getRemoteControlCapabilities() = RemoteControlCapabilities()
+
+                    override fun getSyncCapabilities() =
+                        SyncCapabilities(
                             supportsFirmwareVersion = false,
                             supportsDeviceName = true,
                             supportsDateTimeSync = true,
@@ -233,6 +243,11 @@ class MultiDeviceSyncCoordinatorFirmwareTest {
 
                     override fun extractModelFromPairingName(pairingName: String?) =
                         pairingName ?: "No FW"
+
+                    override fun createRemoteControlDelegate(
+                        peripheral: com.juul.kable.Peripheral,
+                        camera: Camera,
+                    ): RemoteControlDelegate = FakeRemoteControlDelegate()
                 }
 
             vendorRegistry.addVendor(noFirmwareVendor)
@@ -241,7 +256,7 @@ class MultiDeviceSyncCoordinatorFirmwareTest {
 
             val connection =
                 FakeCameraConnection(
-                    dev.sebastiano.camerasync.domain.model.Camera(
+                    Camera(
                         identifier = noFwDevice.macAddress,
                         name = noFwDevice.name,
                         macAddress = noFwDevice.macAddress,
@@ -303,11 +318,11 @@ class MultiDeviceSyncCoordinatorFirmwareTest {
     fun `initial setup respects capabilities`() =
         testScope.runTest {
             val limitedVendor =
-                object : dev.sebastiano.camerasync.domain.vendor.CameraVendor {
+                object : CameraVendor {
                     override val vendorId: String = "limited"
                     override val vendorName: String = "Limited"
-                    override val gattSpec = dev.sebastiano.camerasync.fakes.FakeGattSpec
-                    override val protocol = dev.sebastiano.camerasync.fakes.FakeProtocol
+                    override val gattSpec = FakeGattSpec
+                    override val protocol = FakeProtocol
 
                     override fun recognizesDevice(
                         deviceName: String?,
@@ -318,8 +333,10 @@ class MultiDeviceSyncCoordinatorFirmwareTest {
                     override fun createConnectionDelegate(): VendorConnectionDelegate =
                         DefaultConnectionDelegate()
 
-                    override fun getCapabilities() =
-                        dev.sebastiano.camerasync.domain.vendor.CameraCapabilities(
+                    override fun getRemoteControlCapabilities() = RemoteControlCapabilities()
+
+                    override fun getSyncCapabilities() =
+                        SyncCapabilities(
                             supportsFirmwareVersion = false,
                             supportsDeviceName = false,
                             supportsDateTimeSync = false,
@@ -329,6 +346,11 @@ class MultiDeviceSyncCoordinatorFirmwareTest {
 
                     override fun extractModelFromPairingName(pairingName: String?) =
                         pairingName ?: "Limited"
+
+                    override fun createRemoteControlDelegate(
+                        peripheral: com.juul.kable.Peripheral,
+                        camera: Camera,
+                    ): RemoteControlDelegate = FakeRemoteControlDelegate()
                 }
 
             vendorRegistry.addVendor(limitedVendor)
@@ -337,7 +359,7 @@ class MultiDeviceSyncCoordinatorFirmwareTest {
                 testDevice1.copy(vendorId = "limited", macAddress = "FF:FF:FF:FF:FF:FF")
             val connection =
                 FakeCameraConnection(
-                    dev.sebastiano.camerasync.domain.model.Camera(
+                    Camera(
                         identifier = limitedDevice.macAddress,
                         name = limitedDevice.name,
                         macAddress = limitedDevice.macAddress,

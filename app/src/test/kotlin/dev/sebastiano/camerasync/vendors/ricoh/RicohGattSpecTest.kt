@@ -9,26 +9,23 @@ import org.junit.Test
 class RicohGattSpecTest {
 
     @Test
-    fun `scan filter service UUID matches specification`() {
-        assertEquals(
-            Uuid.parse("84A0DD62-E8AA-4D0F-91DB-819B6724C69E"),
-            RicohGattSpec.SCAN_FILTER_SERVICE_UUID,
-        )
-    }
-
-    @Test
-    fun `scan filter service UUIDs list contains scan filter UUID`() {
-        assertEquals(1, RicohGattSpec.scanFilterServiceUuids.size)
-        assertEquals(
-            RicohGattSpec.SCAN_FILTER_SERVICE_UUID,
-            RicohGattSpec.scanFilterServiceUuids[0],
-        )
+    fun `scan filter service UUIDs list is empty for Ricoh`() {
+        assertEquals(0, RicohGattSpec.scanFilterServiceUuids.size)
     }
 
     @Test
     fun `scan filter device names includes GR and RICOH`() {
         assertEquals(2, RicohGattSpec.scanFilterDeviceNames.size)
         assertEquals(listOf("GR", "RICOH"), RicohGattSpec.scanFilterDeviceNames)
+    }
+
+    @Test
+    fun `scan filter manufacturer data includes Ricoh company id and prefix`() {
+        assertEquals(1, RicohGattSpec.scanFilterManufacturerData.size)
+        val filter = RicohGattSpec.scanFilterManufacturerData.first()
+        assertEquals(0x065F, filter.manufacturerId)
+        assertEquals(byteArrayOf(0xDA.toByte()).toList(), filter.data.toList())
+        assertEquals(byteArrayOf(0xFF.toByte()).toList(), filter.mask?.toList())
     }
 
     @Test
@@ -164,9 +161,79 @@ class RicohGattSpecTest {
     }
 
     @Test
-    fun `location service UUID matches scan filter service UUID`() {
-        // In Ricoh's implementation, the location service and scan filter use the same UUID
-        assertEquals(RicohGattSpec.SCAN_FILTER_SERVICE_UUID, RicohGattSpec.Location.SERVICE_UUID)
+    fun `Shooting service and Operation Request characteristic match dm-zharov spec`() {
+        assertEquals(
+            Uuid.parse("9f00f387-8345-4bbc-8b92-b87b52e3091a"),
+            RicohGattSpec.Shooting.SERVICE_UUID,
+        )
+        assertEquals(
+            Uuid.parse("559644b8-e0bc-4011-929b-5cf9199851e7"),
+            RicohGattSpec.Shooting.OPERATION_REQUEST_CHARACTERISTIC_UUID,
+        )
+    }
+
+    @Test
+    fun `Shooting service characteristics match dm-zharov spec`() {
+        assertEquals(
+            Uuid.parse("a3c51525-de3e-4777-a1c2-699e28736fcf"),
+            RicohGattSpec.Shooting.SHOOTING_MODE_CHARACTERISTIC_UUID,
+        )
+        assertEquals(
+            Uuid.parse("78009238-ac3d-4370-9b6f-c9ce2f4e3ca8"),
+            RicohGattSpec.Shooting.CAPTURE_MODE_CHARACTERISTIC_UUID,
+        )
+        assertEquals(
+            Uuid.parse("b29e6de3-1aec-48c1-9d05-02cea57ce664"),
+            RicohGattSpec.Shooting.DRIVE_MODE_CHARACTERISTIC_UUID,
+        )
+        assertEquals(
+            Uuid.parse("b5589c08-b5fd-46f5-be7d-ab1b8c074caa"),
+            RicohGattSpec.Shooting.CAPTURE_STATUS_CHARACTERISTIC_UUID,
+        )
+    }
+
+    @Test
+    fun `WlanControl service and Network Type characteristic match dm-zharov spec`() {
+        assertEquals(
+            Uuid.parse("f37f568f-9071-445d-a938-5441f2e82399"),
+            RicohGattSpec.WlanControl.SERVICE_UUID,
+        )
+        assertEquals(
+            Uuid.parse("9111cdd0-9f01-45c4-a2d4-e09e8fb0424d"),
+            RicohGattSpec.WlanControl.NETWORK_TYPE_CHARACTERISTIC_UUID,
+        )
+    }
+
+    @Test
+    fun `CameraState Camera Power characteristic matches dm-zharov spec`() {
+        assertEquals(
+            Uuid.parse("b58ce84c-0666-4de9-bec8-2d27b27b3211"),
+            RicohGattSpec.CameraState.CAMERA_POWER_CHARACTERISTIC_UUID,
+        )
+    }
+
+    @Test
+    fun `CameraState Battery Level characteristic matches dm-zharov spec`() {
+        assertEquals(
+            Uuid.parse("875fc41d-4980-434c-a653-fd4a4d4410c4"),
+            RicohGattSpec.CameraState.BATTERY_LEVEL_CHARACTERISTIC_UUID,
+        )
+    }
+
+    @Test
+    fun `CameraState Storage Info characteristic matches dm-zharov spec`() {
+        assertEquals(
+            Uuid.parse("a0c10148-8865-4470-9631-8f36d79a41a5"),
+            RicohGattSpec.CameraState.STORAGE_INFO_CHARACTERISTIC_UUID,
+        )
+    }
+
+    @Test
+    fun `CameraState Operation Mode characteristic matches dm-zharov spec`() {
+        assertEquals(
+            Uuid.parse("1452335a-ec7f-4877-b8ab-0f72e18bb295"),
+            RicohGattSpec.CameraState.OPERATION_MODE_CHARACTERISTIC_UUID,
+        )
     }
 
     @Test
@@ -174,7 +241,6 @@ class RicohGattSpecTest {
         // Verify UUID format consistency - UUIDs should use uppercase hex digits
         val allUuids =
             listOf(
-                RicohGattSpec.SCAN_FILTER_SERVICE_UUID.toString(),
                 RicohGattSpec.Firmware.SERVICE_UUID.toString(),
                 RicohGattSpec.Firmware.VERSION_CHARACTERISTIC_UUID.toString(),
                 RicohGattSpec.DeviceName.SERVICE_UUID.toString(),
@@ -184,6 +250,18 @@ class RicohGattSpecTest {
                 RicohGattSpec.DateTime.GEO_TAGGING_CHARACTERISTIC_UUID.toString(),
                 RicohGattSpec.Location.SERVICE_UUID.toString(),
                 RicohGattSpec.Location.LOCATION_CHARACTERISTIC_UUID.toString(),
+                RicohGattSpec.Shooting.SERVICE_UUID.toString(),
+                RicohGattSpec.Shooting.SHOOTING_MODE_CHARACTERISTIC_UUID.toString(),
+                RicohGattSpec.Shooting.CAPTURE_MODE_CHARACTERISTIC_UUID.toString(),
+                RicohGattSpec.Shooting.DRIVE_MODE_CHARACTERISTIC_UUID.toString(),
+                RicohGattSpec.Shooting.CAPTURE_STATUS_CHARACTERISTIC_UUID.toString(),
+                RicohGattSpec.Shooting.OPERATION_REQUEST_CHARACTERISTIC_UUID.toString(),
+                RicohGattSpec.WlanControl.SERVICE_UUID.toString(),
+                RicohGattSpec.WlanControl.NETWORK_TYPE_CHARACTERISTIC_UUID.toString(),
+                RicohGattSpec.CameraState.CAMERA_POWER_CHARACTERISTIC_UUID.toString(),
+                RicohGattSpec.CameraState.BATTERY_LEVEL_CHARACTERISTIC_UUID.toString(),
+                RicohGattSpec.CameraState.STORAGE_INFO_CHARACTERISTIC_UUID.toString(),
+                RicohGattSpec.CameraState.OPERATION_MODE_CHARACTERISTIC_UUID.toString(),
             )
 
         // All UUIDs should be properly formatted (8-4-4-4-12 format)

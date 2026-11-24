@@ -8,6 +8,9 @@ interface IntentFactory {
     /** Creates an [Intent] to trigger a connection refresh. */
     fun createRefreshIntent(context: Context): Intent
 
+    /** Creates an [Intent] to refresh a specific device connection. */
+    fun createRefreshDeviceIntent(context: Context, macAddress: String): Intent
+
     /** Creates an [Intent] to stop all synchronizations. */
     fun createStopIntent(context: Context): Intent
 

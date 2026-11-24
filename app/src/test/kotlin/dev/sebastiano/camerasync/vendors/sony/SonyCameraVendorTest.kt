@@ -86,27 +86,27 @@ class SonyCameraVendorTest {
 
     @Test
     fun `capabilities indicate firmware version support`() {
-        assertTrue(SonyCameraVendor.getCapabilities().supportsFirmwareVersion)
+        assertTrue(SonyCameraVendor.getSyncCapabilities().supportsFirmwareVersion)
     }
 
     @Test
     fun `capabilities indicate no device name support`() {
-        assertFalse(SonyCameraVendor.getCapabilities().supportsDeviceName)
+        assertFalse(SonyCameraVendor.getSyncCapabilities().supportsDeviceName)
     }
 
     @Test
     fun `capabilities indicate date time sync support`() {
-        assertTrue(SonyCameraVendor.getCapabilities().supportsDateTimeSync)
+        assertTrue(SonyCameraVendor.getSyncCapabilities().supportsDateTimeSync)
     }
 
     @Test
     fun `capabilities indicate no geo tagging support`() {
-        assertFalse(SonyCameraVendor.getCapabilities().supportsGeoTagging)
+        assertFalse(SonyCameraVendor.getSyncCapabilities().supportsGeoTagging)
     }
 
     @Test
     fun `capabilities indicate location sync support`() {
-        assertTrue(SonyCameraVendor.getCapabilities().supportsLocationSync)
+        assertTrue(SonyCameraVendor.getSyncCapabilities().supportsLocationSync)
     }
 
     @Test

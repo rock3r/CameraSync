@@ -57,17 +57,11 @@ StorageInformationModel(
 
 **DriveModeModel:** `DriveModeModel(driveMode: DriveMode)`
 
-**DriveMode BLE enum (`QOa`)** — 16 values:
+**DriveMode BLE enum** (Drive Mode characteristic `B29E6DE3`) — **0–65 values**:
 
-| Value | Name                                  |
-|:------|:--------------------------------------|
-| 0     | `oneFrame`                            |
-| 1     | `tenSecondFrame`                      |
-| 2     | `twoSecondFrame`                      |
-| 3     | `continuousShootingFrame`             |
-| 4     | `bracketFrame`                        |
-| 5–9   | bracket/multi-exposure + timer variants |
-| 10–15 | interval / interval composition + timer variants |
+The dm-zharov list expands the drive mode enum to include remote/self-timer variants, focus
+bracketing, motion bracketing, mirror lockup, and star stream modes. Use the dm-zharov Drive Mode
+table as the canonical mapping.
 
 **CountdownStatus enum (`uOa`):** `notInCountdown` (0), `selfTimerCountdown` (1), `scheduledTimeWaiting` (2)
 

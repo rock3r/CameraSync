@@ -24,4 +24,5 @@ dependencyResolutionManagement {
 
 rootProject.name = "CameraSync"
 include(":app")
+include(":detekt-rules")
  

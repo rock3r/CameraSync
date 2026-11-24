@@ -1,6 +1,8 @@
 package dev.sebastiano.camerasync.domain.vendor
 
 import android.companion.DeviceFilter
+import com.juul.kable.Peripheral
+import dev.sebastiano.camerasync.domain.model.Camera
 import dev.sebastiano.camerasync.domain.model.GpsLocation
 import dev.sebastiano.camerasync.util.DeviceNameProvider
 import java.time.ZonedDateTime
@@ -65,12 +67,29 @@ interface CameraVendor {
     fun createConnectionDelegate(): VendorConnectionDelegate
 
     /**
-     * Returns the device capabilities for this vendor.
+     * Returns the remote control capabilities for this vendor.
      *
-     * Different vendors may support different features (e.g., geo-tagging, time sync, firmware
-     * version reading, etc.).
+     * Defines what remote shooting, monitoring, and transfer features are supported.
      */
-    fun getCapabilities(): CameraCapabilities
+    fun getRemoteControlCapabilities(): RemoteControlCapabilities
+
+    /**
+     * Returns the background sync capabilities for this vendor.
+     *
+     * Defines support for firmware, device name, date/time, geo-tagging, location, pairing, etc.
+     */
+    fun getSyncCapabilities(): SyncCapabilities
+
+    /**
+     * Returns the name to set on the camera for this paired device (e.g. phone name).
+     *
+     * Used when the camera supports displaying or storing the connected device name.
+     *
+     * @param deviceNameProvider Provider for the current device name.
+     * @return The name to write to the camera.
+     */
+    fun getPairedDeviceName(deviceNameProvider: DeviceNameProvider): String =
+        deviceNameProvider.getDeviceName()
 
     /**
      * Extracts the camera model from a pairing name.
@@ -93,25 +112,35 @@ interface CameraVendor {
     fun getCompanionDeviceFilters(): List<DeviceFilter<*>> = emptyList()
 
     /**
-     * Returns the name that should be sent to the camera to identify this paired device (the
-     * phone).
+     * Creates a remote control delegate for this vendor.
      *
-     * @param deviceNameProvider Provider for the phone's device name.
-     * @return The name to set on the camera.
+     * @param peripheral The connected BLE peripheral.
+     * @param camera The camera domain object.
+     * @return A new instance of [RemoteControlDelegate].
      */
-    fun getPairedDeviceName(deviceNameProvider: DeviceNameProvider): String =
-        deviceNameProvider.getDeviceName()
+    fun createRemoteControlDelegate(peripheral: Peripheral, camera: Camera): RemoteControlDelegate
 }
 
 /** Defines the BLE GATT service and characteristic UUIDs for a camera vendor. */
 @OptIn(ExperimentalUuidApi::class)
 interface CameraGattSpec {
 
+    /** Manufacturer data scan filter for BLE advertisements. */
+    data class ManufacturerDataFilter(
+        val manufacturerId: Int,
+        val data: ByteArray,
+        val mask: ByteArray? = null,
+    )
+
     /** Service UUID(s) used for scanning and filtering camera advertisements. */
     val scanFilterServiceUuids: List<Uuid>
 
     /** Device name prefix(es) used for scanning and filtering camera advertisements. */
     val scanFilterDeviceNames: List<String>
+        get() = emptyList()
+
+    /** Manufacturer data filters used for scanning and filtering camera advertisements. */
+    val scanFilterManufacturerData: List<ManufacturerDataFilter>
         get() = emptyList()
 
     /** Firmware version service UUID, or null if not supported. */
@@ -217,32 +246,3 @@ interface CameraProtocol {
      */
     fun getPairingInitData(): ByteArray? = null
 }
-
-/** Defines the capabilities supported by a camera vendor. */
-data class CameraCapabilities(
-    /** Whether the camera supports reading firmware version. */
-    val supportsFirmwareVersion: Boolean = false,
-
-    /** Whether the camera supports setting a paired device name. */
-    val supportsDeviceName: Boolean = false,
-
-    /** Whether the camera supports date/time synchronization. */
-    val supportsDateTimeSync: Boolean = false,
-
-    /** Whether the camera supports enabling/disabling geo-tagging. */
-    val supportsGeoTagging: Boolean = false,
-
-    /** Whether the camera supports GPS location synchronization. */
-    val supportsLocationSync: Boolean = false,
-
-    /**
-     * Whether the camera requires vendor-specific pairing initialization.
-     *
-     * Some vendors (like Sony) require a specific BLE command to be sent after OS-level bonding to
-     * complete the pairing process.
-     */
-    val requiresVendorPairing: Boolean = false,
-
-    /** Whether the camera supports reading hardware revision. */
-    val supportsHardwareRevision: Boolean = false,
-)

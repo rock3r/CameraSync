@@ -313,6 +313,7 @@ constructor(
         coroutineScope.launch {
             val macAddress = device.macAddress.uppercase()
             var activeConnection: CameraConnection? = null
+            var syncJob: Job? = null
 
             connectionMutex.withLock {
                 if (isDeviceSyncingOrConnecting(macAddress)) {
@@ -351,16 +352,16 @@ constructor(
 
                 val firmwareVersion = performInitialSetup(connection, device)
 
+                val currentJob =
+                    currentCoroutineContext()[Job] ?: coroutineScope.launch {}.also { it.cancel() }
+                syncJob = currentJob
+                connectionManager.addConnection(macAddress, connection, currentJob)
+                locationCollector.registerDevice(macAddress)
+                _presentDevices.update { it + macAddress }
                 updateDeviceState(
                     macAddress,
                     DeviceConnectionState.Syncing(firmwareVersion = firmwareVersion),
                 )
-                _presentDevices.update { it + macAddress }
-
-                val syncJob =
-                    currentCoroutineContext()[Job] ?: coroutineScope.launch {}.also { it.cancel() }
-                connectionManager.addConnection(macAddress, connection, syncJob)
-                locationCollector.registerDevice(macAddress)
 
                 // Ensure location sync is running for all connected devices
                 ensureLocationSyncRunning()
@@ -408,21 +409,30 @@ constructor(
                     DeviceConnectionState.Error(e.message ?: "Unknown error", isRecoverable = true),
                 )
             } finally {
-                locationCollector.unregisterDevice(macAddress)
-                val (managedConnection, _) = connectionManager.removeConnection(macAddress)
+                val (managedConnection, removedJob) =
+                    syncJob?.let { job ->
+                        connectionManager.removeConnectionIfMatches(macAddress, job)
+                    } ?: (null to null)
+                if (removedJob != null) {
+                    locationCollector.unregisterDevice(macAddress)
+                }
                 (managedConnection ?: activeConnection)?.disconnect()
 
                 // We don't cancel the job here as this finally block runs IN that job
                 // or if the job was cancelled externally.
                 // The connection removal ensures future lookups don't find it.
-                _presentDevices.update { it - macAddress }
+                if (removedJob != null) {
+                    _presentDevices.update { it - macAddress }
+                }
 
-                val state = getDeviceState(macAddress)
-                if (
-                    state is DeviceConnectionState.Connected ||
-                        state is DeviceConnectionState.Syncing
-                ) {
-                    updateDeviceState(macAddress, DeviceConnectionState.Disconnected)
+                if (removedJob != null) {
+                    val state = getDeviceState(macAddress)
+                    if (
+                        state is DeviceConnectionState.Connected ||
+                            state is DeviceConnectionState.Syncing
+                    ) {
+                        updateDeviceState(macAddress, DeviceConnectionState.Disconnected)
+                    }
                 }
             }
         }
@@ -442,9 +452,9 @@ constructor(
     ): String? {
         Log.info(tag = TAG) { "Performing initial setup for ${device.macAddress}" }
 
-        val capabilities = connection.camera.vendor.getCapabilities()
+        val syncCapabilities = connection.camera.vendor.getSyncCapabilities()
 
-        if (capabilities.supportsDeviceName) {
+        if (syncCapabilities.supportsDeviceName) {
             try {
                 val deviceName = connection.camera.vendor.getPairedDeviceName(deviceNameProvider)
                 connection.setPairedDeviceName(deviceName)
@@ -469,7 +479,7 @@ constructor(
         val gattSpec = connection.camera.vendor.gattSpec
         val usesUnifiedPacket =
             gattSpec.dateTimeCharacteristicUuid == gattSpec.locationCharacteristicUuid
-        val shouldSyncDateTime = capabilities.supportsDateTimeSync && !usesUnifiedPacket
+        val shouldSyncDateTime = syncCapabilities.supportsDateTimeSync && !usesUnifiedPacket
         if (shouldSyncDateTime) {
             try {
                 connection.syncDateTime(ZonedDateTime.now())
@@ -480,14 +490,14 @@ constructor(
                     "Failed to sync date time for ${device.macAddress}"
                 }
             }
-        } else if (capabilities.supportsDateTimeSync && usesUnifiedPacket) {
+        } else if (syncCapabilities.supportsDateTimeSync && usesUnifiedPacket) {
             Log.debug(tag = TAG) {
                 "Skipping initial date/time sync for ${device.macAddress} - " +
                     "camera uses unified time+location packets, will sync with first location update"
             }
         }
 
-        if (capabilities.supportsGeoTagging) {
+        if (syncCapabilities.supportsGeoTagging) {
             try {
                 connection.setGeoTaggingEnabled(true)
             } catch (e: CancellationException) {
@@ -500,7 +510,7 @@ constructor(
         }
 
         var firmwareVersion: String? = null
-        if (capabilities.supportsFirmwareVersion) {
+        if (syncCapabilities.supportsFirmwareVersion) {
             try {
                 firmwareVersion = connection.readFirmwareVersion()
                 pairedDevicesRepository.updateFirmwareVersion(device.macAddress, firmwareVersion)
@@ -520,8 +530,9 @@ constructor(
      * Stops synchronization for a specific device.
      *
      * @param macAddress The MAC address of the device to stop syncing.
+     * @param awaitCompletion When true, waits for the sync job to finish before returning.
      */
-    suspend fun stopDeviceSync(macAddress: String) {
+    suspend fun stopDeviceSync(macAddress: String, awaitCompletion: Boolean = false) {
         val upperMacAddress = macAddress.uppercase()
 
         // Stop location updates first
@@ -531,7 +542,11 @@ constructor(
         val (connection, job) = connectionManager.removeConnection(upperMacAddress)
         connection?.disconnect()
         job?.cancel()
+        if (awaitCompletion) {
+            job?.join()
+        }
 
+        _presentDevices.update { it - upperMacAddress }
         updateDeviceState(upperMacAddress, DeviceConnectionState.Disconnected)
     }
 
@@ -699,7 +714,7 @@ constructor(
         connection: CameraConnection,
         location: GpsLocation,
     ) {
-        if (!connection.camera.vendor.getCapabilities().supportsLocationSync) return
+        if (!connection.supportsLocationSync()) return
         try {
             connection.syncLocation(location)
             val now = System.currentTimeMillis()

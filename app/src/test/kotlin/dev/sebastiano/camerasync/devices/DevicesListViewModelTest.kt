@@ -5,6 +5,7 @@ import dev.sebastiano.camerasync.CameraSyncApp
 import dev.sebastiano.camerasync.domain.model.PairedDevice
 import dev.sebastiano.camerasync.fakes.FakeBatteryOptimizationChecker
 import dev.sebastiano.camerasync.fakes.FakeBluetoothBondingChecker
+import dev.sebastiano.camerasync.fakes.FakeIntentFactory
 import dev.sebastiano.camerasync.fakes.FakeIssueReporter
 import dev.sebastiano.camerasync.fakes.FakeKhronicleLogger
 import dev.sebastiano.camerasync.fakes.FakeLocationRepository
@@ -38,7 +39,7 @@ class DevicesListViewModelTest {
     private lateinit var bluetoothBondingChecker: FakeBluetoothBondingChecker
     private lateinit var batteryOptimizationChecker: FakeBatteryOptimizationChecker
     private lateinit var issueReporter: FakeIssueReporter
-    private lateinit var intentFactory: dev.sebastiano.camerasync.fakes.FakeIntentFactory
+    private lateinit var intentFactory: FakeIntentFactory
     private lateinit var viewModel: DevicesListViewModel
     private val testDispatcher = UnconfinedTestDispatcher()
 
@@ -56,7 +57,7 @@ class DevicesListViewModelTest {
         bluetoothBondingChecker = FakeBluetoothBondingChecker()
         batteryOptimizationChecker = FakeBatteryOptimizationChecker()
         issueReporter = FakeIssueReporter()
-        intentFactory = dev.sebastiano.camerasync.fakes.FakeIntentFactory()
+        intentFactory = FakeIntentFactory()
 
         viewModel =
             DevicesListViewModel(

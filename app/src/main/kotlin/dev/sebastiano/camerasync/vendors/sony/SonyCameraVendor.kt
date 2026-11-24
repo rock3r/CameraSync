@@ -4,11 +4,25 @@ import android.bluetooth.le.ScanFilter
 import android.companion.BluetoothLeDeviceFilter
 import android.companion.DeviceFilter
 import android.os.ParcelUuid
-import dev.sebastiano.camerasync.domain.vendor.CameraCapabilities
+import com.juul.kable.Peripheral
+import dev.sebastiano.camerasync.domain.model.Camera
+import dev.sebastiano.camerasync.domain.vendor.AdvancedShootingCapabilities
+import dev.sebastiano.camerasync.domain.vendor.AutofocusCapabilities
+import dev.sebastiano.camerasync.domain.vendor.BatteryMonitoringCapabilities
 import dev.sebastiano.camerasync.domain.vendor.CameraGattSpec
 import dev.sebastiano.camerasync.domain.vendor.CameraProtocol
 import dev.sebastiano.camerasync.domain.vendor.CameraVendor
+import dev.sebastiano.camerasync.domain.vendor.ConnectionModeSupport
+import dev.sebastiano.camerasync.domain.vendor.ImageBrowsingCapabilities
+import dev.sebastiano.camerasync.domain.vendor.ImageControlCapabilities
+import dev.sebastiano.camerasync.domain.vendor.LiveViewCapabilities
+import dev.sebastiano.camerasync.domain.vendor.RemoteCaptureCapabilities
+import dev.sebastiano.camerasync.domain.vendor.RemoteControlCapabilities
+import dev.sebastiano.camerasync.domain.vendor.RemoteControlDelegate
+import dev.sebastiano.camerasync.domain.vendor.StorageMonitoringCapabilities
+import dev.sebastiano.camerasync.domain.vendor.SyncCapabilities
 import dev.sebastiano.camerasync.domain.vendor.VendorConnectionDelegate
+import dev.sebastiano.camerasync.domain.vendor.VideoRecordingCapabilities
 import java.util.regex.Pattern
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
@@ -77,6 +91,11 @@ object SonyCameraVendor : CameraVendor {
 
     override fun createConnectionDelegate(): VendorConnectionDelegate = SonyConnectionDelegate()
 
+    override fun createRemoteControlDelegate(
+        peripheral: Peripheral,
+        camera: Camera,
+    ): RemoteControlDelegate = SonyRemoteControlDelegate(peripheral, camera)
+
     /** Checks if the manufacturer data indicates a Sony camera. */
     private fun isSonyCamera(manufacturerData: Map<Int, ByteArray>): Boolean {
         val sonyData = manufacturerData[SONY_MANUFACTURER_ID] ?: return false
@@ -103,14 +122,80 @@ object SonyCameraVendor : CameraVendor {
     /** Minimum protocol version that requires DD30/DD31 unlock sequence. */
     const val PROTOCOL_VERSION_REQUIRES_UNLOCK = 65
 
-    override fun getCapabilities(): CameraCapabilities {
-        return CameraCapabilities(
-            supportsFirmwareVersion = true, // Standard DIS
-            supportsDeviceName = false, // Setting device name is not standard for Sony via BLE
+    override fun getRemoteControlCapabilities(): RemoteControlCapabilities {
+        return RemoteControlCapabilities(
+            connectionModeSupport =
+                ConnectionModeSupport(bleOnlyShootingSupported = true, wifiAddsFeatures = true),
+            batteryMonitoring =
+                BatteryMonitoringCapabilities(
+                    supported = true,
+                    supportsMultiplePacks = true,
+                    supportsPowerSourceDetection = true,
+                ),
+            storageMonitoring =
+                StorageMonitoringCapabilities(
+                    supported = true,
+                    supportsMultipleSlots = true,
+                    supportsVideoCapacity = true,
+                ),
+            remoteCapture =
+                RemoteCaptureCapabilities(
+                    supported = true,
+                    requiresWifi = false, // Works via BLE FF01
+                    supportsHalfPressAF = true,
+                    supportsTouchAF = true, // Wi-Fi only
+                    supportsBulbMode = true,
+                    supportsManualFocus = true,
+                    supportsZoom = true,
+                    supportsAELock = true, // Wi-Fi only
+                    supportsFELock = true, // Wi-Fi only
+                    supportsAWBLock = true, // Wi-Fi only
+                    supportsCustomButtons = true,
+                ),
+            advancedShooting =
+                AdvancedShootingCapabilities(
+                    supported = true,
+                    requiresWifi = true, // PTP/IP properties
+                    supportsExposureModeReading = true,
+                    supportsDriveModeReading = true,
+                    supportsSelfTimer = true,
+                    supportsProgramShift = true,
+                    supportsExposureCompensation = true,
+                ),
+            videoRecording =
+                VideoRecordingCapabilities(
+                    supported = true,
+                    requiresWifi = false, // BLE toggle
+                ),
+            liveView =
+                LiveViewCapabilities(
+                    supported = true,
+                    requiresWifi = true,
+                    supportsPostView = true,
+                ),
+            autofocus = AutofocusCapabilities(supported = true, supportsFocusStatusReading = true),
+            imageControl = ImageControlCapabilities(supported = false), // Not supported
+            imageBrowsing =
+                ImageBrowsingCapabilities(
+                    supported = true,
+                    supportsThumbnails = true,
+                    supportsPreview = true,
+                    supportsFullDownload = true,
+                    supportsExifReading = true,
+                    supportsPushTransfer = true,
+                    supportsDownloadResume = true,
+                ),
+        )
+    }
+
+    override fun getSyncCapabilities(): SyncCapabilities {
+        return SyncCapabilities(
+            supportsFirmwareVersion = true,
+            supportsDeviceName = false,
             supportsDateTimeSync = true,
-            supportsGeoTagging = false, // No separate toggle; location data includes time
+            supportsGeoTagging = false,
             supportsLocationSync = true,
-            requiresVendorPairing = true, // Sony requires writing to EE01 characteristic
+            requiresVendorPairing = true,
             supportsHardwareRevision = true,
         )
     }

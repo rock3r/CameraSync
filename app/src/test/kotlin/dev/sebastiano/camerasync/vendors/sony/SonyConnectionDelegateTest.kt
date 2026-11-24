@@ -6,6 +6,7 @@ import com.juul.kable.DiscoveredService
 import com.juul.kable.Peripheral
 import dev.sebastiano.camerasync.domain.model.Camera
 import dev.sebastiano.camerasync.domain.model.GpsLocation
+import dev.sebastiano.camerasync.testutils.WriteRecorder
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
@@ -430,28 +431,6 @@ class SonyConnectionDelegateTest {
     }
 
     // ==================== Helpers ====================
-
-    /** Records BLE writes for later assertion. Avoids MockK's `match` limitations. */
-    private class WriteRecorder {
-        private val writes = mutableListOf<Pair<Uuid, ByteArray>>()
-
-        fun record(char: Characteristic, data: ByteArray) {
-            writes.add(char.characteristicUuid to data.copyOf())
-        }
-
-        fun hasWriteTo(charUuid: Uuid): Boolean = writes.any { it.first == charUuid }
-
-        fun hasWriteToWithData(charUuid: Uuid, data: ByteArray): Boolean =
-            writes.any { it.first == charUuid && it.second.contentEquals(data) }
-
-        fun dataWrittenTo(charUuid: Uuid): ByteArray? =
-            writes.lastOrNull { it.first == charUuid }?.second
-
-        fun countWritesWithData(charUuid: Uuid, data: ByteArray): Int =
-            writes.count { it.first == charUuid && it.second.contentEquals(data) }
-
-        fun getAllWrites(): List<Pair<Uuid, ByteArray>> = writes.toList()
-    }
 
     private fun createCamera(protocolVersion: Int? = null): Camera {
         val metadata = buildMap {

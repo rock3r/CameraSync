@@ -10,24 +10,15 @@ to the camera AP.
 
 ## 4.1. Enabling Camera WLAN (BLE Command)
 
-Before connecting to Wi-Fi, you may need to turn on the camera's WLAN function via BLE:
+Before connecting to Wi-Fi, turn on the camera's WLAN via the **WLAN Control Command** service
+`F37F568F-9071-445D-A938-5441F2E82399`.
 
-**Command Characteristic:** `A3C51525-DE3E-4777-A1C2-699E28736FCF`
-
-**WLAN Control Command Model:**
-
-```dart
-WLANControlCommandModel(
-  networkType: String,  // "wifi"
-  wlanFreq: int         // 0=2.4GHz, 1=5GHz
-)
-```
+**Network Type Characteristic:** `9111CDD0-9F01-45C4-A2D4-E09E8FB0424D`
 
 **Write Operation:**
 
-1. Serialize command to bytes
-2. Write to characteristic
-3. Wait for notification confirming WLAN enabled
+1. Write `1` to enable AP mode (write `0` to disable).
+2. Wait for the next camera/shooting notification to confirm state (or poll readback).
 
 **Error Cases:**
 
@@ -44,17 +35,16 @@ WLANControlCommandModel(
 
 ## 4.2. Getting Credentials (BLE)
 
-You need the SSID and Password.
+You can read credentials directly from the WLAN Control Command service:
 
-**Wi-Fi Config Characteristic:** `5f0a7ba9-ae46-4645-abac-58ab2a1f4fe4`
+- **SSID:** `90638E5A-E77D-409D-B550-78F7E1CA5AB4` (UTF-8 string)
+- **Passphrase:** `0F38279C-FE9E-461B-8596-81287E8C9A81` (UTF-8 string)
+- **Channel:** `51DE6EBC-0F22-4357-87E4-B1FA1D385AB8` (0=Auto, 1-11)
 
 **Read Operation:**
 
-1. Read characteristic value
-2. Parse response for SSID and password
-
-**Response Format (presumed):**
-The characteristic likely returns WiFi credentials in a structured format (binary or JSON). Reverse engineering (e.g., BLE sniffing) may be required to parse it. It likely contains the `ssid` and `password` fields similar to the HTTP `/v1/props` response.
+1. Read SSID and Passphrase characteristics.
+2. Optionally read channel (if you need a fixed channel hint).
 
 **Fallback Strategy (Manual Connection):**
 If the BLE credential read fails or is unimplemented:
@@ -71,15 +61,14 @@ If the BLE credential read fails or is unimplemented:
 
 ---
 
-## 4.3. WLAN Frequency Settings
+## 4.3. WLAN Channel Settings
 
-The camera supports different frequency bands:
+The WLAN Control Command service exposes a **Channel** characteristic (`51DE6EBC`):
 
-* **2.4 GHz** - Better compatibility, longer range
-* **5 GHz** - Faster speeds, less interference
+- `0` = Auto
+- `1`–`11` = specific channel
 
-The `wlan_frequency` parameter is stored in the device database and can be changed via camera
-settings.
+The camera still negotiates 2.4 GHz Wi-Fi; no public BLE characteristic exposes a 5 GHz toggle.
 
 ---
 
@@ -114,6 +103,8 @@ The official app explicitly handles a "WPA3 Transition Mode" issue.
 
 1. Try connection with `securityType` (WPA2 or WPA3).
 2. If `onUnavailable` fires, **retry immediately** with the *other* security type.
+
+**GR II note:** GR II only supports 20 MHz 802.11n; real-world throughput tops out around 65 Mbps.
 
 ---
 

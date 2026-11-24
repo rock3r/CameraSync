@@ -3,8 +3,8 @@
 Battery level is read and notified over BLE. Sufficient battery is required for firmware updates and
 can affect file transfer and connection steps.
 
-**BLE Characteristic:** `FE3A32F8-A189-42DE-A391-BC81AE4DAA76` (Battery/Info) — Read and Notify.  
-**Model:** `BatteryLevelModel(level: int)` — 0–100 percentage.
+**BLE Characteristic:** `875FC41D-4980-434C-A653-FD4A4D4410C4` — Read and Notify.  
+**Model:** `BatteryLevelModel(level: int, used: int)` — 0–100 percentage, plus power source (`0` = battery, `1` = AC adapter).
 
 ---
 
